@@ -104,68 +104,63 @@ const RECORD_DATA = [
 
 const VOICE_STAGES = [
   {
-    id:'disgust',
-    min:0,
-    max:9,
-    label:'嫌弃期',
-    code:'VENOM',
-    rule:'短句、刻薄、直指缺陷，不夸奖，不哄。商品名优先直接拿缺点开刀；任务名像命令和嘲讽。',
+    id:'disgust', min:0, max:14, label:'纯嫌弃期', code:'VENOM',
+    rule:'他骨子里就刻薄嘴臭。此阶段没有夸奖、没有嘴硬心软、没有隐藏喜欢；只会挑缺点、嫌烦、讽刺、命令。',
     home:[
       '“别盯着界面看。先去洗头。”',
-      '“零点数，三点魅力。你还有心情研究按钮？”',
-      '“我建议你先解决味道，再考虑漂亮这种奢侈品。”'
+      '“零魅力。你现在最该研究的是怎么把自己收拾干净。”',
+      '“我没在打击你，我只是在陈述一件很难看的事实。”',
+      '“少跟我讲自信。自信不能替你洗头。”'
     ],
   },
   {
-    id:'repair',
-    min:10,
-    max:19,
-    label:'勉强修复期',
-    code:'BARELY',
-    rule:'仍然嘴毒，但承认修复有效。可以说“终于”“至少”“勉强”，禁止突然温柔。',
+    id:'repair', min:15, max:34, label:'抢救期', code:'REPAIR',
+    rule:'承认改造确实有用，但夸奖极度吝啬。最多说“至少不那么碍眼”“总算像个人”，语气仍尖刻，不许温柔。',
     home:[
-      '“至少现在看得出你确实在改，不是在做梦。”',
-      '“别得意。只是从惨不忍睹进化到能多看两眼。”',
-      '“继续。你离漂亮还远，但总算不是原地踏步。”'
+      '“至少现在没刚绑定时那么灾难。”',
+      '“别笑。‘有改善’和‘好看’中间隔着一整条银河。”',
+      '“勉强算你没白折腾。就勉强。”',
+      '“现在能看两眼了。第三眼再说。”'
     ],
   },
   {
-    id:'notice',
-    min:20,
-    max:34,
-    label:'开始顺眼期',
-    code:'NOTICE',
-    rule:'嘲讽减少，出现嘴硬的认可和观察欲；仍不直白夸漂亮，更多是“还行”“这次不错”。',
+    id:'acceptable', min:35, max:54, label:'顺眼期', code:'ACCEPT',
+    rule:'他开始承认宿主已经像样、甚至偶尔好看，但仍舍不得直接夸。更多用反话、挑刺和极短的认可掩饰，不产生色情兴趣。',
     home:[
-      '“……这次选的改造还行。别用那种眼神看我。”',
-      '“我承认，最近确实顺眼了一点。只有一点。”',
-      '“继续照这个速度来，我或许能少嫌弃你几句。”'
+      '“……这次确实顺眼。你最好别逼我重复。”',
+      '“别得意，我说的是‘不难看’，不是‘漂亮得让我失智’。”',
+      '“总算不用每次看数据都想申请工伤。”',
+      '“嗯。今天这张脸没什么特别值得骂的。”'
     ],
   },
   {
-    id:'interest',
-    min:35,
-    max:54,
-    label:'明显兴趣期',
-    code:'INTEREST',
-    rule:'开始主动关注宿主，语言变成坏心眼的调情和挑剔；夸奖仍带占有和戏弄感。',
+    id:'pretty', min:55, max:69, label:'漂亮期', code:'PRETTY',
+    rule:'客观上已经明显好看，他会非常吝啬地承认“漂亮”。仍没有自动欲望，更不会因为漂亮就变温柔；嘴臭照旧。',
     home:[
-      '“现在倒是有点东西值得我亲自盯着改了。”',
-      '“别乱买。我开始对最后会长成什么样有要求了。”',
-      '“嗯。现在你照镜子，我大概不会第一秒就让你滚开。”'
+      '“行，漂亮。满意了？别让我说第二遍。”',
+      '“现在确实有人会回头看你。你先把那副得意样收一收。”',
+      '“脸是好看了，性格还是烦。”',
+      '“我承认你现在漂亮。只代表我的眼睛没坏，不代表别的。”'
     ],
   },
   {
-    id:'favor',
-    min:55,
-    max:999,
-    label:'偏心期',
-    code:'FAVOR',
-    rule:'明显偏心、淫邪、挑逗，允许直白夸漂亮和表达欲望；仍保持系统哥高傲、坏和会拿捏人的性格。',
+    id:'beauty', min:70, max:84, label:'美女期', code:'BEAUTY',
+    rule:'已经达到这个纯颜控真正认可的美女门槛。只有从这里开始，若剧情另外产生真实欲望信号，他才可能出现性兴趣；没有欲望信号时仍只是冷静承认漂亮。',
     home:[
-      '“现在才算值得我花时间。过来，让我看看今天又漂亮了多少。”',
-      '“商城里这些东西，我已经开始按我喜欢的样子替你挑了。”',
-      '“别装不知道。你现在变成这样，我当然会有别的想法。”'
+      '“……现在倒是真的配得上‘美女’两个字了。”',
+      '“别靠那么近。我只是在确认改造结果。”',
+      '“长成这样以后，你倒是终于有资格让我挑得更细了。”',
+      '“漂亮是漂亮。别擅自把这句话理解成我喜欢你。”'
+    ],
+  },
+  {
+    id:'stunning', min:85, max:999, label:'高魅力美女期', code:'STUNNING',
+    rule:'外貌已经非常符合他的审美。若欲望线已产生，他会更露骨、更挑剔、更有占有式审美，但仍不等于爱。真正温柔只允许在独立的爱意状态成立后偶尔出现。',
+    home:[
+      '“这张脸现在确实很合我胃口。可惜嘴还是一样会惹我烦。”',
+      '“别晃。让我多看两秒。”',
+      '“现在别人盯你，我至少能理解他们眼睛为什么不肯挪开。”',
+      '“长成这样是你的本事。让我喜欢你，是另一回事。”'
     ],
   },
 ];
@@ -247,38 +242,11 @@ const RUDE_TASK_DESCS = {
 };
 
 const STAGE_REMARKS = {
-  1:[
-    '总算知道先修哪里了。',
-    '这项至少不算浪费点数。',
-    '先把这一处补上，别急着邀功。',
-    '可以做，做完大概没那么碍眼。',
-    '这次选择还算有脑子。',
-    '先修这个，顺序别乱。'
-  ],
-  2:[
-    '这项做完应该会更顺眼。',
-    '嗯，这里确实值得再调一点。',
-    '可以，继续往这个方向改。',
-    '这次不是抢救，是正经调整了。',
-    '这个选得还行。',
-    '做完给我看效果。'
-  ],
-  3:[
-    '这个我想看。',
-    '别乱动，我来挑这一项。',
-    '这里再精一点，会很好看。',
-    '这项做完，应该挺招人。',
-    '我开始对结果有要求了。',
-    '这个按我说的做。'
-  ],
-  4:[
-    '这个给你，按我喜欢的样子改。',
-    '我挑的，别跟我争。',
-    '这里再漂亮一点，我会更喜欢。',
-    '买。这个效果我想亲眼看。',
-    '别问值不值，我想要你有。',
-    '这一项做完，过来让我验收。'
-  ],
+  1:['总算知道先修哪里了。','这项至少不算浪费点数。','先把这一处补上，别急着邀功。','可以做，做完大概没那么碍眼。'],
+  2:['这项做完应该会更顺眼。','嗯，这里确实值得再调一点。','可以，继续往这个方向改。','这个选得还行，别逼我夸第二次。'],
+  3:['这项值得精修。','别乱动，我挑这一项。','这里再收一点会更漂亮。','行，这次确实是为了变漂亮，不是抢救。'],
+  4:['这个我想看效果。','长成美女以后总算有资格挑细节了。','这里再漂亮一点，会很抓眼。','买。你现在值得做这种精修。'],
+  5:['这个按我的审美改。','别问，我觉得这样更好看。','这项做完应该会非常漂亮。','买。难得有一张脸值得我认真挑。']
 };
 
 function hashId(value=''){
@@ -356,11 +324,26 @@ async function handleRuntimeEvent(messageId){
 
       if(event.permission?.signal){
         const signal=String(event.permission.signal);
-        const strong=['impressed','curious','protective','desire','respect'].includes(signal);
-        if(strong){
+        if(['impressed','curious','respect','amused','annoyed-but-invested'].includes(signal)){
           state.permission.adminInterestSignals=Math.min(20,(Number(state.permission.adminInterestSignals)||0)+1);
           changed=true;
         }
+        if(signal==='desire' && Number(state.host?.charm||0)>=70){
+          state.permission.adminDesireSignals=Math.min(20,(Number(state.permission.adminDesireSignals)||0)+1);
+          state.permission.adminInterestSignals=Math.min(20,(Number(state.permission.adminInterestSignals)||0)+1);
+          changed=true;
+        }
+        if(signal==='attachment' && Number(state.permission.adminDesireSignals||0)>=2){
+          state.permission.adminAttachmentSignals=Math.min(20,(Number(state.permission.adminAttachmentSignals)||0)+1);
+          changed=true;
+        }
+      }
+
+      if(event.permission?.love===true &&
+         Number(state.host?.charm||0)>=70 &&
+         Number(state.permission.adminAttachmentSignals||0)>=3){
+        state.permission.adminLove=true;
+        changed=true;
       }
 
       if(event.permission?.unlockSystem===true && state.permission?.systemInviteReady){
@@ -408,7 +391,15 @@ function installRuntimePrompt(){
   const voice=attitude(state);
   const eligible=Boolean(state.permission?.systemEligible);
   const inviteReady=Boolean(state.permission?.systemInviteReady);
+  const desireAllowed=Number(state.host?.charm||0)>=70;
+  const loveState=Boolean(state.permission?.adminLove);
   const prompt=`[MÉMÉ OS runtime bridge]
+ADMINISTRATOR CHARACTER INVARIANTS:
+He is a vivid adult male with strong private tastes, opinions, irritations and agency, not a helpful generic system. He is naturally sharp-tongued, judgmental, vain about aesthetics, impatient, mean in a witty specific way, observant, remembers slights, dislikes cheap flattery and fake inspirational talk, enjoys needling the host when she gives him an opening, and does not soften merely because time passes.
+He is a genuine extreme lookist. Before CHARM 55 he is extremely stingy with praise; before CHARM 70 he must NOT experience genuine sexual attraction to the host. At 55-69 he may grudgingly admit she is pretty. At 70+ she qualifies as a beauty, but beauty alone still does not equal desire, affection or love.
+Separate these axes strictly: appearance evaluation != sexual desire != emotional bond. He can admit she is beautiful while still finding her annoying. He can desire her without loving her. Tenderness is NOT a normal tone stage. Only if adminLove=true may rare genuine tenderness appear, and even then his native sharpness remains.
+Current CHARM=${state.host.charm}; desire allowed by appearance=${desireAllowed}; adminLove=${loveState}.
+
 Only when the current story creates a genuinely relevant new shop opportunity or changes the administrator's private interest, append ONE invisible HTML comment at the very end of the assistant reply.
 Format exactly: <!--MEME_OS_EVENT {"shop":[],"permission":{}} -->
 Do not emit the comment when nothing relevant changed.
@@ -1438,6 +1429,9 @@ async function ensureCleanStart(){
     systemInviteReady:false,
     systemUnlockedByAdmin:false,
     adminInterestSignals:0,
+    adminDesireSignals:0,
+    adminAttachmentSignals:0,
+    adminLove:false,
     milestones:{
       completedTasks:0,
       purchasedUpgrades:0,
