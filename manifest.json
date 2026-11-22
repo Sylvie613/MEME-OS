@@ -1,0 +1,14 @@
+{
+  "display_name": "MÉMÉ OS",
+  "loading_order": 50,
+  "requires": [],
+  "optional": [],
+  "dependencies": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "Sylvie & River",
+  "version": "0.1.0",
+  "homePage": "https://github.com/Sylvie613/MEME-OS",
+  "auto_update": false,
+  "minimum_client_version": "1.12.0"
+}
