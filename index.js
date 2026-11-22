@@ -12,7 +12,7 @@ import { appendToInput, removeFromInput } from './src/input.js?v=0.7.1';
 import { isBoundCharacter } from './src/binding.js?v=0.7.1';
 
 /**
- * MÉMÉ OS v0.7.1
+ * MÉMÉ OS v0.7.2
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -305,11 +305,34 @@ const RUDE_TASK_NAMES = {
 };
 
 const CHARM_GAIN = {
-  lip1:1,hair1:1,skin1:2,face1:2,eye1:2,face2:3,
-  posture1:1,bodyfat1:2,waist1:2,leg1:1,neck1:1,bust1:2,
-  scent1:1,breath1:1,voice1:1,touch1:1,scent2:2,
-  sensitive1:0,arousal1:0,lubrication1:0,orgasm1:0,recovery1:0,
-  charmseal:3,
+  // Small cleanup / polish: +0.25
+  lip1:0.25,
+  hair1:0.25,
+  skin1:0.25,
+  posture1:0.25,
+  leg1:0.25,
+  neck1:0.25,
+  scent1:0.25,
+  breath1:0.25,
+  voice1:0.25,
+  touch1:0.25,
+
+  // Noticeable structural / attraction upgrades: +0.5
+  face1:0.5,
+  eye1:0.5,
+  face2:0.5,
+  bodyfat1:0.5,
+  waist1:0.5,
+  bust1:0.5,
+  scent2:0.5,
+  charmseal:0.5,
+
+  // Adult-response upgrades change experience, not outward CHARM.
+  sensitive1:0,
+  arousal1:0,
+  lubrication1:0,
+  orgasm1:0,
+  recovery1:0,
 };
 
 const REQUIRE_UPGRADE = {
@@ -1198,6 +1221,49 @@ async function handleMessageSent(messageId){
   }
 }
 
+async function migratePendingCharmGains(){
+  const state=runtimeState();
+  if(!Array.isArray(state.pending) || !state.pending.length) return;
+
+  const textarea=document.querySelector('#send_textarea');
+  let changed=false;
+
+  for(const action of state.pending){
+    const id=action.effect?.purchase?.id;
+    if(!id || !(id in CHARM_GAIN)) continue;
+
+    const desired=Number(CHARM_GAIN[id]||0);
+    const current=Number(action.effect?.charmDelta||0);
+    if(current===desired) continue;
+
+    const oldText=action.text || '';
+    action.effect.charmDelta=desired;
+
+    const replaceCharm=(value)=>{
+      if(/CHARM \+[0-9.]+/.test(value)){
+        return value.replace(/CHARM \+[0-9.]+/, desired>0 ? `CHARM +${desired}` : '').replace(/；；/g,'；');
+      }
+      return value;
+    };
+
+    action.text=replaceCharm(action.text || '');
+    action.summary=replaceCharm(action.summary || '');
+
+    if(textarea && oldText && textarea.value.includes(oldText)){
+      textarea.value=textarea.value.replace(oldText,action.text);
+      textarea.dispatchEvent(new Event('input',{bubbles:true}));
+    }
+
+    changed=true;
+  }
+
+  if(changed){
+    await saveState(state);
+    renderView(currentView(),false);
+    globalThis.toastr?.info?.('“我把魅力涨幅重算了。别想买两件东西就飞升。”');
+  }
+}
+
 async function maybeGrantTestAP(){
   if(!isBoundCharacter() || !hasActiveChat()) return;
   const state=runtimeState();
@@ -1225,7 +1291,11 @@ function bindSillyTavernEvents(){
   const events=context?.event_types || context?.eventTypes || {};
   if(!source?.on) return;
   if(events.MESSAGE_SENT) source.on(events.MESSAGE_SENT,handleMessageSent);
-  if(events.CHAT_CHANGED) source.on(events.CHAT_CHANGED,async()=>{renderView('home',false);await maybeGrantTestAP();});
+  if(events.CHAT_CHANGED) source.on(events.CHAT_CHANGED,async()=>{
+    renderView('home',false);
+    await migratePendingCharmGains();
+    await maybeGrantTestAP();
+  });
   globalThis.__meme_os_events_bound__=true;
 }
 
@@ -1364,7 +1434,10 @@ function start() {
   mount();
   ensureDialog();
   bindSillyTavernEvents();
-  setTimeout(()=>maybeGrantTestAP(),700);
+  setTimeout(async()=>{
+    await migratePendingCharmGains();
+    await maybeGrantTestAP();
+  },700);
   globalThis.__meme_os_probe_timer__ = setInterval(mount, 1000);
   window.addEventListener('resize', mount, { passive:true });
   window.addEventListener('orientationchange', () => setTimeout(mount,150), { passive:true });
