@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.8';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.8';
-import { isBoundCharacter } from './src/binding.js?v=0.10.8';
+} from './src/state.js?v=0.10.9';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.9';
+import { isBoundCharacter } from './src/binding.js?v=0.10.9';
 
 /**
- * MÉMÉ OS v0.10.8
+ * MÉMÉ OS v0.10.9
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -905,6 +905,13 @@ async function handleRuntimeEvent(messageId){
   state.shop=state.shop||{dynamic:[],plotTurn:0};
   state.shop.plotTurn=(Number(state.shop.plotTurn)||0)+1;
   state.shop.dynamic=(state.shop.dynamic||[]).filter(item=>Number(item.expiresTurn||0)>=state.shop.plotTurn);
+  state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
+  state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
+  state.tasks.generatedDaily=state.tasks.generatedDaily.filter(task=>{
+    const done=state.tasks.dailyCompleted?.[task.id];
+    if(!done) return true;
+    return Number(done.completedTurn||-1) >= Number(state.shop.plotTurn||0);
+  });
 
   const raw=String(message.mes||'');
   const allMatches=[...raw.matchAll(/<!--MEME_OS_EVENT\s+([\s\S]*?)-->/g)];
@@ -917,6 +924,22 @@ async function handleRuntimeEvent(messageId){
       const event=JSON.parse(match[1].trim());
 
       state.reactivity=state.reactivity||{recentChanges:[],recentIssues:[],recentReactions:[]};
+
+      if(Array.isArray(event.dailyTaskOffers)){
+        state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
+        state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
+        const openStatic=TASK_DATA.daily.filter(task=>!state.tasks.everCompleted?.[task.id]).length;
+        const openDynamic=state.tasks.generatedDaily.filter(task=>!state.tasks.everCompleted?.[task.id]).length;
+        const canGenerate=(openStatic+openDynamic)<3 && Number(state.tasks.lastGeneratedDailyTurn||0)!==Number(state.shop.plotTurn||0);
+        if(canGenerate){
+          const task=sanitizeGeneratedDailyTask(event.dailyTaskOffers[0],state);
+          if(task){
+            state.tasks.generatedDaily=[task,...state.tasks.generatedDaily.filter(old=>old.id!==task.id)].slice(0,8);
+            state.tasks.lastGeneratedDailyTurn=Number(state.shop.plotTurn)||0;
+            changed=true;
+          }
+        }
+      }
 
       if(Array.isArray(event.taskOffers)){
         state.tasks=state.tasks||{storyDay:1,active:{},generated:[],lastGeneratedDesireDay:0,completed:{},dailyCompleted:{},everCompleted:{}};
@@ -942,6 +965,12 @@ async function handleRuntimeEvent(messageId){
       if(Array.isArray(event.tasks)){
         for(const rawTask of event.tasks.slice(0,4)){
           if(settleTaskFromModel(state,rawTask,messageId)) changed=true;
+        }
+      }
+
+      if(Array.isArray(event.storyRewards)){
+        for(const rawReward of event.storyRewards.slice(0,2)){
+          if(settleStoryRewardFromModel(state,rawReward,messageId)) changed=true;
         }
       }
 
@@ -1002,7 +1031,7 @@ async function handleRuntimeEvent(messageId){
           type:'story_day',
           recordType:'system',
           title:`剧情进入 DAY ${String(state.tasks.storyDay).padStart(3,'0')}`,
-          summary:'新的一天开始，日常任务已重新开放。',
+          summary:'新的一天开始；未完成的旧日常挂起项已清理，任务板继续按剧情滚动。',
           text:'STORY DAY ADVANCED',
           committedAt:Date.now(),
         });
@@ -1253,10 +1282,23 @@ The naming right is intimate and relationship-gated, not a system-level reward. 
 After namingRightOffered=true, when the host clearly chooses a name for him, accept it only if he accepts the naming in visible prose, then append identity.name with exactly the chosen name. Once stored, use that name naturally thereafter. Never retroactively claim he had that name before the host gave it.
 Current namingRightOffered=${Boolean(state.system?.namingRightOffered)}; current assigned name=${state.system?.name||'NONE'}.
 
+RESOURCE SNAPSHOT — EXTENSION IS THE ONLY AUTHORITY:
+Current real AP=${Number(state.resources?.ap)||0}; current real SV=${Number(state.resources?.sv)||0}; current real CHARM=${Number(state.host?.charm)||0}.
+Spendable after pending reservations: AP=${getSpendableResources(state).ap}; SV=${getSpendableResources(state).sv}.
+If visible prose mentions a numeric AP/SV/CHARM balance, it MUST match this current snapshot exactly. Never reuse an older balance from chat history, never mentally add rewards, and never narrate a new numeric balance before the extension has actually settled it. If a plot-generated task/reward is needed, use the hidden event fields below and let the extension update the balance.
+
 STRUCTURED HOST STATE:
 CHARM is only the overall appearance score. Never infer that every body area improved from CHARM alone.
 Current body-axis levels: ${JSON.stringify(state.host?.body||{})}.
 Only describe a permanent physical improvement as already present when the matching body axis / purchased upgrade supports it. Unmodified areas stay at their established baseline.
+
+ROLLING DAILY / STORY TASK BOARD:
+Completed daily tasks are not permanent checklist items. A just-completed daily/story task may remain visible as crossed-out for the current assistant turn only; on the next assistant turn it leaves the board permanently. Completed starter dailies do not reopen tomorrow.
+Current open starter dailies: ${JSON.stringify(TASK_DATA.daily.filter(t=>!state.tasks?.everCompleted?.[t.id]).map(t=>({id:t.id,title:t.title,desc:t.desc})))}.
+Current generated daily/story tasks: ${JSON.stringify((state.tasks?.generatedDaily||[]).filter(t=>!state.tasks?.everCompleted?.[t.id]).map(t=>({id:t.id,title:t.title,desc:t.desc,difficulty:t.difficulty,source:t.source})))}.
+When the visible daily board has fewer than 3 unfinished tasks, you SHOULD create one context-fitting replacement through dailyTaskOffers if the current plot offers a sensible mundane, appearance, hygiene, movement, social-presentation or practical challenge. Do not regenerate an already completed task under a synonym.
+dailyTaskOffers entries: maximum 1; fields {title,desc,detail,source,difficulty}. difficulty is only light|normal|hard. Never choose or print the AP reward; the extension maps difficulty to the reward.
+If the current visible scene itself unexpectedly completes a sensible one-off system challenge that was not previously active, you MAY use storyRewards to let the extension recognize it retroactively. storyRewards entries: maximum 2; fields {title,evidence,source,difficulty}. Never put AP/SV numbers in storyRewards or visible prose; the extension calculates the real reward. Do not use storyRewards for trivial actions merely to farm AP.
 
 DYNAMIC DESIRE MISSION BOARD:
 Fixed desire tasks (spark/sample/oral/repeat/drain) are only the foundational milestones. MÉMÉ OS should continue creating many different one-time erotic missions over a long playthrough.
@@ -1336,10 +1378,12 @@ Do not emit a new relationship signal merely because a previous feeling continue
 Current CHARM=${state.host.charm}; desire allowed by appearance=${desireAllowed}; adminLove=${loveState}.
 
 Only when the current story creates a genuinely relevant MÉMÉ OS state update — tasks, shop, feedback, MEN, evolution, permission, identity, or timeline — append ONE invisible HTML comment at the very end of the assistant reply.
-Format exactly: <!--MEME_OS_EVENT {"taskOffers":[],"tasks":[],"shop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{},"timeline":{}} -->
+Format exactly: <!--MEME_OS_EVENT {"dailyTaskOffers":[],"taskOffers":[],"tasks":[],"storyRewards":[],"shop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{},"timeline":{}} -->
 Do not emit the comment when nothing relevant changed.
+dailyTaskOffers: maximum 1 new rolling daily/story task; fields title,desc,detail,source,difficulty(light|normal|hard). Never include id or reward values.
 taskOffers: maximum 1 new generated erotic mission; fields title,desc,detail,source. Never include tier, id or rewards.
-tasks: max 4 completed task entries; fields id,status("completed"),evidence. Never include rewards; the extension calculates them.
+tasks: max 4 completed ACTIVE task entries; fields id,status("completed"),evidence. Never include rewards; the extension calculates them.
+storyRewards: max 2 one-off plot tasks that visibly became complete without prior acceptance; fields title,evidence,source,difficulty(light|normal|hard). Never include AP/SV numbers.
 shop: maximum 2 temporary items. Each item fields: title,desc,detail,currency("AP"|"SV"),ttl(1-8),icon,source,bodyAxis(optional),sourceIssueId(optional). Never include id, price or charmGain; the extension assigns all three. bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
 feedback.issues: max 2, only direct story evidence; fields id,axis(optional),source,note,severity(low|medium|high).
 feedback.reactions: max 2, only directly observed reactions to established state/change; fields id,axis(optional),source,note,valence(negative|neutral|positive|sexual).
