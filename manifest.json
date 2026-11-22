@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.9.7",
+  "version": "0.9.8",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS: narrative task verification with immediate extension-side reward settlement in the same reply.",
-  "js": "index.js?v=0.9.7",
-  "css": "style.css?v=0.9.7",
+  "description": "MÉMÉ OS: administrator evolution line with Q-form visibility, limited adult embodiment and full autonomous manifestation.",
+  "js": "index.js?v=0.9.8",
+  "css": "style.css?v=0.9.8",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
