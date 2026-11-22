@@ -12,7 +12,7 @@ import { appendToInput, removeFromInput } from './src/input.js?v=0.9.6';
 import { isBoundCharacter } from './src/binding.js?v=0.9.6';
 
 /**
- * MÉMÉ OS v0.9.6
+ * MÉMÉ OS v0.9.7
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -467,6 +467,77 @@ const BOND_LOVE_TAGS = new Set([
   'sacrifice','personal_priority','vulnerability','future_choice','identity_choice',
 ]);
 
+function settleTaskFromModel(state,rawTask,messageId){
+  if(!rawTask || typeof rawTask!=='object') return false;
+  const id=String(rawTask.id||'').trim();
+  const status=String(rawTask.status||'').toLowerCase();
+  if(!id || status!=='completed') return false;
+
+  const task=findTask(id);
+  const active=state.tasks?.active?.[id];
+  if(!task || !active) return false;
+
+  const currentDay=Math.max(1,Number(state.tasks?.storyDay)||1);
+  if(task.category==='daily' && Number(active.storyDay||0)!==currentDay) return false;
+  if(task.category==='daily' && Number(state.tasks?.dailyCompleted?.[id]?.day||0)===currentDay) return false;
+  if(task.category!=='daily' && state.tasks?.completed?.[id]) return false;
+
+  const evidence=String(rawTask.evidence||'').replace(/\s+/g,' ').trim().slice(0,180);
+  if(!evidence) return false;
+
+  const historyId=`meme_task_verified_${messageId}_${id}`;
+  if((state.history||[]).some(entry=>entry.id===historyId)) return false;
+
+  const reward=taskReward(task);
+  const title=active.title || taskVoiceName(task,state);
+  const wasEverCompleted=Boolean(state.tasks?.everCompleted?.[id]);
+
+  state.resources.ap=Math.max(0,Number(state.resources.ap||0)+reward.ap);
+  state.resources.sv=Math.max(0,Number(state.resources.sv||0)+reward.sv);
+  delete state.tasks.active[id];
+
+  if(task.category==='daily'){
+    const previous=state.tasks.dailyCompleted?.[id]||{};
+    state.tasks.dailyCompleted[id]={
+      id,
+      title,
+      category:task.category,
+      day:currentDay,
+      count:Math.max(0,Number(previous.count)||0)+1,
+      evidence,
+      completedAt:Date.now(),
+    };
+  }else{
+    state.tasks.completed[id]={
+      id,
+      title,
+      category:task.category,
+      evidence,
+      completedAt:Date.now(),
+    };
+  }
+
+  state.tasks.everCompleted[id]={
+    id,
+    title,
+    category:task.category,
+    firstCompletedAt:state.tasks.everCompleted?.[id]?.firstCompletedAt||Date.now(),
+  };
+  if(!wasEverCompleted) state.permission.milestones.completedTasks+=1;
+
+  state.history.push({
+    id:historyId,
+    type:'task_complete',
+    recordType:'task',
+    title:`完成：${title}`,
+    summary:`任务「${title}」验收通过；AP +${reward.ap}${reward.sv?` / SV +${reward.sv}`:''}。证据：${evidence}`,
+    text:`TASK VERIFIED AND SETTLED: ${id}`,
+    committedAt:Date.now(),
+  });
+  if(state.history.length>240) state.history=state.history.slice(-240);
+  return true;
+}
+
 function normalizeBondReason(value){
   return String(value||'').replace(/\s+/g,' ').trim().slice(0,180);
 }
@@ -600,6 +671,12 @@ async function handleRuntimeEvent(messageId){
       const event=JSON.parse(match[1].trim());
 
       state.reactivity=state.reactivity||{recentChanges:[],recentIssues:[],recentReactions:[]};
+
+      if(Array.isArray(event.tasks)){
+        for(const rawTask of event.tasks.slice(0,4)){
+          if(settleTaskFromModel(state,rawTask,messageId)) changed=true;
+        }
+      }
 
       if(Array.isArray(event.feedback?.issues)){
         for(const rawIssue of event.feedback.issues.slice(0,2)){
