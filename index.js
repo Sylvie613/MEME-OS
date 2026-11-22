@@ -2130,7 +2130,7 @@ async function handleTaskAction(id){
 
   const voiced=taskVoiceName(task,state);
   const dayTag=task.category==='daily'?`DAY ${String(storyDay).padStart(3,'0')}｜`:'';
-  const text=`【MÉMÉ OS｜任务接取】${dayTag}TASK_ID:${task.id}｜「${voiced}」\n完成过程：`;
+  const text=`【MÉMÉ OS｜任务接取】${dayTag}TASK_ID:${task.id}｜「${voiced}」\n任务要求：${taskVoiceDesc(task,state)}\n完成过程：`;
 
   await queueAction(createPendingAction({
     type:'task_accept',
