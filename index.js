@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.6';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.6';
-import { isBoundCharacter } from './src/binding.js?v=0.10.6';
+} from './src/state.js?v=0.10.7';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.7';
+import { isBoundCharacter } from './src/binding.js?v=0.10.7';
 
 /**
- * MÉMÉ OS v0.10.6
+ * MÉMÉ OS v0.10.7
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -1619,18 +1619,45 @@ function findTask(id,state=runtimeState()){
 }
 
 function positionLauncher(button) {
-  const send = document.getElementById('send_but');
+  const width = 44;
+  const height = 40;
+  const gap = 18;
+  const viewportWidth = window.visualViewport?.width || window.innerWidth;
+  const viewportHeight = window.visualViewport?.height || window.innerHeight;
+  const viewportTop = window.visualViewport?.offsetTop || 0;
+  const viewportLeft = window.visualViewport?.offsetLeft || 0;
+
+  // Some mobile SillyTavern layouts leave a hidden/zero-size #send_but in the DOM.
+  // Never anchor the launcher to a zero-size or off-screen placeholder.
+  const candidates = [...document.querySelectorAll('[id="send_but"], #send_form button[type="submit"], #send_form .send_but')];
+  const send = candidates.find(el => {
+    const rect = el.getBoundingClientRect();
+    const style = getComputedStyle(el);
+    return style.display !== 'none'
+      && style.visibility !== 'hidden'
+      && rect.width >= 24
+      && rect.height >= 24
+      && rect.right > viewportLeft
+      && rect.left < viewportLeft + viewportWidth
+      && rect.bottom > viewportTop
+      && rect.top < viewportTop + viewportHeight;
+  });
+
   if (!send) {
+    button.style.left = 'auto';
+    button.style.top = 'auto';
     button.style.right = '18px';
     button.style.bottom = '112px';
     return;
   }
+
   const rect = send.getBoundingClientRect();
-  const width = 44;
-  const height = 40;
-  const gap = 18;
-  const left = Math.min(window.innerWidth - width - 10, rect.left + (rect.width - width) / 2 - 8);
-  const top = Math.max(8, rect.top - height - gap);
+  const minLeft = viewportLeft + 8;
+  const maxLeft = viewportLeft + viewportWidth - width - 8;
+  const desiredLeft = rect.left + (rect.width - width) / 2 - 8;
+  const left = Math.max(minLeft, Math.min(maxLeft, desiredLeft));
+  const top = Math.max(viewportTop + 8, rect.top - height - gap);
+
   button.style.left = left + 'px';
   button.style.top = top + 'px';
   button.style.right = 'auto';
