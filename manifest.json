@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS: strict lookist administrator, separated CHARM/desire/bond axes, richer persistent personality.",
-  "js": "index.js?v=0.8.1",
-  "css": "style.css?v=0.8.1",
+  "description": "MÉMÉ OS: vivid host/admin characterization with separated beauty, desire, bond and love axes.",
+  "js": "index.js?v=0.8.2",
+  "css": "style.css?v=0.8.2",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
