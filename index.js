@@ -7,9 +7,9 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.9.3';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.9.3';
-import { isBoundCharacter } from './src/binding.js?v=0.9.3';
+} from './src/state.js?v=0.9.4';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.9.4';
+import { isBoundCharacter } from './src/binding.js?v=0.9.4';
 
 /**
  * MÉMÉ OS v0.9.4
@@ -1718,8 +1718,8 @@ function systemMarkup() {
       ${labelValue('重生类','处理人生重启、身份与目标重构')}
       ${labelValue('事业类','处理成功、资源、竞争与社会跃迁')}
       ${labelValue('修仙类','处理修为、资源、境界与世界规则')}
-      ${labelValue('本次评价','第一次遇到开局审美灾难严重到让我不想交命名权的宿主')}
-      <p class="meme-men-rule-note">这里仍不会自动显示命名机制。只有“来自他的坦白”发生以后，命名权才会成为已公开事实。</p>
+      ${labelValue('本次评价','第一次遇到开局审美灾难严重到让我想申请换人的宿主')}
+      <p class="meme-men-rule-note">PRIVATE 也不是全知权限。还有些东西我没说，就是没打算现在给你看。</p>
     </section>
   ` : `
     <section class="meme-page-card">
