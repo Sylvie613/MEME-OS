@@ -16,6 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Check extension JavaScript syntax
+        run: |
+          node --check index.js
+          node --check src/state.js
       - name: Build PNG character card
         run: python3 scripts/build_card_png.py
       - name: Commit generated PNG
