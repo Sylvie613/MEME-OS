@@ -22,7 +22,7 @@ const DIALOG_ID = 'meme-os-dialog';
 const PREVIEW_STATE = {
   ap: 0,
   sv: 0,
-  charm: 3,
+  charm: 0,
   stage: '初始改造阶段',
   systemLevel: 1,
   systemForm: '意识体',
@@ -96,8 +96,8 @@ const SHOP_DATA = {
 };
 
 const RECORD_DATA = [
-  {type:'system',code:'BINDING',title:'MÉMÉ OS 绑定完成',desc:'随机宿主绑定成功。AP 0 / SV 0 / CHARM 3。'},
-  {type:'change',code:'SCAN',title:'首次宿主扫描',desc:'系统判定：明显难看 · 未改造。改造进度 0.3%。'},
+  {type:'system',code:'BINDING',title:'MÉMÉ OS 绑定完成',desc:'随机宿主绑定成功。AP 0 / SV 0 / CHARM 0。'},
+  {type:'change',code:'SCAN',title:'首次宿主扫描',desc:'系统判定：明显难看 · 未改造。改造进度 0%。'},
   {type:'system',code:'ADMIN',title:'管理员首次评价',desc:'“先去洗头。”'},
 ];
 
