@@ -7,9 +7,9 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.9.2';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.9.2';
-import { isBoundCharacter } from './src/binding.js?v=0.9.2';
+} from './src/state.js?v=0.9.3';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.9.3';
+import { isBoundCharacter } from './src/binding.js?v=0.9.3';
 
 /**
  * MÉMÉ OS v0.9.3
@@ -712,7 +712,7 @@ Do not decide CURRENT/RECENT/RETURNING yourself. The extension derives the bucke
 
 Current CHARM=${state.host.charm}; desire allowed by appearance=${desireAllowed}; adminLove=${loveState}.
 
-Only when the current story creates a genuinely relevant new shop opportunity or changes the administrator's private interest, append ONE invisible HTML comment at the very end of the assistant reply.
+Only when the current story creates a genuinely relevant MÉMÉ OS state update — shop, feedback, MEN, permission, identity, or timeline — append ONE invisible HTML comment at the very end of the assistant reply.
 Format exactly: <!--MEME_OS_EVENT {"shop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"permission":{},"identity":{},"timeline":{}} -->
 Do not emit the comment when nothing relevant changed.
 shop: maximum 2 temporary items. Each item fields: id,title,desc,detail,price,currency("AP"|"SV"),charmGain(0|0.25|0.5),ttl(1-8),icon,source,bodyAxis(optional),sourceIssueId(optional). bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
