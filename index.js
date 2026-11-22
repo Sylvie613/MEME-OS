@@ -14,7 +14,7 @@ import { isBoundCharacter } from './src/binding.js?v=0.10.9';
 /**
  * MÉMÉ OS v0.10.9
  * Navigable content shell. Visual style + native <dialog> retained.
- * Persistent state, tone engine, pending actions and transaction commits are live in this build.
+ * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync.
  */
 const MEME_ID = 'meme-os-heart-launcher';
 const DIALOG_ID = 'meme-os-dialog';
