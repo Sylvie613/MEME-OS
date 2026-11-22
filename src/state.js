@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 22;
+const SCHEMA_VERSION = 23;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -378,24 +378,6 @@ export async function commitPendingActions(sentText) {
     return { state, committed };
 }
 
-function refreshDerivedState(state) {
-    const tone = charmToStage(state.host.charm);
-    state.host.stage = tone.stage;
-    state.system.attitudeStage = tone.attitudeStage;
-    state.host.progress = Math.min(100, Math.max(0, Number(state.host.charm) || 0));
-
-    const milestones = state.permission.milestones;
-    state.permission.systemEligible =
-        state.host.charm >= 10 &&
-        milestones.completedTasks >= 2 &&
-        milestones.purchasedUpgrades >= 1 &&
-        state.permission.adminInterestSignals >= 1;
-
-    state.permission.systemInviteReady =
-        state.permission.systemEligible &&
-        state.permission.adminInterestSignals >= 2;
-}
-
 function applyEffect(state, effect) {
     if (!effect || typeof effect !== 'object') return;
 
@@ -409,18 +391,6 @@ function applyEffect(state, effect) {
 
     if (Number.isFinite(effect.charmDelta)) {
         state.host.charm = Math.min(100, Math.max(0, state.host.charm + effect.charmDelta));
-    }
-
-    if (effect.host && typeof effect.host === 'object') {
-        Object.assign(state.host, effect.host);
-    }
-
-    if (effect.system && typeof effect.system === 'object') {
-        Object.assign(state.system, effect.system);
-    }
-
-    if (effect.permission && typeof effect.permission === 'object') {
-        Object.assign(state.permission, effect.permission);
     }
 
     if (effect.bodyDelta && typeof effect.bodyDelta === 'object') {
@@ -474,46 +444,6 @@ function applyEffect(state, effect) {
             storyDay: Number(state.tasks.storyDay) || 1,
             acceptedAt: Date.now(),
         };
-    }
-
-    if (effect.taskComplete && typeof effect.taskComplete === 'object') {
-        const task = effect.taskComplete;
-        const wasEverCompleted = Boolean(state.tasks.everCompleted?.[task.id]);
-        delete state.tasks.active[task.id];
-
-        if (task.category === 'daily') {
-            const previous = state.tasks.dailyCompleted?.[task.id] || {};
-            state.tasks.dailyCompleted[task.id] = {
-                id: task.id,
-                title: task.title,
-                category: task.category,
-                day: Number(state.tasks.storyDay) || 1,
-                count: Math.max(0, Number(previous.count) || 0) + 1,
-                completedAt: Date.now(),
-            };
-        } else {
-            state.tasks.completed[task.id] = {
-                id: task.id,
-                title: task.title,
-                category: task.category,
-                completedAt: Date.now(),
-            };
-        }
-
-        state.tasks.everCompleted[task.id] = {
-            id: task.id,
-            title: task.title,
-            category: task.category,
-            firstCompletedAt: state.tasks.everCompleted?.[task.id]?.firstCompletedAt || Date.now(),
-        };
-
-        if (!wasEverCompleted) state.permission.milestones.completedTasks += 1;
-    }
-
-    if (effect.men && typeof effect.men === 'object') {
-        if (Array.isArray(effect.men.current)) state.men.current = effect.men.current.slice(0, 3);
-        if (Array.isArray(effect.men.recent)) state.men.recent = effect.men.recent.slice(0, 8);
-        if (Array.isArray(effect.men.returning)) state.men.returning = effect.men.returning.slice(0, 5);
     }
 
     const tone = charmToStage(state.host.charm);
