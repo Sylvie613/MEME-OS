@@ -1,7 +1,18 @@
+import {
+  addPendingAction,
+  commitPendingActions,
+  createPendingAction,
+  getSpendableResources,
+  getState,
+  hasActiveChat,
+  removePendingAction,
+} from './src/state.js?v=0.7.0';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.7.0';
+
 /**
- * MÉMÉ OS v0.6.0
+ * MÉMÉ OS v0.7.0
  * Navigable content shell. Visual style + native <dialog> retained.
- * State-changing actions are intentionally preview-only in this build.
+ * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
 const MEME_ID = 'meme-os-heart-launcher';
 const DIALOG_ID = 'meme-os-dialog';
@@ -88,6 +99,283 @@ const RECORD_DATA = [
   {type:'system',code:'ADMIN',title:'管理员首次评价',desc:'“先去洗头。”'},
 ];
 
+
+const VOICE_STAGES = [
+  {
+    id:'disgust',
+    min:0,
+    max:9,
+    label:'嫌弃期',
+    code:'VENOM',
+    rule:'短句、刻薄、直指缺陷，不夸奖，不哄。商品名优先直接拿缺点开刀；任务名像命令和嘲讽。',
+    home:[
+      '“别盯着界面看。先去洗头。”',
+      '“零点数，三点魅力。你还有心情研究按钮？”',
+      '“我建议你先解决味道，再考虑漂亮这种奢侈品。”'
+    ],
+  },
+  {
+    id:'repair',
+    min:10,
+    max:19,
+    label:'勉强修复期',
+    code:'BARELY',
+    rule:'仍然嘴毒，但承认修复有效。可以说“终于”“至少”“勉强”，禁止突然温柔。',
+    home:[
+      '“至少现在看得出你确实在改，不是在做梦。”',
+      '“别得意。只是从惨不忍睹进化到能多看两眼。”',
+      '“继续。你离漂亮还远，但总算不是原地踏步。”'
+    ],
+  },
+  {
+    id:'notice',
+    min:20,
+    max:34,
+    label:'开始顺眼期',
+    code:'NOTICE',
+    rule:'嘲讽减少，出现嘴硬的认可和观察欲；仍不直白夸漂亮，更多是“还行”“这次不错”。',
+    home:[
+      '“……这次选的改造还行。别用那种眼神看我。”',
+      '“我承认，最近确实顺眼了一点。只有一点。”',
+      '“继续照这个速度来，我或许能少嫌弃你几句。”'
+    ],
+  },
+  {
+    id:'interest',
+    min:35,
+    max:54,
+    label:'明显兴趣期',
+    code:'INTEREST',
+    rule:'开始主动关注宿主，语言变成坏心眼的调情和挑剔；夸奖仍带占有和戏弄感。',
+    home:[
+      '“现在倒是有点东西值得我亲自盯着改了。”',
+      '“别乱买。我开始对最后会长成什么样有要求了。”',
+      '“嗯。现在你照镜子，我大概不会第一秒就让你滚开。”'
+    ],
+  },
+  {
+    id:'favor',
+    min:55,
+    max:999,
+    label:'偏心期',
+    code:'FAVOR',
+    rule:'明显偏心、淫邪、挑逗，允许直白夸漂亮和表达欲望；仍保持系统哥高傲、坏和会拿捏人的性格。',
+    home:[
+      '“现在才算值得我花时间。过来，让我看看今天又漂亮了多少。”',
+      '“商城里这些东西，我已经开始按我喜欢的样子替你挑了。”',
+      '“别装不知道。你现在变成这样，我当然会有别的想法。”'
+    ],
+  },
+];
+
+const RUDE_SHOP_NAMES = {
+  lip1:'先把这张起皮的嘴救回来',
+  hair1:'油头急救Ⅰ',
+  skin1:'把这层粗糙皮先磨细点',
+  face1:'脸别再肿成一团Ⅰ',
+  eye1:'把那副没睡醒的眼睛救一下',
+  face2:'五官别各长各的Ⅰ',
+  posture1:'别再缩得像挨骂一样',
+  bodyfat1:'先把这一身赘肉处理掉Ⅰ',
+  waist1:'终于开始找腰了Ⅰ',
+  leg1:'腿线别再乱七八糟Ⅰ',
+  neck1:'把脖子和肩膀从肉里捞出来',
+  bust1:'胸型至少别拖整体后腿',
+  scent1:'先把这股汗油味压下去',
+  breath1:'嘴里别再一股闷味',
+  voice1:'说话别那么难听Ⅰ',
+  touch1:'摸起来别再这么粗糙',
+  scent2:'终于可以谈“好闻”了',
+  sensitive1:'把这副迟钝身体调灵一点',
+  arousal1:'别连自己想不想要都搞不懂',
+  lubrication1:'至少让身体学会自己配合',
+  orgasm1:'别高潮都这么没出息',
+  recovery1:'玩完别立刻瘫成一滩',
+  charmseal:'给你烙个终于配得上的印记',
+  qadmin:'想看我？先把等级爬上来',
+  touchadmin:'想让我碰你？资格还没到',
+  embody:'等你真有本事把我弄出来',
+};
+
+const RUDE_TASK_NAMES = {
+  clean:'先把自己洗得像个人',
+  mirror:'对着镜子认清现实',
+  walk:'动一动，别继续长在椅子上',
+  posture:'别缩成一团',
+  outfit:'穿得别像刚从垃圾袋里爬出来',
+  spark:'先证明真有人会对你起欲望',
+  sample:'第一次把精液交上来',
+  oral:'嘴别只会顶嘴',
+  repeat:'第二次还来？那就不算意外了',
+  drain:'既然都碰了，就别空手回来',
+  audit:'让我重新看看你到底救回来多少',
+  qform:'终于有资格看见我了',
+  contract:'你现在还没资格知道',
+  override:'真有本事就拿一次越级奖励',
+};
+
+const CHARM_GAIN = {
+  lip1:1,hair1:1,skin1:2,face1:2,eye1:2,face2:3,
+  posture1:1,bodyfat1:2,waist1:2,leg1:1,neck1:1,bust1:2,
+  scent1:1,breath1:1,voice1:1,touch1:1,scent2:2,
+  sensitive1:0,arousal1:0,lubrication1:0,orgasm1:0,recovery1:0,
+  charmseal:3,
+};
+
+const REQUIRE_UPGRADE = {
+  waist1:'bodyfat1',
+  touch1:'skin1',
+};
+
+const REQUIRE_TASK = {
+  sensitive1:'sample',
+  lubrication1:'sample',
+};
+
+function runtimeState(){
+  return getState();
+}
+
+function attitude(state=runtimeState()){
+  const charm=Number(state.host?.charm)||0;
+  return VOICE_STAGES.find(stage=>charm>=stage.min && charm<=stage.max) || VOICE_STAGES[0];
+}
+
+function toneIndex(state=runtimeState()){
+  return Math.max(0, VOICE_STAGES.findIndex(stage=>stage.id===attitude(state).id));
+}
+
+function pickStable(lines, state=runtimeState(), salt=0){
+  if(!Array.isArray(lines)||!lines.length) return '';
+  const seed=(Number(state.host?.charm)||0)+(Number(state.history?.length)||0)+salt;
+  return lines[Math.abs(seed)%lines.length];
+}
+
+function systemHomeLine(state=runtimeState()){
+  return pickStable(attitude(state).home,state,3);
+}
+
+function shopVoiceName(item,state=runtimeState()){
+  const i=toneIndex(state);
+  if(i===0) return RUDE_SHOP_NAMES[item.id] || item.title;
+  if(i===1) return (RUDE_SHOP_NAMES[item.id] || item.title).replace(/先|别再|终于/g,'').replace(/Ⅰ$/,'') + ' · 修复';
+  if(i===2) return item.title.replace('Ⅰ','') + ' · 调整';
+  if(i===3) return item.title.replace('Ⅰ','') + ' · 精修';
+  return item.title.replace('Ⅰ','') + ' · 私人定制';
+}
+
+function shopVoiceDesc(item,state=runtimeState()){
+  const i=toneIndex(state);
+  if(i===0) return `“别误会，这不是变漂亮，只是在抢救。” ${item.desc}`;
+  if(i===1) return `“至少这项做完，能少一处让我皱眉。” ${item.desc}`;
+  if(i===2) return `“这项值得做。做完应该会顺眼不少。” ${item.desc}`;
+  if(i===3) return `“这个我想看效果。” ${item.desc}`;
+  return `“这个给你。按我喜欢的方向改。” ${item.desc}`;
+}
+
+function taskVoiceName(task,state=runtimeState()){
+  const i=toneIndex(state);
+  if(i===0) return RUDE_TASK_NAMES[task.id] || task.title;
+  if(i===1) return task.title + ' · 别偷懒';
+  if(i===2) return task.title;
+  if(i===3) return task.title + ' · 给我看看';
+  return task.title + ' · 乖一点';
+}
+
+function taskVoiceDesc(task,state=runtimeState()){
+  const i=toneIndex(state);
+  if(i===0) return `“这都做不到就别谈改造。” ${task.desc}`;
+  if(i===1) return `“做完再来邀功。” ${task.desc}`;
+  if(i===2) return `“这次认真点，我会看。” ${task.desc}`;
+  if(i===3) return `“去做。回来以后我亲自验收。” ${task.desc}`;
+  return `“去吧。做得漂亮一点，别让我失望。” ${task.desc}`;
+}
+
+function currentView(){
+  return document.querySelector('#meme-os-dialog .meme-scroll')?.dataset?.view || 'home';
+}
+
+function pendingFor(kind,id,state=runtimeState()){
+  return state.pending?.some(action=>{
+    if(kind==='purchase') return action.effect?.purchase?.id===id;
+    if(kind==='taskAccept') return action.effect?.taskAccept?.id===id;
+    if(kind==='taskComplete') return action.effect?.taskComplete?.id===id;
+    return false;
+  }) || false;
+}
+
+function taskReward(task){
+  const ap=Number(task.reward.match(/AP \+(\d+)/)?.[1]||0);
+  const sv=Number(task.reward.match(/SV \+(\d+)/)?.[1]||0);
+  return {ap,sv};
+}
+
+function taskUnlock(task,state=runtimeState()){
+  const charm=Number(state.host?.charm)||0;
+  const sys=Number(state.system?.level)||1;
+  const map={spark:8,sample:12,oral:15,repeat:18,drain:25};
+  if(map[task.id] && charm<map[task.id]) return {ok:false,reason:`CHARM ${map[task.id]}`};
+  if(task.id==='qform' && sys<2) return {ok:false,reason:'SYSTEM LV.2'};
+  if(task.id==='contract') return {ok:false,reason:'条件未知'};
+  if(task.id==='override') return {ok:false,reason:'由剧情触发'};
+  return {ok:true,reason:''};
+}
+
+function shopRequirement(item,state=runtimeState()){
+  const charm=Number(state.host?.charm)||0;
+  const min=Number(item.req?.match(/CHARM (\d+)/)?.[1]||0);
+  if(min && charm<min) return {ok:false,reason:`CHARM ${min}`};
+  if(item.currency==='LOCK') return {ok:false,reason:item.req||'SYSTEM LOCK'};
+  const needUpgrade=REQUIRE_UPGRADE[item.id];
+  if(needUpgrade && !state.upgrades?.[needUpgrade]) return {ok:false,reason:'前置改造未完成'};
+  const needTask=REQUIRE_TASK[item.id];
+  if(needTask && !state.tasks?.completed?.[needTask]) return {ok:false,reason:'前置欲望任务未完成'};
+  return {ok:true,reason:''};
+}
+
+function pendingTrayMarkup(state=runtimeState()){
+  if(!state.pending?.length) return '';
+  return `
+    <section class="meme-pending-tray">
+      <div class="meme-pending-title"><span>PENDING ACTION</span><b>${state.pending.length}</b></div>
+      ${state.pending.map(action=>`
+        <div class="meme-pending-item">
+          <span>${action.title || '待结算操作'}</span>
+          <button type="button" data-remove-pending="${action.id}">撤销</button>
+        </div>
+      `).join('')}
+      <p>还没发送就不会结算。发送后才正式改数值。</p>
+    </section>
+  `;
+}
+
+async function queueAction(action){
+  if(!hasActiveChat()){
+    globalThis.toastr?.warning?.('先打开角色聊天。连账本都没有，我给你结算到空气里？');
+    return;
+  }
+  await addPendingAction(action);
+  appendToInput(action.text);
+  renderView(currentView(),false);
+  globalThis.toastr?.success?.('已经塞进输入框。没发送之前还能反悔。');
+}
+
+function findShopItem(id){
+  for(const [category,items] of Object.entries(SHOP_DATA)){
+    const item=items.find(x=>x.id===id);
+    if(item) return {...item,category};
+  }
+  return null;
+}
+
+function findTask(id){
+  for(const [category,tasks] of Object.entries(TASK_DATA)){
+    const task=tasks.find(x=>x.id===id);
+    if(task) return {...task,category};
+  }
+  return null;
+}
+
 function positionLauncher(button) {
   const send = document.getElementById('send_but');
   if (!send) {
@@ -168,7 +456,7 @@ function moduleIcon(type) {
 }
 
 function totalMenCount() {
-  const men = PREVIEW_STATE.men || {};
+  const men = runtimeState().men || {};
   return ['current','recent','returning'].reduce((sum, key) => sum + (men[key]?.length || 0), 0);
 }
 
@@ -184,61 +472,63 @@ function moduleCard(key, title, sub) {
 }
 
 function statsMarkup(compact = false) {
+  const state=runtimeState();
   return `
     <div class="meme-stat-grid ${compact ? 'meme-stat-grid--compact' : ''}">
-      <article><small>AP</small><strong>${String(PREVIEW_STATE.ap).padStart(3,'0')}</strong><em>改造点</em></article>
-      <article><small>SV</small><strong>${String(PREVIEW_STATE.sv).padStart(3,'0')}</strong><em>精液值</em></article>
-      <article><small>CHARM</small><strong>${String(PREVIEW_STATE.charm).padStart(2,'0')}</strong><em>综合魅力</em></article>
+      <article><small>AP</small><strong>${String(state.resources.ap).padStart(3,'0')}</strong><em>改造点</em></article>
+      <article><small>SV</small><strong>${String(state.resources.sv).padStart(3,'0')}</strong><em>精液值</em></article>
+      <article><small>CHARM</small><strong>${String(state.host.charm).padStart(2,'0')}</strong><em>综合魅力</em></article>
     </div>
   `;
 }
 
 function homeMarkup() {
-  const nextUnlock = PREVIEW_STATE.charm < 8 ? 'CHARM 8 · 欲望任务' : '欲望任务已开放';
+  const state=runtimeState();
+  const voice=attitude(state);
+  const nextUnlock=state.host.charm<8 ? 'CHARM 8 · 欲望任务' : '欲望任务已开放';
+  const activeCount=Object.keys(state.tasks?.active||{}).length;
   return `
+    ${pendingTrayMarkup(state)}
     <section class="meme-contract">
       <div class="meme-contract-top">
         <span class="meme-status"><i></i> BOUND</span>
         <span class="meme-code">HOST · 001</span>
       </div>
-
       <div class="meme-crown-seal">
         <span class="meme-crown-orbit"></span>
         <span class="meme-crown-orbit meme-crown-orbit--inner"></span>
         <span class="meme-crown-symbol">${crownMarkup()}</span>
       </div>
-
-      <p class="meme-contract-label">DESIRE ENGINE</p>
-      <h2>${PREVIEW_STATE.stage}</h2>
-      <p class="meme-contract-copy">外貌、欲望、奖励与代价，都将被系统记录。</p>
-
-      <div class="meme-progress"><span></span></div>
+      <p class="meme-contract-label">DESIRE ENGINE · ${voice.code}</p>
+      <h2>${state.host.stage}</h2>
+      <p class="meme-contract-copy">“${voice.label}。别急着高兴，你现在离让我满意还远。”</p>
+      <div class="meme-progress"><span style="width:${Math.max(3,Math.min(100,state.host.progress||0))}%"></span></div>
       ${statsMarkup()}
     </section>
 
     <section class="meme-home-strip">
-      <article><small>CURRENT TASK</small><b>未接取</b><em>去 TASK 看任务</em></article>
-      <article><small>NEXT UNLOCK</small><b>${nextUnlock}</b><em>系统按阶段开放内容</em></article>
+      <article><small>CURRENT TASK</small><b>${activeCount ? `已挂上 ${activeCount} 项` : '一项都没接'}</b><em>${activeCount ? '做完再回来邀功' : '去 TASK，别装忙'}</em></article>
+      <article><small>NEXT UNLOCK</small><b>${nextUnlock}</b><em>我说开才开</em></article>
     </section>
 
     <section class="meme-whisper-card">
       <span>♛</span>
-      <div><small>ADMINISTRATOR</small><b>“别盯着界面看。先去洗头。”</b></div>
+      <div><small>ADMINISTRATOR · ${voice.label}</small><b>${systemHomeLine(state)}</b></div>
     </section>
 
     <section class="meme-modules">
       <div class="meme-section-head">
-        <div><small>PRIVATE ACCESS</small><h3>欲望系统</h3></div>
+        <div><small>PRIVATE ACCESS</small><h3>想看什么自己点</h3></div>
         <span>7 / 7</span>
       </div>
       <div class="meme-module-grid">
-        ${moduleCard('me','ME','宿主改造')}
-        ${moduleCard('task','TASK','任务与奖励')}
-        ${moduleCard('shop','SHOP','欲望商城')}
-        ${moduleCard('men','MEN','对象档案')}
-        ${moduleCard('system','SYSTEM','管理员')}
-        ${moduleCard('record','RECORD','成长记录')}
-        ${moduleCard('home','HOME','系统总览')}
+        ${moduleCard('me','ME','看看你现在有多惨')}
+        ${moduleCard('task','TASK','我给你的活')}
+        ${moduleCard('shop','SHOP','花点数救你')}
+        ${moduleCard('men','MEN','沾过边的男人')}
+        ${moduleCard('system','SYSTEM','看我干什么')}
+        ${moduleCard('record','RECORD','你干过的事')}
+        ${moduleCard('home','HOME','滚回总览')}
       </div>
     </section>
   `;
@@ -283,65 +573,71 @@ function scanRow(label, value, score, tone='bad') {
 }
 
 function meMarkup() {
+  const state=runtimeState();
+  const voice=attitude(state);
+  const initial=toneIndex(state)===0;
   return `
-    ${pageHeader('HOST PROFILE','ME · 宿主改造','LV.01')}
+    ${pendingTrayMarkup(state)}
+    ${pageHeader('HOST PROFILE','ME · 宿主改造',voice.code)}
     ${statsMarkup(true)}
 
     <section class="meme-page-card">
-      <div class="meme-card-title"><small>CURRENT STATE</small><h3>当前宿主</h3></div>
-      ${labelValue('改造阶段', PREVIEW_STATE.stage, '0.3%')}
-      ${labelValue('系统总评', '明显难看 · 肥胖 · 油腻 · 未整理')}
-      ${labelValue('基础魅力', '3 / 100', 'VERY LOW')}
-      ${labelValue('绑定状态', '永久绑定', 'ACTIVE')}
+      <div class="meme-card-title"><small>CURRENT STATE</small><h3>${initial ? '这就是我抽到的宿主？' : '现在总算有点变化了'}</h3></div>
+      ${labelValue('改造阶段', state.host.stage, `${Number(state.host.progress||0).toFixed(1)}%`)}
+      ${labelValue('系统总评', initial ? '肥胖 / 油腻 / 邋遢 / 明显难看' : voice.label)}
+      ${labelValue('综合魅力', `${state.host.charm} / 100`, voice.code)}
+      ${labelValue('绑定状态', '跑不掉', 'ACTIVE')}
     </section>
 
     <section class="meme-page-card">
-      <div class="meme-card-title"><small>BASELINE SCAN</small><h3>初始扫描</h3></div>
+      <div class="meme-card-title"><small>BASELINE SCAN</small><h3>${initial ? '别躲，难看也得看完' : '复检结果'}</h3></div>
       <div class="meme-scan-list">
-        ${scanRow('面部','浮肿 / 比例不协调',2, 'bad')}
-        ${scanRow('体型','明显肥胖 / 线条模糊',1, 'bad')}
-        ${scanRow('皮肤','粗糙 / 暗沉 / 出油',2, 'bad')}
-        ${scanRow('头发','油腻 / 毛躁 / 缺乏打理',1, 'bad')}
-        ${scanRow('气味','清洁度不足',0, 'bad')}
-        ${scanRow('声线','普通 / 缺乏辨识度',4, 'low')}
-        ${scanRow('仪态','含胸 / 缩肩',2, 'bad')}
+        ${scanRow('面部',initial?'浮肿 / 比例不协调':'轮廓正在修复',Math.max(2,state.host.charm), initial?'bad':'low')}
+        ${scanRow('体型',initial?'明显肥胖 / 线条模糊':'体态正在重塑',Math.max(1,state.host.charm-1), initial?'bad':'low')}
+        ${scanRow('皮肤',initial?'粗糙 / 暗沉 / 出油':'肤质逐步改善',Math.max(2,state.host.charm), initial?'bad':'low')}
+        ${scanRow('头发',initial?'油腻 / 毛躁 / 缺乏打理':'至少像认真洗过了',Math.max(1,state.host.charm), initial?'bad':'low')}
+        ${scanRow('气味',initial?'清洁度不足':'气味正在优化',Math.max(0,state.host.charm-2), initial?'bad':'low')}
+        ${scanRow('声线',initial?'普通 / 没辨识度':'听感逐步修正',Math.max(4,state.host.charm+1),'low')}
+        ${scanRow('仪态',initial?'含胸 / 缩肩':'姿态正在修正',Math.max(2,state.host.charm),'low')}
       </div>
     </section>
 
     <section class="meme-page-card">
-      <div class="meme-card-title"><small>RECONSTRUCTION</small><h3>改造槽位</h3></div>
+      <div class="meme-card-title"><small>RECONSTRUCTION</small><h3>我允许你改的地方</h3></div>
       <div class="meme-upgrade-list">
-        ${levelRow('面部精修','未开始','轮廓、眼型、五官协调与细节修复')}
-        ${levelRow('体态塑形','未开始','体脂趋势、腰臀、腿型与肩颈线条')}
-        ${levelRow('皮肤优化','未开始','肤质、细腻度、触感与光泽')}
-        ${levelRow('发质系统','未开始','清洁感、顺滑度与发丝状态')}
-        ${levelRow('体香系统','未开始','基础气味、近距离存在感与诱导体香')}
-        ${levelRow('声线调整','未开始','音色、稳定度与辨识度')}
-        ${levelRow('仪态修正','未开始','站姿、坐姿、肩颈与动作习惯')}
-        ${levelRow('成人反应','LOCKED','敏感度、分泌、高潮与恢复','SV · LOCK')}
+        ${levelRow('面部精修',state.upgrades.face2?'已启用':'未开始','轮廓、眼型、五官协调与细节修复')}
+        ${levelRow('体态塑形',state.upgrades.bodyfat1?'已启用':'未开始','体脂趋势、腰臀、腿型与肩颈线条')}
+        ${levelRow('皮肤优化',state.upgrades.skin1?'已启用':'未开始','肤质、细腻度、触感与光泽')}
+        ${levelRow('发质系统',state.upgrades.hair1?'已启用':'未开始','清洁感、顺滑度与发丝状态')}
+        ${levelRow('体香系统',state.upgrades.scent1?'已启用':'未开始','基础气味、近距离存在感与诱导体香')}
+        ${levelRow('声线调整',state.upgrades.voice1?'已启用':'未开始','音色、稳定度与辨识度')}
+        ${levelRow('仪态修正',state.upgrades.posture1?'已启用':'未开始','站姿、坐姿、肩颈与动作习惯')}
+        ${levelRow('成人反应',state.tasks.completed.sample?'可解锁':'LOCKED','敏感度、分泌、高潮与恢复','SV · LOCK')}
       </div>
-    </section>
-
-    <section class="meme-page-card">
-      <div class="meme-card-title"><small>UNLOCK LOGIC</small><h3>解锁规则</h3></div>
-      ${labelValue('AP 改造','外貌 / 身体 / 感官')}
-      ${labelValue('SV 改造','成人欲望 / 性反应')}
-      ${labelValue('高阶改造','需要 CHARM 与前置项目')}
-      ${labelValue('系统具现','不在商城购买，由 SYSTEM 独立升级')}
     </section>
   `;
 }
 
 function taskItem(task) {
+  const state=runtimeState();
+  const unlock=taskUnlock(task,state);
+  const active=Boolean(state.tasks?.active?.[task.id]);
+  const completed=Boolean(state.tasks?.completed?.[task.id]);
+  const pending=pendingFor(active?'taskComplete':'taskAccept',task.id,state);
+  let button='挂上';
+  if(!unlock.ok) button='没资格';
+  else if(completed) button='交过了';
+  else if(pending) button='待发送';
+  else if(active) button='交差';
+
   return `
-    <article class="meme-task-card ${task.locked ? 'is-locked' : ''}" data-task-id="${task.id}">
-      <div class="meme-task-top"><span>${task.type}</span><em>${task.state}</em></div>
-      <h4>${task.title}</h4>
-      <p>${task.desc}</p>
+    <article class="meme-task-card ${!unlock.ok ? 'is-locked' : ''} ${completed?'is-done':''}" data-task-id="${task.id}">
+      <div class="meme-task-top"><span>${task.type}</span><em>${completed?'已完成':active?'已接取':unlock.ok?task.state:unlock.reason}</em></div>
+      <div data-task-detail><h4>${taskVoiceName(task,state)}</h4><p>${taskVoiceDesc(task,state)}</p></div>
       <div class="meme-task-detail">${task.detail}</div>
       <div class="meme-task-foot">
         <b>${task.reward}</b>
-        <button type="button" data-task-detail>${task.locked ? '条件' : '详情'}</button>
+        <button type="button" data-task-action="${task.id}" ${(!unlock.ok||completed||pending)?'disabled':''}>${button}</button>
       </div>
     </article>
   `;
@@ -352,56 +648,66 @@ function renderTaskList(category='daily') {
 }
 
 function taskMarkup() {
+  const state=runtimeState();
   return `
-    ${pageHeader('MISSION CENTER','TASK · 任务中心','AUTO')}
+    ${pendingTrayMarkup(state)}
+    ${pageHeader('MISSION CENTER','TASK · 我给你的活',attitude(state).code)}
     <div class="meme-tabbar" data-task-tabs>
       <button class="is-active" type="button" data-task-tab="daily">日常</button>
       <button type="button" data-task-tab="desire">欲望</button>
       <button type="button" data-task-tab="special">特殊</button>
     </div>
-    <section class="meme-task-list" data-task-list>
-      ${renderTaskList('daily')}
-    </section>
+    <section class="meme-task-list" data-task-list>${renderTaskList('daily')}</section>
     <section class="meme-page-card meme-task-rules">
-      <div class="meme-card-title"><small>MISSION LOGIC</small><h3>任务规则</h3></div>
-      ${labelValue('日常任务','低 AP · 可重复出现')}
-      ${labelValue('欲望任务','主要产出 SV · 按魅力阶段解锁')}
-      ${labelValue('特殊任务','管理员 / 剧情 / 隐藏条件触发')}
-      ${labelValue('生成原则','任务随剧情变化，不固定刷同一套')}
+      <div class="meme-card-title"><small>MY RULES</small><h3>听清楚再接</h3></div>
+      ${labelValue('日常','低 AP。该做的基本事，不值得我夸。')}
+      ${labelValue('欲望','主要产出 SV。魅力不够就别做梦。')}
+      ${labelValue('特殊','我什么时候想发，什么时候才有。')}
+      ${labelValue('结算','发进聊天后才算完成操作，别让正文再扣第二次。')}
     </section>
   `;
 }
 
-function shopItem(item) {
-  const locked = item.currency === 'LOCK';
+function shopItem(item,category) {
+  const state=runtimeState();
+  const req=shopRequirement(item,state);
+  const owned=Boolean(state.upgrades?.[item.id]);
+  const pending=pendingFor('purchase',item.id,state);
+  const spendable=getSpendableResources(state);
+  const enough=item.currency==='AP' ? spendable.ap>=item.price : item.currency==='SV' ? spendable.sv>=item.price : false;
+  let button=owned?'买过了':pending?'待发送':!req.ok?'锁着':!enough?'穷':'买';
+
   return `
-    <article class="meme-shop-card ${locked ? 'is-locked' : ''}" data-shop-id="${item.id}">
-      <span class="meme-shop-icon">${item.icon}</span>
-      <div class="meme-shop-copy">
-        <b>${item.title}</b>
-        <p>${item.desc}</p>
-        <small>${item.level} · ${item.req}</small>
+    <article class="meme-shop-card ${(!req.ok||owned)?'is-locked':''}" data-shop-id="${item.id}" data-shop-category="${category}">
+      <span class="meme-shop-icon" data-shop-detail>${item.icon}</span>
+      <div class="meme-shop-copy" data-shop-detail>
+        <b>${shopVoiceName(item,state)}</b>
+        <p>${shopVoiceDesc(item,state)}</p>
+        <small>${item.level} · ${req.ok?item.req:req.reason}</small>
         <div class="meme-shop-detail">${item.detail}</div>
       </div>
       <div class="meme-shop-buy">
-        <strong>${locked ? '—' : item.price}</strong><em>${item.currency}</em>
-        <button type="button" data-shop-detail>${locked ? '条件' : '预览'}</button>
+        <strong>${item.currency==='LOCK'?'—':item.price}</strong><em>${item.currency}</em>
+        <button type="button" data-shop-action="${item.id}" ${(owned||pending||!req.ok||!enough)?'disabled':''}>${button}</button>
       </div>
     </article>
   `;
 }
 
 function renderShopList(category='appearance') {
-  return (SHOP_DATA[category] || SHOP_DATA.appearance).map(shopItem).join('');
+  return (SHOP_DATA[category] || SHOP_DATA.appearance).map(item=>shopItem(item,category)).join('');
 }
 
 function shopMarkup() {
+  const state=runtimeState();
+  const spendable=getSpendableResources(state);
   return `
-    ${pageHeader('DESIRE MARKET','SHOP · 欲望商城',`AP ${String(PREVIEW_STATE.ap).padStart(3,'0')}`)}
+    ${pendingTrayMarkup(state)}
+    ${pageHeader('DESIRE MARKET','SHOP · 花点数救你',attitude(state).code)}
     <div class="meme-shop-balance">
-      <span><small>AP</small><b>${String(PREVIEW_STATE.ap).padStart(3,'0')}</b></span>
+      <span><small>AP 可用</small><b>${String(spendable.ap).padStart(3,'0')}</b></span>
       <i></i>
-      <span><small>SV</small><b>${String(PREVIEW_STATE.sv).padStart(3,'0')}</b></span>
+      <span><small>SV 可用</small><b>${String(spendable.sv).padStart(3,'0')}</b></span>
     </div>
     <div class="meme-shop-filter" data-shop-filters>
       <button class="is-active" type="button" data-shop-filter="appearance">外貌</button>
@@ -410,10 +716,8 @@ function shopMarkup() {
       <button type="button" data-shop-filter="desire">欲望</button>
       <button type="button" data-shop-filter="special">特殊</button>
     </div>
-    <section class="meme-shop-list" data-shop-list>
-      ${renderShopList('appearance')}
-    </section>
-    <p class="meme-preview-note">本版已填完整商品结构；真实购买、扣款与写入聊天框将在下一阶段接通。</p>
+    <section class="meme-shop-list" data-shop-list>${renderShopList('appearance')}</section>
+    <p class="meme-preview-note">价格是我定的。买不起就去做任务，别盯着商品流口水。</p>
   `;
 }
 
@@ -459,105 +763,109 @@ function menEmptyGroup(kind) {
 }
 
 function menGroupMarkup(kind, label, title, defaultOpen=false) {
-  const list = PREVIEW_STATE.men?.[kind] || [];
+  const list = runtimeState().men?.[kind] || [];
   const body = list.length ? list.map(menPersonCard).join('') : menEmptyGroup(kind);
-
   return `
     <section class="meme-men-group ${defaultOpen ? 'is-open' : ''}" data-men-group="${kind}">
       <button type="button" class="meme-men-group-head" data-men-group-toggle>
-        <span>
-          <small>${label}</small>
-          <b>${title}</b>
-        </span>
+        <span><small>${label}</small><b>${title}</b></span>
         <span class="meme-men-group-meta">${String(list.length).padStart(2,'0')} <i>⌄</i></span>
       </button>
-      <div class="meme-men-group-body">
-        ${body}
-      </div>
+      <div class="meme-men-group-body">${body}</div>
     </section>
   `;
 }
 
 function menMarkup() {
-  const count = totalMenCount();
+  const state=runtimeState();
+  const count=totalMenCount();
   return `
-    ${pageHeader('TARGET ARCHIVE','MEN · 对象档案',String(count).padStart(2,'0'))}
-
+    ${pendingTrayMarkup(state)}
+    ${pageHeader('TARGET ARCHIVE','MEN · 沾过边的男人',String(count).padStart(2,'0'))}
     <section class="meme-men-summary">
-      <div><small>CURRENT</small><b>${PREVIEW_STATE.men.current.length}</b><em>当前</em></div>
-      <div><small>RECENT</small><b>${PREVIEW_STATE.men.recent.length}</b><em>近期</em></div>
-      <div><small>RETURNING</small><b>${PREVIEW_STATE.men.returning.length}</b><em>再遇</em></div>
+      <div><small>CURRENT</small><b>${state.men.current.length}</b><em>正在碰</em></div>
+      <div><small>RECENT</small><b>${state.men.recent.length}</b><em>刚碰过</em></div>
+      <div><small>RETURNING</small><b>${state.men.returning.length}</b><em>又回来了</em></div>
     </section>
-
     <div class="meme-men-groups">
-      ${menGroupMarkup('current','CURRENT','当前对象',true)}
-      ${menGroupMarkup('recent','RECENT','近期痕迹',false)}
-      ${menGroupMarkup('returning','RETURNING','再遇对象',false)}
+      ${menGroupMarkup('current','CURRENT','现在还没走的',true)}
+      ${menGroupMarkup('recent','RECENT','最近留过痕迹的',false)}
+      ${menGroupMarkup('returning','RETURNING','居然又找回来的',false)}
     </div>
-
     <section class="meme-page-card meme-men-rules">
-      <div class="meme-card-title"><small>ARCHIVE LOGIC</small><h3>档案规则</h3></div>
-      ${labelValue('建档条件','任务关联 / 性接触 / 明显欲望 / 联系方式 / 关键剧情')}
-      ${labelValue('普通路人','不建档')}
-      ${labelValue('CURRENT 上限','3 人 · 只留当前剧情中心对象')}
-      ${labelValue('RECENT 上限','8 人 · 超出后最旧痕迹淡出')}
-      ${labelValue('RETURNING 上限','5 人 · 只保留近期真正回流者')}
-      ${labelValue('近期衰减','长期未再出现 → 从 MEN 主界面淡出')}
-      ${labelValue('再次出现','旧档案自动唤醒 → RETURNING')}
-      <p class="meme-men-rule-note">MEN 不预设“长期对象”。超出显示上限的旧人只在 RECORD 留历史痕迹，不持续占用模型上下文；以后真的再次出现，再重新唤醒。</p>
+      <div class="meme-card-title"><small>MY ARCHIVE RULE</small><h3>我没兴趣替你记所有男人</h3></div>
+      ${labelValue('CURRENT','最多 3 个。只留现在剧情真正在碰的。')}
+      ${labelValue('RECENT','最多 8 个。睡过、榨过、约过、留过联系方式才配进。')}
+      ${labelValue('RETURNING','最多 5 个。真的再次出现才算，不叫长期对象。')}
+      ${labelValue('路人','说两句话的我懒得记。')}
+      <p class="meme-men-rule-note">淡出 MEN 的旧人只在 RECORD 留一笔。以后真撞回来，我会把旧档案重新翻出来。</p>
     </section>
   `;
 }
 
 function systemMarkup() {
+  const state=runtimeState();
+  const voice=attitude(state);
+  const next=VOICE_STAGES[Math.min(VOICE_STAGES.length-1,toneIndex(state)+1)];
   return `
-    ${pageHeader('ADMINISTRATOR','SYSTEM · 管理员','LV.01')}
-
+    ${pendingTrayMarkup(state)}
+    ${pageHeader('ADMINISTRATOR','SYSTEM · 看我干什么',voice.code)}
     <section class="meme-admin-card">
       <div class="meme-admin-emblem">${crownMarkup()}</div>
       <div class="meme-admin-copy">
-        <small>CURRENT FORM</small>
-        <h3>${PREVIEW_STATE.systemForm}</h3>
-        <p>成年男性系统意识体。当前仅存在于宿主脑内，不能被其他人看见。</p>
+        <small>CURRENT ATTITUDE</small>
+        <h3>${voice.label}</h3>
+        <p>成年男性系统意识体。态度跟着宿主实际改造结果变，不会因为“你是宿主”就自动喜欢你。</p>
       </div>
     </section>
 
     <section class="meme-system-meters">
-      <article><small>审美容忍</small><b>0</b><span><i style="width:0%"></i></span></article>
-      <article><small>宿主性吸引</small><b>0</b><span><i style="width:0%"></i></span></article>
-      <article><small>系统权限</small><b>1 / 4</b><span><i style="width:25%"></i></span></article>
+      <article><small>综合魅力</small><b>${state.host.charm}</b><span><i style="width:${Math.min(100,state.host.charm)}%"></i></span></article>
+      <article><small>当前态度</small><b>${voice.code}</b><span><i style="width:${(toneIndex(state)+1)*20}%"></i></span></article>
+      <article><small>系统权限</small><b>${state.system.level} / 4</b><span><i style="width:${state.system.level*25}%"></i></span></article>
     </section>
 
     <section class="meme-page-card">
-      <div class="meme-card-title"><small>ADMIN PROFILE</small><h3>管理员档案</h3></div>
+      <div class="meme-card-title"><small>VOICE PROTOCOL</small><h3>我的嘴不会一直一个样</h3></div>
+      ${VOICE_STAGES.map(stage=>`
+        <div class="meme-voice-rule ${stage.id===voice.id?'is-current':''}">
+          <span>${stage.code}</span>
+          <div><b>${stage.min}–${stage.max===999?'100':stage.max} · ${stage.label}</b><p>${stage.rule}</p></div>
+        </div>
+      `).join('')}
+      <p class="meme-men-rule-note">规则：任务名、商品名、商品说明、宿主评价、提示语、报错和管理员留言全部先经过当前态度层。结构标签可以保持简短，但内容不许突然变成客服腔。</p>
+    </section>
+
+    <section class="meme-page-card">
+      <div class="meme-card-title"><small>ADMIN PROFILE</small><h3>我本来就这样</h3></div>
       ${labelValue('核心性格','审美偏执 / 嘴毒 / 自负 / 色情 / 不耐烦')}
-      ${labelValue('绑定原因','完全随机', 'NO DESTINY')}
-      ${labelValue('当前态度','嫌弃宿主外貌 · 无触碰欲望')}
-      ${labelValue('初始评价','“这就是我这次的宿主？”')}
-      ${labelValue('目前建议','先去洗头')}
+      ${labelValue('绑定原因','纯随机。别自作多情。','NO DESTINY')}
+      ${labelValue('当前态度',voice.label)}
+      ${labelValue('下一变化',next.id===voice.id?'已经到最高态度层':`CHARM ${next.min} → ${next.label}`)}
+      ${labelValue('目前建议',toneIndex(state)===0?'先去洗头':'继续改，别停')}
     </section>
 
     <section class="meme-page-card">
-      <div class="meme-card-title"><small>PRIVATE PREFERENCE</small><h3>私人偏好</h3></div>
+      <div class="meme-card-title"><small>PRIVATE PREFERENCE</small><h3>别把我的癖好往你身上套</h3></div>
       ${labelValue('审美对象','漂亮的成年女性')}
       ${labelValue('特殊癖好','对睡眠状态下的漂亮成年女性有明显性兴趣')}
-      ${labelValue('宿主适用','当前不适用', '0%')}
-      <p class="meme-men-rule-note">他的偏好是他原本就存在的私人性癖，不是因为宿主才产生。宿主目前远未达到他的审美阈值。</p>
+      ${labelValue('宿主适用',toneIndex(state)===0?'目前完全不适用':'随魅力上升重新判定')}
+      <p class="meme-men-rule-note">这是我原本就有的偏好，不是因为绑定你才长出来的。你够不够格，是另一回事。</p>
     </section>
 
     <section class="meme-page-card">
-      <div class="meme-card-title"><small>EVOLUTION</small><h3>形态进化</h3></div>
+      <div class="meme-card-title"><small>EVOLUTION</small><h3>想看见我？慢慢爬。</h3></div>
       <div class="meme-system-levels">
-        <article class="is-on"><span>01</span><div><b>意识体</b><small>脑内声音 · 当前</small></div></article>
-        <article><span>02</span><div><b>Q 版可视</b><small>宿主可见 · 其他人不可见</small></div></article>
-        <article><span>03</span><div><b>有限实体</b><small>短时触碰 · 受系统限制</small></div></article>
-        <article><span>04</span><div><b>完全具现</b><small>稳定成年实体 · 自主行动</small></div></article>
+        <article class="${state.system.level>=1?'is-on':''}"><span>01</span><div><b>意识体</b><small>脑内声音 · 当前基础形态</small></div></article>
+        <article class="${state.system.level>=2?'is-on':''}"><span>02</span><div><b>Q 版可视</b><small>只有宿主能看见</small></div></article>
+        <article class="${state.system.level>=3?'is-on':''}"><span>03</span><div><b>有限实体</b><small>短时触碰 · 仍受限制</small></div></article>
+        <article class="${state.system.level>=4?'is-on':''}"><span>04</span><div><b>完全具现</b><small>稳定成年实体 · 自主行动</small></div></article>
       </div>
     </section>
 
     <section class="meme-admin-quote">
-      <small>LIVE COMMENT</small>
-      <p>“你最好别把我这里当换装小游戏。赚不到点数，丑就是丑。”</p>
+      <small>LIVE COMMENT · ${voice.code}</small>
+      <p>${systemHomeLine(state)}</p>
     </section>
   `;
 }
@@ -572,19 +880,29 @@ function recordItem(item) {
 }
 
 function renderRecordList(filter='all') {
-  const list = filter === 'all' ? RECORD_DATA : RECORD_DATA.filter(item => item.type === filter);
-  const items = list.map(recordItem).join('');
+  const state=runtimeState();
+  const dynamic=(state.history||[]).map(entry=>({
+    type:entry.recordType==='purchase'?'change':entry.recordType || entry.type || 'system',
+    code:String(entry.type||'EVENT').toUpperCase(),
+    title:entry.title || '系统操作',
+    desc:entry.summary || entry.text,
+  }));
+  const all=[...RECORD_DATA,...dynamic];
+  const list=filter==='all'?all:all.filter(item=>item.type===filter);
+  const items=list.map(recordItem).join('');
   return items + `
     <article class="is-future">
       <span></span>
-      <div><small>WAITING</small><h4>下一条记录尚未生成</h4><p>任务、购买、对象变化与系统进化都会写入这里。</p></div>
+      <div><small>WAITING</small><h4>后面还有。</h4><p>你做过的任务、买过的改造、碰过的人，我都会记。</p></div>
     </article>
   `;
 }
 
 function recordMarkup() {
+  const state=runtimeState();
   return `
-    ${pageHeader('PRIVATE LOG','RECORD · 成长记录',String(RECORD_DATA.length).padStart(2,'0'))}
+    ${pendingTrayMarkup(state)}
+    ${pageHeader('PRIVATE LOG','RECORD · 你干过的事',String(RECORD_DATA.length+(state.history?.length||0)).padStart(2,'0'))}
     <div class="meme-record-filter" data-record-filters>
       <button class="is-active" type="button" data-record-filter="all">全部</button>
       <button type="button" data-record-filter="change">改造</button>
@@ -592,14 +910,12 @@ function recordMarkup() {
       <button type="button" data-record-filter="men">对象</button>
       <button type="button" data-record-filter="system">系统</button>
     </div>
-    <section class="meme-timeline" data-record-list>
-      ${renderRecordList('all')}
-    </section>
-    <p class="meme-preview-note">RECORD 保存历史痕迹；旧对象淡出 MEN 后仍可在记录中留下简短事件，不持续占用模型上下文。</p>
+    <section class="meme-timeline" data-record-list>${renderRecordList('all')}</section>
+    <p class="meme-preview-note">别担心，旧男人淡出 MEN 也不会凭空失忆。历史我替你留着，只是不拿来每回合浪费上下文。</p>
   `;
 }
 
-function renderView(view='home') {
+function renderView(view='home', animate=true) {
   const root = document.querySelector('#meme-os-dialog .meme-scroll');
   if (!root) return;
 
@@ -613,13 +929,15 @@ function renderView(view='home') {
     record: recordMarkup,
   };
 
-  root.classList.add('is-switching');
-  setTimeout(() => {
-    root.innerHTML = (views[view] || views.home)();
-    root.scrollTop = 0;
-    root.dataset.view = view;
+  const paint=()=>{
+    root.innerHTML=(views[view]||views.home)();
+    root.scrollTop=0;
+    root.dataset.view=view;
     root.classList.remove('is-switching');
-  }, 90);
+  };
+  if(!animate){ paint(); return; }
+  root.classList.add('is-switching');
+  setTimeout(paint,90);
 }
 
 function panelMarkup() {
@@ -636,9 +954,7 @@ function panelMarkup() {
         <button class="meme-close" type="button" data-meme-close aria-label="关闭">×</button>
       </header>
 
-      <main class="meme-scroll" data-view="home">
-        ${homeMarkup()}
-      </main>
+      <main class="meme-scroll" data-view="home">${homeMarkup()}</main>
 
       <footer class="meme-footer">
         <span class="meme-footer-spark">✦</span>
@@ -651,6 +967,135 @@ function panelMarkup() {
   `;
 }
 
+
+async function handleTaskAction(id){
+  const task=findTask(id);
+  if(!task) return;
+  const state=runtimeState();
+  const unlock=taskUnlock(task,state);
+  if(!unlock.ok){
+    globalThis.toastr?.warning?.(`没资格。先把 ${unlock.reason} 做到。`);
+    return;
+  }
+  if(state.tasks?.completed?.[id]){
+    globalThis.toastr?.info?.('这份差已经交过了。别想重复领。');
+    return;
+  }
+
+  const voiced=taskVoiceName(task,state);
+  if(state.tasks?.active?.[id]){
+    const reward=taskReward(task);
+    const text=`【MÉMÉ OS｜已结算｜勿重复结算】完成任务「${voiced}」；AP +${reward.ap}${reward.sv?`；SV +${reward.sv}`:''}。扩展已负责数值结算，正文只承认结果。`;
+    await queueAction(createPendingAction({
+      type:'task_complete',
+      recordType:'task',
+      title:`完成：${voiced}`,
+      summary:`完成任务「${voiced}」，获得 AP +${reward.ap}${reward.sv?` / SV +${reward.sv}`:''}。`,
+      text,
+      effect:{
+        apDelta:reward.ap,
+        svDelta:reward.sv,
+        taskComplete:{id:task.id,title:voiced,category:task.category},
+      },
+    }));
+    return;
+  }
+
+  const text=`【MÉMÉ OS｜已结算｜勿重复结算】接取任务「${voiced}」。扩展已记录为进行中；正文只承认任务状态，不要重复生成或扣改数值。`;
+  await queueAction(createPendingAction({
+    type:'task_accept',
+    recordType:'task',
+    title:`接取：${voiced}`,
+    summary:`接取任务「${voiced}」。`,
+    text,
+    effect:{taskAccept:{id:task.id,title:voiced,category:task.category}},
+  }));
+}
+
+async function handleShopAction(id){
+  const item=findShopItem(id);
+  if(!item) return;
+  const state=runtimeState();
+  const req=shopRequirement(item,state);
+  if(!req.ok){
+    globalThis.toastr?.warning?.(`锁着呢。先做到：${req.reason}。`);
+    return;
+  }
+  if(state.upgrades?.[id]){
+    globalThis.toastr?.info?.('买过了。别重复点。');
+    return;
+  }
+  if(pendingFor('purchase',id,state)){
+    globalThis.toastr?.info?.('已经在输入框里等你发送。');
+    return;
+  }
+
+  const spendable=getSpendableResources(state);
+  const balance=item.currency==='AP'?spendable.ap:spendable.sv;
+  if(balance<item.price){
+    globalThis.toastr?.warning?.(`穷。还差 ${item.price-balance} ${item.currency}。`);
+    return;
+  }
+
+  const voiced=shopVoiceName(item,state);
+  const charmGain=Number(CHARM_GAIN[item.id]||0);
+  const apDelta=item.currency==='AP'?-item.price:0;
+  const svDelta=item.currency==='SV'?-item.price:0;
+  const text=`【MÉMÉ OS｜已结算｜勿重复结算】购入「${voiced}」；${item.currency} -${item.price}${charmGain?`；CHARM +${charmGain}`:''}。扩展已完成扣款与改造记录，正文只描写改造后的结果。`;
+
+  await queueAction(createPendingAction({
+    type:'purchase',
+    recordType:'change',
+    title:`购入：${voiced}`,
+    summary:`购入「${voiced}」；${item.currency} -${item.price}${charmGain?`；CHARM +${charmGain}`:''}。`,
+    text,
+    effect:{
+      apDelta,
+      svDelta,
+      charmDelta:charmGain,
+      purchase:{id:item.id,title:voiced,category:item.category,level:1},
+    },
+  }));
+}
+
+async function handleRemovePending(actionId){
+  const state=runtimeState();
+  const action=state.pending?.find(item=>item.id===actionId);
+  if(!action) return;
+  removeFromInput(action.text);
+  await removePendingAction(actionId);
+  renderView(currentView(),false);
+  globalThis.toastr?.info?.('撤了。没发送就当没发生。');
+}
+
+async function handleMessageSent(messageId){
+  const context=globalThis.SillyTavern?.getContext?.() || {};
+  let sentMessage=null;
+  if(Number.isInteger(messageId)) sentMessage=context.chat?.[messageId] || null;
+  if(!sentMessage && messageId && typeof messageId==='object' && 'mes' in messageId) sentMessage=messageId;
+  if(!sentMessage){
+    const chat=context.chat || [];
+    sentMessage=[...chat].reverse().find(message=>message?.is_user) || null;
+  }
+  if(!sentMessage?.is_user) return;
+  const {committed}=await commitPendingActions(sentMessage.mes || '');
+  if(committed.length){
+    renderView(currentView(),false);
+    globalThis.toastr?.success?.(`MÉMÉ OS 已正式结算 ${committed.length} 项。`);
+  }
+}
+
+function bindSillyTavernEvents(){
+  if(globalThis.__meme_os_events_bound__) return;
+  const context=globalThis.SillyTavern?.getContext?.();
+  const source=context?.eventSource;
+  const events=context?.event_types || context?.eventTypes || {};
+  if(!source?.on) return;
+  if(events.MESSAGE_SENT) source.on(events.MESSAGE_SENT,handleMessageSent);
+  if(events.CHAT_CHANGED) source.on(events.CHAT_CHANGED,()=>renderView('home',false));
+  globalThis.__meme_os_events_bound__=true;
+}
+
 function ensureDialog() {
   let dialog = document.getElementById(DIALOG_ID);
   if (dialog) return dialog;
@@ -660,7 +1105,7 @@ function ensureDialog() {
   dialog.setAttribute('aria-label','MÉMÉ OS');
   dialog.innerHTML = panelMarkup();
 
-  dialog.addEventListener('click', event => {
+  dialog.addEventListener('click', async event => {
     if (event.target === dialog || event.target.closest('[data-meme-close]')) {
       closeMemeOS();
       return;
@@ -688,6 +1133,12 @@ function ensureDialog() {
       return;
     }
 
+    const taskAction = event.target.closest('[data-task-action]');
+    if (taskAction) {
+      await handleTaskAction(taskAction.dataset.taskAction);
+      return;
+    }
+
     const taskDetail = event.target.closest('[data-task-detail]');
     if (taskDetail) {
       taskDetail.closest('.meme-task-card')?.classList.toggle('is-open');
@@ -700,6 +1151,12 @@ function ensureDialog() {
       filters?.querySelectorAll('[data-shop-filter]').forEach(btn => btn.classList.toggle('is-active', btn === shopFilter));
       const list = dialog.querySelector('[data-shop-list]');
       if (list) list.innerHTML = renderShopList(shopFilter.dataset.shopFilter);
+      return;
+    }
+
+    const shopAction = event.target.closest('[data-shop-action]');
+    if (shopAction) {
+      await handleShopAction(shopAction.dataset.shopAction);
       return;
     }
 
@@ -718,6 +1175,12 @@ function ensureDialog() {
       return;
     }
 
+    const removePendingButton=event.target.closest('[data-remove-pending]');
+    if(removePendingButton){
+      await handleRemovePending(removePendingButton.dataset.removePending);
+      return;
+    }
+
     const groupToggle = event.target.closest('[data-men-group-toggle]');
     if (groupToggle) {
       groupToggle.closest('[data-men-group]')?.classList.toggle('is-open');
@@ -730,9 +1193,7 @@ function ensureDialog() {
       return;
     }
 
-    if (event.target.closest('[data-meme-preview]')) {
-      globalThis.toastr?.info?.('预览版：下一阶段再接真实操作与结算。');
-    }
+
   });
 
   dialog.addEventListener('cancel', event => {
@@ -745,8 +1206,9 @@ function ensureDialog() {
 }
 
 function openMemeOS() {
-  const dialog = ensureDialog();
-  if (!dialog.open) dialog.showModal();
+  const dialog=ensureDialog();
+  renderView(currentView(),false);
+  if(!dialog.open) dialog.showModal();
   document.documentElement.classList.add('meme-os-open');
 }
 
@@ -764,6 +1226,7 @@ function mount() {
 function start() {
   mount();
   ensureDialog();
+  bindSillyTavernEvents();
   globalThis.__meme_os_probe_timer__ = setInterval(mount, 1000);
   window.addEventListener('resize', mount, { passive:true });
   window.addEventListener('orientationchange', () => setTimeout(mount,150), { passive:true });
