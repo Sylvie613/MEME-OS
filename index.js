@@ -12,7 +12,7 @@ import { appendToInput, removeFromInput } from './src/input.js?v=0.8.3';
 import { isBoundCharacter } from './src/binding.js?v=0.8.3';
 
 /**
- * MÉMÉ OS v0.8.6
+ * MÉMÉ OS v0.9.0
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -35,7 +35,7 @@ const PREVIEW_STATE = {
 
 const TASK_DATA = {
   daily: [
-    { id:'clean', type:'DAILY', title:'先把自己收拾干净', desc:'完成洗头、洗澡、换洗衣物与基础口腔清洁。系统拒绝给“脏乱”找借口。', reward:'AP +20', state:'可接取', detail:'完成后由剧情状态确认。重复完成只记录，不重复刷取首通奖励。' },
+    { id:'clean', type:'DAILY', title:'先把自己收拾干净', desc:'完成洗头、洗澡、换洗衣物与基础口腔清洁。系统拒绝给“脏乱”找借口。', reward:'AP +20', state:'可接取', detail:'完成后由剧情状态确认。每个剧情日可结算一次；跨入新的一天后重新开放。' },
     { id:'mirror', type:'DAILY', title:'镜前扫描', desc:'在镜子前完整观察当前外貌三分钟，不遮脸、不跳过身体状态。', reward:'AP +10', state:'可接取', detail:'用于建立宿主对当前状态的客观认知。' },
     { id:'walk', type:'DAILY', title:'动起来', desc:'连续完成一次不少于二十分钟的步行或低强度活动。', reward:'AP +25', state:'可接取', detail:'系统只判定“完成 / 未完成”，不计算现实热量。' },
     { id:'posture', type:'DAILY', title:'别塌着', desc:'在一段完整场景中保持肩颈舒展、坐姿或站姿不持续蜷缩。', reward:'AP +15', state:'可接取', detail:'用于解锁后续姿态类改造。' },
@@ -268,6 +268,7 @@ function sanitizeDynamicItem(raw,state=runtimeState()){
   const title=String(raw.title||'临时改造').slice(0,40);
   const desc=String(raw.desc||'系统临时上架。').slice(0,140);
   const detail=String(raw.detail||'根据当前剧情临时出现，过期后自动撤架。').slice(0,180);
+  const bodyAxis=BODY_AXES.has(String(raw.bodyAxis||'')) ? String(raw.bodyAxis) : null;
   return {
     id,
     icon:String(raw.icon||'✦').slice(0,4),
@@ -284,6 +285,7 @@ function sanitizeDynamicItem(raw,state=runtimeState()){
     createdTurn:Number(state.shop?.plotTurn)||0,
     expiresTurn:(Number(state.shop?.plotTurn)||0)+ttl,
     source:String(raw.source||'剧情临时上架').slice(0,80),
+    bodyAxis,
   };
 }
 
@@ -515,6 +517,38 @@ const CHARM_GAIN = {
   orgasm1:0,
   recovery1:0,
 };
+
+const BODY_EFFECTS = {
+  lip1:{lips:1},
+  hair1:{hair:1},
+  skin1:{skin:1},
+  face1:{face:1},
+  eye1:{eyes:1},
+  face2:{face:1},
+  posture1:{posture:1},
+  bodyfat1:{bodyShape:1},
+  waist1:{waistHip:1},
+  leg1:{legs:1},
+  neck1:{neckShoulders:1},
+  bust1:{bust:1},
+  scent1:{scent:1},
+  breath1:{breath:1},
+  voice1:{voice:1},
+  touch1:{touch:1},
+  scent2:{scent:1},
+  sensitive1:{sensitivity:1},
+  arousal1:{arousal:1},
+  lubrication1:{lubrication:1},
+  orgasm1:{orgasm:1},
+  recovery1:{recovery:1},
+  charmseal:{specialMark:1},
+};
+
+const BODY_AXES = new Set([
+  'lips','face','eyes','skin','hair','posture','bodyShape','waistHip','legs',
+  'neckShoulders','bust','scent','breath','voice','touch','sensitivity',
+  'arousal','lubrication','orgasm','recovery','specialMark'
+]);
 
 const REQUIRE_UPGRADE = {
   waist1:'bodyfat1',
