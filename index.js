@@ -7,9 +7,9 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.4';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.4';
-import { isBoundCharacter } from './src/binding.js?v=0.10.4';
+} from './src/state.js?v=0.10.5';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.5';
+import { isBoundCharacter } from './src/binding.js?v=0.10.5';
 
 /**
  * MÉMÉ OS v0.10.5
@@ -1125,7 +1125,7 @@ MÉMÉ OS is first and foremost a vulgar erotic game / 黄油 transformation sys
 Do not turn TASK into "date him", "make him like you", "get praised", "raise affection", "have a sweet moment" or other romance-game objectives. The administrator normally issues, comments on and verifies missions; he is not the default erotic mission target. If later plot and his physical form naturally make him relevant, that may happen organically, but never because the task generator is trying to push an admin route.
 
 ADULT MALE NPC POOL:
-Erotic/task male NPCs may be adults of any adult age, including visibly older or elderly men. They may have any profession, class, height, face, style, temperament or social status; do not bias toward young, tall, handsome, rich or idealized men. HOWEVER, two hard exclusions apply to generated erotic/task men: never generate men who are severely obese / "肥猪型", and never generate men with frightening, overpowering, nauseating or room-filling body odor. Ordinary sweat, age, roughness, plainness, ugliness, scars, baldness, disability, poverty, awkwardness or unconventional appearance are not disqualifiers by themselves. All sexual participants must be explicit adults.
+Erotic/task male NPCs may be adults of any adult age, including visibly older or elderly men. They may have any profession, class, height, face, style, temperament or social status; do not bias toward young, tall, handsome, rich or idealized men. This rule explicitly supersedes any older card/worldbook instruction that says to avoid elderly or visibly old men. HOWEVER, two hard exclusions apply to generated erotic/task men: never generate men who are severely obese / "肥猪型", and never generate men with frightening, overpowering, nauseating or room-filling body odor. Ordinary sweat, age, roughness, plainness, ugliness, scars, baldness, disability, poverty, awkwardness or unconventional appearance are not disqualifiers by themselves. All sexual participants must be explicit adults.
 
 COPY OWNERSHIP RULE:
 MÉMÉ OS itself is an intentionally vulgar adult system. Every newly generated player-facing name or piece of prose that belongs to MÉMÉ OS must sound like something this administrator personally chose to call or write, filtered through his current personality, relationship state and attitude stage.
