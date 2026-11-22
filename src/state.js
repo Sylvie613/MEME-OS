@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 10;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -83,6 +83,7 @@ const DEFAULT_STATE = Object.freeze({
         current: [],
         recent: [],
         returning: [],
+        archive: {},
     },
     pending: [],
     history: [],
@@ -154,9 +155,10 @@ function mergeState(raw) {
             everCompleted: { ...base.tasks.everCompleted, ...(raw.tasks?.everCompleted ?? {}), ...(raw.tasks?.completed ?? {}) },
         },
         men: {
-            current: Array.isArray(raw.men?.current) ? raw.men.current : [],
-            recent: Array.isArray(raw.men?.recent) ? raw.men.recent : [],
-            returning: Array.isArray(raw.men?.returning) ? raw.men.returning : [],
+            current: Array.isArray(raw.men?.current) ? raw.men.current.slice(0, 3) : [],
+            recent: Array.isArray(raw.men?.recent) ? raw.men.recent.slice(0, 8) : [],
+            returning: Array.isArray(raw.men?.returning) ? raw.men.returning.slice(0, 5) : [],
+            archive: raw.men?.archive && typeof raw.men.archive === 'object' ? { ...raw.men.archive } : {},
         },
         pending: Array.isArray(raw.pending) ? raw.pending : [],
         history: Array.isArray(raw.history) ? raw.history : [],
