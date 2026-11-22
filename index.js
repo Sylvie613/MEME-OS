@@ -1,6 +1,7 @@
 /**
- * MÉMÉ OS v0.2.5
- * Native <dialog> top-layer modal for iOS Safari / SillyTavern compatibility.
+ * MÉMÉ OS v0.3.0
+ * High-fidelity visual shell based on the approved succubus reference.
+ * Native <dialog> retained for iOS Safari / SillyTavern reliability.
  */
 const MEME_ID = 'meme-os-heart-launcher';
 const DIALOG_ID = 'meme-os-dialog';
@@ -24,7 +25,7 @@ function positionLauncher(button) {
   button.style.bottom = 'auto';
 }
 
-function heartMarkup() {
+function launcherMarkup() {
   return `
     <svg viewBox="0 0 100 90" width="44" height="40" aria-hidden="true">
       <path d="M50 84 C43 76 11 57 7 34 C4 17 15 6 29 6 C39 6 46 12 50 20
@@ -40,13 +41,14 @@ function heartMarkup() {
 function makeLauncher() {
   let button = document.getElementById(MEME_ID);
   if (button) return button;
+
   button = document.createElement('button');
   button.id = MEME_ID;
   button.type = 'button';
   button.title = '打开 MÉMÉ OS';
   button.setAttribute('aria-label','打开 MÉMÉ OS');
-  button.innerHTML = heartMarkup();
-  button.addEventListener('click', (event) => {
+  button.innerHTML = launcherMarkup();
+  button.addEventListener('click', event => {
     event.preventDefault();
     event.stopPropagation();
     openMemeOS();
@@ -55,11 +57,48 @@ function makeLauncher() {
   return button;
 }
 
-function moduleCard(key, sigil, title, sub) {
+function crownMarkup() {
+  return `
+    <svg viewBox="0 0 92 82" width="54" height="48" aria-hidden="true">
+      <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 29
+                 C20 38 26 43 34 45
+                 C38 46 41 45 46 41
+                 C51 45 54 46 58 45
+                 C66 43 72 38 78 29"
+              stroke-width="3"/>
+        <path d="M14 29 L25 36 L31 18 L40 36 L46 11 L52 36 L61 18 L67 36 L78 29"
+              stroke-width="3"/>
+        <path d="M27 50 C37 56 55 56 65 50" stroke-width="2.3"/>
+        <path d="M46 53 L46 70" stroke-width="2.2"/>
+      </g>
+      <path d="M46 66 L51 72 L46 78 L41 72 Z" fill="currentColor"/>
+      <path d="M46 8 L50 13 L46 18 L42 13 Z" fill="currentColor"/>
+    </svg>
+  `;
+}
+
+function moduleIcon(type) {
+  const icons = {
+    me: '<span class="meme-heart-outline">♡</span>',
+    task: '<span class="meme-star-glyph">✦</span>',
+    shop: '<span class="meme-diamond-glyph">◇</span>',
+    men: '<span class="meme-mars-glyph">♂</span>',
+    system: '<span class="meme-crown-mini">♛</span>',
+    record: '<span class="meme-record-glyph">≋</span>',
+    home: '<span class="meme-home-glyph">⌂</span>',
+  };
+  return icons[type] || '•';
+}
+
+function moduleCard(key, title, sub) {
   return `
     <button type="button" class="meme-module" data-meme-module="${key}">
-      <span class="meme-module-sigil">${sigil}</span>
-      <span class="meme-module-copy"><b>${title}</b><small>${sub}</small></span>
+      <span class="meme-module-icon">${moduleIcon(key)}</span>
+      <span class="meme-module-copy">
+        <b>${title}</b>
+        <small>${sub}</small>
+      </span>
       <span class="meme-module-arrow">›</span>
     </button>
   `;
@@ -68,13 +107,11 @@ function moduleCard(key, sigil, title, sub) {
 function panelMarkup() {
   return `
     <section class="meme-os-window">
-      <div class="meme-ambient meme-ambient--pink"></div>
-      <div class="meme-ambient meme-ambient--violet"></div>
-      <div class="meme-horn meme-horn--left"></div>
-      <div class="meme-horn meme-horn--right"></div>
+      <div class="meme-edge-glow meme-edge-glow--a"></div>
+      <div class="meme-edge-glow meme-edge-glow--b"></div>
 
       <header class="meme-head">
-        <div>
+        <div class="meme-brand">
           <span class="meme-kicker">SUCCUBUS PROTOCOL</span>
           <div class="meme-title"><span>MÉMÉ</span><i>OS</i></div>
         </div>
@@ -88,28 +125,10 @@ function panelMarkup() {
             <span class="meme-code">HOST · 001</span>
           </div>
 
-          <div class="meme-seal">
-            <span class="meme-seal-ring"></span>
-            <span class="meme-seal-eye" aria-hidden="true">
-  <svg viewBox="0 0 64 64" width="34" height="34">
-    <path d="M10 32 C17 20 25 15 32 15 C39 15 47 20 54 32 C47 44 39 49 32 49 C25 49 17 44 10 32Z"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.6"
-          stroke-linecap="round"/>
-    <ellipse cx="32" cy="32" rx="7" ry="12"
-             fill="rgba(239,119,171,.18)"
-             stroke="currentColor"
-             stroke-width="2"/>
-    <ellipse cx="32" cy="32" rx="2.6" ry="8"
-             fill="currentColor"/>
-    <path d="M32 12 L29 7 M32 12 L35 7"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.2"
-          stroke-linecap="round"/>
-  </svg>
-</span>
+          <div class="meme-crown-seal">
+            <span class="meme-crown-orbit"></span>
+            <span class="meme-crown-orbit meme-crown-orbit--inner"></span>
+            <span class="meme-crown-symbol">${crownMarkup()}</span>
           </div>
 
           <p class="meme-contract-label">DESIRE ENGINE</p>
@@ -119,37 +138,51 @@ function panelMarkup() {
           <div class="meme-progress"><span></span></div>
 
           <div class="meme-stat-grid">
-            <article><small>AP</small><strong>000</strong><em>改造点</em></article>
-            <article><small>SV</small><strong>000</strong><em>精液值</em></article>
-            <article><small>CHARM</small><strong>03</strong><em>综合魅力</em></article>
+            <article>
+              <small>AP</small>
+              <strong>000</strong>
+              <em>改造点</em>
+            </article>
+            <article>
+              <small>SV</small>
+              <strong>000</strong>
+              <em>精液值</em>
+            </article>
+            <article>
+              <small>CHARM</small>
+              <strong>03</strong>
+              <em>综合魅力</em>
+            </article>
           </div>
         </section>
 
         <section class="meme-modules">
           <div class="meme-section-head">
-            <div><small>PRIVATE ACCESS</small><h3>欲望系统</h3></div>
+            <div>
+              <small>PRIVATE ACCESS</small>
+              <h3>欲望系统</h3>
+            </div>
             <span>7 / 7</span>
           </div>
 
           <div class="meme-module-grid">
-            ${moduleCard('me','♡','ME','宿主改造')}
-            ${moduleCard('task','✦','TASK','任务与奖励')}
-            ${moduleCard('shop','◇','SHOP','欲望商城')}
-            ${moduleCard('men','♂','MEN','对象档案')}
-            ${moduleCard('system','♛','SYSTEM','管理员')}
-            ${moduleCard('record','≋','RECORD','成长记录')}
-            ${moduleCard('home','⌂','HOME','系统总览')}
+            ${moduleCard('me','ME','宿主改造')}
+            ${moduleCard('task','TASK','任务与奖励')}
+            ${moduleCard('shop','SHOP','欲望商城')}
+            ${moduleCard('men','MEN','对象档案')}
+            ${moduleCard('system','SYSTEM','管理员')}
+            ${moduleCard('record','RECORD','成长记录')}
+            ${moduleCard('home','HOME','系统总览')}
           </div>
-        </section>
-
-        <section class="meme-whisper">
-          <span class="meme-whisper-mark">♥</span>
-          <div><small>SYSTEM WHISPER</small><p>“别急。你现在还只是绑定成功而已。”</p></div>
         </section>
       </main>
 
       <footer class="meme-footer">
-        <span>PRIVATE CONTRACT</span><b>♥</b><span>NO ESCAPE</span>
+        <span class="meme-footer-spark">✦</span>
+        <span>PRIVATE CONTRACT</span>
+        <b>♥</b>
+        <span>NO ESCAPE</span>
+        <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
   `;
@@ -164,19 +197,7 @@ function ensureDialog() {
   dialog.setAttribute('aria-label','MÉMÉ OS');
   dialog.innerHTML = panelMarkup();
 
-  Object.assign(dialog.style,{
-    padding:'0',
-    border:'0',
-    background:'transparent',
-    width:'min(390px, calc(100vw - 20px))',
-    maxWidth:'390px',
-    maxHeight:'78dvh',
-    overflow:'visible',
-    margin:'auto',
-    color:'inherit'
-  });
-
-  dialog.addEventListener('click', (event) => {
+  dialog.addEventListener('click', event => {
     if (event.target === dialog || event.target.closest('[data-meme-close]')) {
       closeMemeOS();
       return;
@@ -189,7 +210,7 @@ function ensureDialog() {
     }
   });
 
-  dialog.addEventListener('cancel', (event) => {
+  dialog.addEventListener('cancel', event => {
     event.preventDefault();
     closeMemeOS();
   });
