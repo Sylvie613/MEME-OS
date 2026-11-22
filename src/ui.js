@@ -84,6 +84,12 @@ function bindSillyTavernEvents() {
 }
 
 function togglePanel() {
+    const root = document.getElementById(ROOT_ID);
+    if (root?.dataset.bound !== 'true') {
+        globalThis.toastr?.warning?.('MÉMÉ OS 扩展已加载，但当前角色卡的 meme_os 绑定未被识别。');
+        return;
+    }
+
     const panel = document.getElementById(PANEL_ID);
     const open = panel.getAttribute('aria-hidden') === 'true';
     panel.setAttribute('aria-hidden', String(!open));
@@ -156,15 +162,20 @@ function refreshUi() {
     const panel = root.querySelector(`#${PANEL_ID}`);
     const binding = getBinding();
 
+    // Diagnostic-safe launcher: if the extension itself loaded, always expose MÉ.
+    // Bound cards get the real OS; unbound cards only get a diagnostic shell.
+    launcher.hidden = false;
+
     if (!binding) {
-        launcher.hidden = true;
-        panel.setAttribute('aria-hidden', 'true');
-        panel.classList.remove('is-open');
         root.dataset.bound = 'false';
+        root.dataset.profile = 'unbound';
+        launcher.textContent = 'MÉ!';
+        launcher.title = 'MÉMÉ OS 已加载，但当前角色卡绑定未识别';
         return;
     }
 
-    launcher.hidden = false;
+    launcher.textContent = 'MÉ';
+    launcher.title = 'MÉMÉ OS';
     root.dataset.bound = 'true';
     root.dataset.profile = binding.profile;
 
