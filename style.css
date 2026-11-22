@@ -1627,7 +1627,13 @@ html.meme-os-open body{
   cursor:pointer;
 }
 .meme-task-card.is-done{
-  opacity:.68;
+  opacity:.62;
+}
+.meme-task-card.is-done h4,
+.meme-task-card.is-done p,
+.meme-task-card.is-done .meme-task-detail{
+  text-decoration:line-through;
+  text-decoration-thickness:1px;
 }
 .meme-task-foot button:disabled,
 .meme-shop-buy button:disabled{
