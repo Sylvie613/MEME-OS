@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -26,6 +26,9 @@ const DEFAULT_STATE = Object.freeze({
         systemInviteReady: false,
         systemUnlockedByAdmin: false,
         adminInterestSignals: 0,
+        adminDesireSignals: 0,
+        adminAttachmentSignals: 0,
+        adminLove: false,
         milestones: {
             completedTasks: 0,
             purchasedUpgrades: 0,
@@ -61,11 +64,12 @@ function cloneDefaultState() {
 
 function charmToStage(charm) {
     const n = Number(charm) || 0;
-    if (n < 10) return { attitudeStage: 0, stage: '初始改造阶段' };
-    if (n < 20) return { attitudeStage: 1, stage: '勉强修复阶段' };
-    if (n < 35) return { attitudeStage: 2, stage: '开始像样阶段' };
-    if (n < 55) return { attitudeStage: 3, stage: '明显吸引阶段' };
-    return { attitudeStage: 4, stage: '高魅力改造阶段' };
+    if (n < 15) return { attitudeStage: 0, stage: '惨不忍睹阶段' };
+    if (n < 35) return { attitudeStage: 1, stage: '抢救修复阶段' };
+    if (n < 55) return { attitudeStage: 2, stage: '终于像样阶段' };
+    if (n < 70) return { attitudeStage: 3, stage: '明显好看阶段' };
+    if (n < 85) return { attitudeStage: 4, stage: '美女阶段' };
+    return { attitudeStage: 5, stage: '高魅力美女阶段' };
 }
 
 function mergeState(raw) {
@@ -288,7 +292,7 @@ function applyEffect(state, effect) {
 
     const milestones = state.permission.milestones;
     state.permission.systemEligible =
-        state.host.charm >= 1 &&
+        state.host.charm >= 10 &&
         milestones.completedTasks >= 2 &&
         milestones.purchasedUpgrades >= 1 &&
         state.permission.adminInterestSignals >= 1;
