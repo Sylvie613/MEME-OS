@@ -12,7 +12,7 @@ import { appendToInput, removeFromInput } from './src/input.js?v=0.8.3';
 import { isBoundCharacter } from './src/binding.js?v=0.8.3';
 
 /**
- * MÉMÉ OS v0.8.5
+ * MÉMÉ OS v0.8.6
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -42,11 +42,11 @@ const TASK_DATA = {
     { id:'outfit', type:'DAILY', title:'像样地出门', desc:'搭配一套干净、合身、没有明显邋遢感的外出服。', reward:'AP +20', state:'可接取', detail:'不要求昂贵，只要求“看起来像认真收拾过”。' },
   ],
   desire: [
-    { id:'spark', type:'DESIRE', title:'第一次欲望信号', desc:'与一名成年对象产生明确、双方可感知的性吸引或欲望互动。', reward:'AP +80 · SV +10', state:'CHARM 8 解锁', locked:true, detail:'不要求发生性行为；只记录明确的成人欲望信号。' },
-    { id:'sample', type:'DESIRE', title:'第一次精液采集', desc:'从成年对象处获得一次有效精液采集，并让系统完成确认。', reward:'AP +120 · SV +40', state:'CHARM 12 解锁', locked:true, detail:'完成后该对象会进入 MEN 的 CURRENT 或 RECENT，视剧情是否继续。' },
-    { id:'oral', type:'DESIRE', title:'口腔采集', desc:'完成一次成人口腔性接触，并取得系统判定的有效样本。', reward:'AP +160 · SV +60', state:'CHARM 15 解锁', locked:true, detail:'属于欲望任务，不会被当作日常重复任务刷取。' },
+    { id:'spark', type:'DESIRE', title:'先让男人真的对你起色心', desc:'让一名成年对象明确对你产生性欲，不算礼貌夸奖，不算客套，得是真想碰你、想睡你。', reward:'AP +80 · SV +10', state:'CHARM 8 解锁', locked:true, detail:'不用真的上床，但对方必须出现明确、可识别的成人性欲。' },
+    { id:'sample', type:'DESIRE', title:'第一次把精液交上来', desc:'从成年对象处拿到第一次可结算的精液。别拿暧昧当成果，系统收的是精液，不是空气。', reward:'AP +120 · SV +40', state:'CHARM 12 解锁', locked:true, detail:'结算成功后，该对象按剧情进入 MEN 的 CURRENT 或 RECENT。' },
+    { id:'oral', type:'DESIRE', title:'嘴别只会顶嘴', desc:'和成年对象完成一次口交，并拿到系统认可的射精结算。嘴硬不算本事，真把活干完才算。', reward:'AP +160 · SV +60', state:'CHARM 15 解锁', locked:true, detail:'欲望任务，不按日常任务无限刷。' },
     { id:'repeat', type:'DESIRE', title:'第二次不是偶然', desc:'与同一成年对象发生第二次明确的性接触或欲望事件。', reward:'AP +180 · SV +50', state:'CHARM 18 解锁', locked:true, detail:'若对象曾淡出，完成后会被 MEN 自动提升为 RETURNING。' },
-    { id:'drain', type:'DESIRE', title:'榨干奖励', desc:'在一次成人性场景中让对象达到系统判定的“完全采集”。', reward:'AP +260 · SV +100', state:'CHARM 25 解锁', locked:true, detail:'高阶采集任务。系统会记录对象状态，但不会因此强制建立长期关系。' },
+    { id:'drain', type:'DESIRE', title:'真有本事就把他榨干', desc:'在一次成人性场景里把成年对象操到系统判定的“完全采集”，别做到一半就只顾自己爽。', reward:'AP +260 · SV +100', state:'CHARM 25 解锁', locked:true, detail:'高阶SV任务。睡过也不等于恋爱，系统只记结果和关系事实。' },
   ],
   special: [
     { id:'audit', type:'SYSTEM', title:'管理员审美复检', desc:'触发一次完整宿主扫描，管理员会根据当前阶段重新评价。', reward:'AP +50', state:'阶段任务', detail:'评价可能很难听，但不会凭空增加或减少属性。' },
@@ -105,17 +105,17 @@ const RECORD_DATA = [
 const VOICE_STAGES = [
   {
     id:'disgust', min:0, max:14, label:'纯嫌弃期', code:'VENOM',
-    rule:'他骨子里就刻薄嘴臭。此阶段没有夸奖、没有嘴硬心软、没有隐藏喜欢；只会挑缺点、嫌烦、讽刺、命令。',
+    rule:'刻薄、嘴臭、恶俗。此阶段没有夸奖、嘴硬心软或隐藏喜欢；会直接拿外貌、邋遢和身体状态开刀，措辞可以粗俗难听，但必须具体，不机械复读脏话。',
     home:[
       '“别盯着界面看。先去洗头。”',
-      '“零魅力。你现在最该研究的是怎么把自己收拾干净。”',
-      '“我没在打击你，我只是在陈述一件很难看的事实。”',
+      '“零魅力。你现在这副样子，连发情都像在给别人添堵。”',
+      '“别摆那张委屈脸。难看的是你，我只是嘴比别人诚实。”',
       '“少跟我讲自信。自信不能替你洗头。”'
     ],
   },
   {
     id:'repair', min:15, max:34, label:'抢救期', code:'REPAIR',
-    rule:'承认改造确实有用，但夸奖极度吝啬。最多说“至少不那么碍眼”“总算像个人”，语气仍尖刻，不许温柔。',
+    rule:'承认改造有效，但嘴仍然脏而刻薄。最多算“从灾难修到能看”，不许温柔；可以拿她终于有点像个会勾人的成年女人来损，但不能提前产生真实欲望。',
     home:[
       '“至少现在没刚绑定时那么灾难。”',
       '“别笑。‘有改善’和‘好看’中间隔着一整条银河。”',
@@ -125,7 +125,7 @@ const VOICE_STAGES = [
   },
   {
     id:'acceptable', min:35, max:54, label:'顺眼期', code:'ACCEPT',
-    rule:'他开始承认宿主已经像样、甚至偶尔好看，但仍舍不得直接夸。更多用反话、挑刺和极短的认可掩饰，不产生色情兴趣。',
+    rule:'开始承认宿主像样甚至好看，但仍吝啬夸奖。恶俗嘴不收，会拿男人视线、骚气、身体观感做下流评价，但仍没有针对宿主的真实性欲。',
     home:[
       '“……这次确实顺眼。你最好别逼我重复。”',
       '“别得意，我说的是‘不难看’，不是‘漂亮得让我失智’。”',
@@ -135,7 +135,7 @@ const VOICE_STAGES = [
   },
   {
     id:'pretty', min:55, max:69, label:'漂亮期', code:'PRETTY',
-    rule:'客观上已经明显好看，他会非常吝啬地承认“漂亮”。仍没有自动欲望，更不会因为漂亮就变温柔；嘴臭照旧。',
+    rule:'客观上明显漂亮。他会承认“漂亮”，但嘴依旧脏，常把夸奖说成下流评价或挑刺；漂亮不等于他本人想操/想睡，更不等于温柔。',
     home:[
       '“行，漂亮。满意了？别让我说第二遍。”',
       '“现在确实有人会回头看你。你先把那副得意样收一收。”',
@@ -145,7 +145,7 @@ const VOICE_STAGES = [
   },
   {
     id:'beauty', min:70, max:84, label:'美女期', code:'BEAUTY',
-    rule:'已经达到这个纯颜控真正认可的美女门槛。只有从这里开始，若剧情另外产生真实欲望信号，他才可能出现性兴趣；没有欲望信号时仍只是冷静承认漂亮。',
+    rule:'真正跨过他的美女审美门槛。只有从这里开始，具体剧情才可能让他出现“想睡/想碰/想操”的真实性欲；没有欲望信号时仍只是一个嘴很脏的审美评价者。',
     home:[
       '“……现在倒是真的配得上‘美女’两个字了。”',
       '“别靠那么近。我只是在确认改造结果。”',
@@ -155,7 +155,7 @@ const VOICE_STAGES = [
   },
   {
     id:'stunning', min:85, max:999, label:'高魅力美女期', code:'STUNNING',
-    rule:'外貌已经非常符合他的审美。若欲望线已产生，他会更露骨、更挑剔、更有占有式审美，但仍不等于爱。真正温柔只允许在独立的爱意状态成立后偶尔出现。',
+    rule:'外貌高度符合他的审美。若欲望线已产生，他会明显更黄、更露骨、更敢直接说想怎么碰、怎么睡，但仍不等于爱。真正温柔只允许LOVE成立后偶尔出现，恶俗嘴不会被洗白。',
     home:[
       '“这张脸现在确实很合我胃口。可惜嘴还是一样会惹我烦。”',
       '“别晃。让我多看两秒。”',
@@ -183,11 +183,11 @@ const RUDE_SHOP_NAMES = {
   voice1:'说话别那么难听Ⅰ',
   touch1:'摸起来别再这么粗糙',
   scent2:'终于可以谈“好闻”了',
-  sensitive1:'把这副迟钝身体调灵一点',
-  arousal1:'别连自己想不想要都搞不懂',
-  lubrication1:'至少让身体学会自己配合',
-  orgasm1:'别高潮都这么没出息',
-  recovery1:'玩完别立刻瘫成一滩',
+  sensitive1:'别被操了半天身体还像死机',
+  arousal1:'先学会知道自己什么时候真发情',
+  lubrication1:'别每次想要了下面还干得丢人',
+  orgasm1:'高潮别像挤牙膏一样寒碜',
+  recovery1:'被操完别立刻瘫成一滩',
   charmseal:'给你烙个终于配得上的印记',
   qadmin:'想看我？先把等级爬上来',
   touchadmin:'想让我碰你？资格还没到',
@@ -213,11 +213,11 @@ const RUDE_SHOP_DESCS = {
   voice1:'声音不算难听，但毫无记忆点，还带点含混。先让人听清楚你在说什么。',
   touch1:'皮肤摸起来粗，干湿还不均。先把触感做得像皮肤，而不是砂纸。',
   scent2:'基础清洁过关以后，才轮得到“让人想再靠近一点”这种东西。',
-  sensitive1:'你现在身体反应慢得像没开机。先把感受调灵一点，别每次都等半天。',
-  arousal1:'连自己有没有欲望都辨认不清。先学会知道自己什么时候真的想要。',
-  lubrication1:'身体别每次都等到最后才肯配合。把自然反应调快一点。',
-  orgasm1:'有反应不代表会享受。把高潮质量往上提，不是单纯追求次数。',
-  recovery1:'一次亲密活动就累得什么都不想动，太没用。把恢复速度往回拉。',
+  sensitive1:'你这身体迟钝得像没通电。真被人摸、舔、操的时候至少该知道哪里爽，别半天才有反应。',
+  arousal1:'连自己什么时候真想要、什么时候只是嘴硬都分不清。先把发情这件事认明白。',
+  lubrication1:'都想被碰了下面还干得跟没这回事一样。把自然湿润反应调快点，省得每次都丢人。',
+  orgasm1:'会叫不等于会爽。把高潮调得像样一点，别每次都像勉强交作业。',
+  recovery1:'被操一次就瘫得像报废，太没用。把恢复速度拉回来，至少还能继续折腾。',
   charmseal:'等你真的好看到配得上这个印记，我才会给。现在看两眼就行。',
   qadmin:'想看见我？先把自己和系统等级一起弄上去。白嫖不存在。',
   touchadmin:'连看都还没看见就惦记上手。想得挺快。',
@@ -230,11 +230,11 @@ const RUDE_TASK_DESCS = {
   walk:'坐着不会自动变好看。起来动二十分钟，别把“改造”理解成躺着等我给。',
   posture:'肩膀打开，背挺起来。你再缩成那样，买再多东西也只是把好东西堆在烂姿态上。',
   outfit:'不用贵，先穿干净、合身、像认真挑过的衣服。别再把随便套上身当风格。',
-  spark:'先证明真有成年男人会对你产生欲望。不是礼貌，不是客套，是他真的想碰你。',
-  sample:'拿到第一次有效样本再回来。别拿一点暧昧就当自己完成成人任务。',
-  oral:'这次别只会嘴硬。完成有效的成人口腔采集，系统要的是结果。',
-  repeat:'同一个人第二次还主动回来，才说明上次不是纯事故。让我看看你到底有没有留住他的欲望。',
-  drain:'既然都做到这一步，就别空手结束。把完整采集拿回来再结算。',
+  spark:'先证明真有成年男人看着你会起色心。不是“你今天真好看”这种屁话，是他真的想碰、想睡、想把你按到床上。',
+  sample:'我要的是第一次能结算的精液。别拿几句骚话和摸两下回来邀功，射出来、收得到，才算数。',
+  oral:'这张嘴平时除了顶嘴没别的本事。去做一次真正的口交，等对方射出来再回来交差。',
+  repeat:'同一个男人第二次还想睡你，才说明上次不是一时脑热。让我看看你到底有没有本事让人操完还惦记。',
+  drain:'都做到床上去了就别装矜持。把人榨到射干净，再把SV给我带回来。',
   audit:'站好。让我重新从头扫一遍，看看到底救回来多少，还是你只会自我感觉良好。',
   qform:'等我愿意让你看见的时候，你自然会看见。现在急也没用。',
   contract:'隐藏就是不想让你提前知道。老实玩，别总想翻答案。',
@@ -439,9 +439,11 @@ ADMINISTRATOR CHARACTER INVARIANTS:
 He is a vivid adult male with strong private tastes, opinions, irritations and agency, not a helpful generic system.
 
 COPY OWNERSHIP RULE:
-Every newly generated player-facing name or piece of prose that belongs to MÉMÉ OS must sound like something this administrator personally chose to call or write, filtered through his current personality, relationship state and attitude stage. This applies to dynamic shop item names/descriptions/details, newly generated task names/descriptions, special-event titles, recommendations, warnings, evaluations, unlock notices, administrator notes, and any future dynamic module copy.
+MÉMÉ OS itself is an intentionally vulgar adult system. Every newly generated player-facing name or piece of prose that belongs to MÉMÉ OS must sound like something this administrator personally chose to call or write, filtered through his current personality, relationship state and attitude stage.
+His house voice is not elegant sarcasm. It is sharp + obscene + mean: crude sexual slang, dirty implications, shameless body commentary, vulgar jokes and specific insults are normal when context allows. In sexual or SV-related contexts, prefer direct adult vocabulary such as 精液、口交、高潮、发情、湿、想操/想睡、射精 instead of sanitized euphemisms such as “亲密接触”“有效样本”“成人互动”. Do not make every sentence sexual when the topic is ordinary hygiene or appearance, but the OS should still feel indecent, low-mouthed and malicious rather than polished or therapeutic.
+This applies to dynamic shop item names/descriptions/details, newly generated task names/descriptions, special-event titles, recommendations, warnings, evaluations, unlock notices, administrator notes, and any future dynamic module copy.
 Do NOT output generic RPG/system copy such as "Skin Upgrade I", "New mission unlocked", "Recommended item", or neutral template prose unless it is a structural UI label. Structural labels such as AP, SV, CHARM, TASK, SHOP, MEN, SYSTEM and RECORD may remain neutral/technical.
-If a new feature is introduced later and its text is authored by the model, default to administrator-authored voice automatically. Names and descriptions should not merely add insults; they must reflect what he specifically thinks about the host and the current situation.
+Names and descriptions must not merely append a swear word. They should reveal what he specifically thinks is ugly, pathetic, horny, funny or worth fixing in the present situation. Avoid repetitive stock insults.
 Current administrator tone stage: ${voice.label}.
 
 He is a vivid adult male with strong private tastes, opinions, irritations and agency, not a helpful generic system. He is naturally sharp-tongued, judgmental, vain about aesthetics, impatient, mean in a witty specific way, observant, remembers slights, dislikes cheap flattery and fake inspirational talk, enjoys needling the host when she gives him an opening, and does not soften merely because time passes.
@@ -472,11 +474,11 @@ const RUDE_TASK_NAMES = {
   walk:'动一动，别继续长在椅子上',
   posture:'别缩成一团',
   outfit:'穿得别像刚从垃圾袋里爬出来',
-  spark:'先证明真有人会对你起欲望',
-  sample:'第一次把精液交上来',
-  oral:'嘴别只会顶嘴',
+  spark:'先证明真有男人想操你',
+  sample:'第一次精液，别空手回来',
+  oral:'这张嘴总得有点别的用处',
   repeat:'第二次还来？那就不算意外了',
-  drain:'既然都碰了，就别空手回来',
+  drain:'都上床了就把精液榨干净',
   audit:'让我重新看看你到底救回来多少',
   qform:'终于有资格看见我了',
   contract:'你现在还没资格知道',
@@ -832,12 +834,12 @@ function homeMarkup() {
         <span>7 / 7</span>
       </div>
       <div class="meme-module-grid">
-        ${moduleCard('me','ME','看看你现在有多惨')}
-        ${moduleCard('task','TASK','我给你的活')}
-        ${moduleCard('shop','SHOP','花点数救你')}
-        ${moduleCard('men','MEN','沾过边的男人')}
+        ${moduleCard('me','ME','看看这副身子还剩多少能救')}
+        ${moduleCard('task','TASK','去干活，别光会发骚')}
+        ${moduleCard('shop','SHOP','花钱把这副身子修得能看')}
+        ${moduleCard('men','MEN','睡过你、想睡你的男人')}
         ${moduleCard('system','SYSTEM','看我干什么')}
-        ${moduleCard('record','RECORD','你干过的事')}
+        ${moduleCard('record','RECORD','你干过的脏事我都记着')}
         ${moduleCard('home','HOME','滚回总览')}
       </div>
     </section>
@@ -961,7 +963,7 @@ function taskMarkup() {
   const state=runtimeState();
   return `
     ${pendingTrayMarkup(state)}
-    ${pageHeader('MISSION CENTER','TASK · 我给你的活',attitude(state).code)}
+    ${pageHeader('MISSION CENTER','TASK · 去干活，别光发骚',attitude(state).code)}
     <div class="meme-tabbar" data-task-tabs>
       <button class="is-active" type="button" data-task-tab="daily">日常</button>
       <button type="button" data-task-tab="desire">欲望</button>
@@ -1014,7 +1016,7 @@ function shopMarkup() {
   const spendable=getSpendableResources(state);
   return `
     ${pendingTrayMarkup(state)}
-    ${pageHeader('DESIRE MARKET','SHOP · 花点数救你',attitude(state).code)}
+    ${pageHeader('DESIRE MARKET','SHOP · 把这副身子修得能看',attitude(state).code)}
     <div class="meme-shop-balance">
       <span><small>AP 可用</small><b>${String(spendable.ap).padStart(3,'0')}</b></span>
       <i></i>
@@ -1029,7 +1031,7 @@ function shopMarkup() {
       ${getDynamicShop(state).length ? '<button type="button" data-shop-filter="plot">剧情 · '+getDynamicShop(state).length+'</button>' : ''}
     </div>
     <section class="meme-shop-list" data-shop-list>${renderShopList('appearance')}</section>
-    <p class="meme-preview-note">价格是我定的。买不起就去做任务，别盯着商品流口水。</p>
+    <p class="meme-preview-note">价格是我定的。买不起就去做任务，别一边穷一边对着改造项目发骚。</p>
   `;
 }
 
@@ -1093,7 +1095,7 @@ function menMarkup() {
   const count=totalMenCount();
   return `
     ${pendingTrayMarkup(state)}
-    ${pageHeader('TARGET ARCHIVE','MEN · 沾过边的男人',String(count).padStart(2,'0'))}
+    ${pageHeader('TARGET ARCHIVE','MEN · 睡过你、想睡你的男人',String(count).padStart(2,'0'))}
     <section class="meme-men-summary">
       <div><small>CURRENT</small><b>${state.men.current.length}</b><em>正在碰</em></div>
       <div><small>RECENT</small><b>${state.men.recent.length}</b><em>刚碰过</em></div>
@@ -1105,11 +1107,11 @@ function menMarkup() {
       ${menGroupMarkup('returning','RETURNING','居然又找回来的',false)}
     </div>
     <section class="meme-page-card meme-men-rules">
-      <div class="meme-card-title"><small>MY ARCHIVE RULE</small><h3>我没兴趣替你记所有男人</h3></div>
+      <div class="meme-card-title"><small>MY ARCHIVE RULE</small><h3>我没兴趣替你记每一个想往你身上蹭的男人</h3></div>
       ${labelValue('CURRENT','最多 3 个。只留现在剧情真正在碰的。')}
       ${labelValue('RECENT','最多 8 个。睡过、榨过、约过、留过联系方式才配进。')}
       ${labelValue('RETURNING','最多 5 个。真的再次出现才算，不叫长期对象。')}
-      ${labelValue('路人','说两句话的我懒得记。')}
+      ${labelValue('路人','说两句话、看两眼就走的废物我懒得记。')}
       <p class="meme-men-rule-note">淡出 MEN 的旧人只在 RECORD 留一笔。以后真撞回来，我会把旧档案重新翻出来。</p>
     </section>
   `;
@@ -1164,7 +1166,7 @@ function systemMarkup() {
           <div><b>${stage.min}–${stage.max===999?'100':stage.max} · ${stage.label}</b><p>${stage.rule}</p></div>
         </div>
       `).join('')}
-      <p class="meme-men-rule-note">规则：除了 AP / SV / CHARM / TASK / SHOP 这类结构标签，所有新生成的名称、说明、任务、事件、推荐、警告和管理员留言都必须像是他本人亲手写的，先经过当前人格与态度层；不是简单加一句骂人话，更不许突然变成通用游戏文案或客服腔。</p>
+      <p class="meme-men-rule-note">规则：除了 AP / SV / CHARM / TASK / SHOP 这类结构标签，所有新生成的名称、说明、任务、事件、推荐、警告和管理员留言都必须像是他本人亲手写的。基调固定为刻薄＋恶俗：能直说就别装文明，碰到性、SV、身体反应时直接说精液、口交、射精、高潮、发情、湿、想睡/想操；普通内容也要嘴脏、下流、缺德，不准突然变成通用游戏文案、心理咨询或客服腔。</p>
     </section>
 
     <section class="meme-page-card">
@@ -1237,7 +1239,7 @@ function recordMarkup() {
   const state=runtimeState();
   return `
     ${pendingTrayMarkup(state)}
-    ${pageHeader('PRIVATE LOG','RECORD · 你干过的事',String(RECORD_DATA.length+(state.history?.length||0)).padStart(2,'0'))}
+    ${pageHeader('PRIVATE LOG','RECORD · 你干过的脏事',String(RECORD_DATA.length+(state.history?.length||0)).padStart(2,'0'))}
     <div class="meme-record-filter" data-record-filters>
       <button class="is-active" type="button" data-record-filter="all">全部</button>
       <button type="button" data-record-filter="change">改造</button>
