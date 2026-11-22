@@ -12,7 +12,7 @@ import { appendToInput, removeFromInput } from './src/input.js?v=0.9.8';
 import { isBoundCharacter } from './src/binding.js?v=0.9.8';
 
 /**
- * MÉMÉ OS v0.9.8
+ * MÉMÉ OS v0.9.9
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -639,6 +639,28 @@ function recordAdminBondMoment(state,{kind,signal,reason,tag,messageId}){
 }
 
 
+function runtimeMessageAlreadyProcessed(state,messageId){
+  if(!Number.isInteger(messageId)) return false;
+  const list=Array.isArray(state.runtime?.processedAssistantMessages)
+    ? state.runtime.processedAssistantMessages
+    : [];
+  return list.includes(messageId);
+}
+
+function markRuntimeMessageProcessed(state,messageId){
+  if(!Number.isInteger(messageId)) return;
+  state.runtime=state.runtime||{processedAssistantMessages:[]};
+  const list=Array.isArray(state.runtime.processedAssistantMessages)
+    ? state.runtime.processedAssistantMessages
+    : [];
+  state.runtime.processedAssistantMessages=[
+    ...list.filter(id=>id!==messageId),
+    messageId,
+  ].slice(-4000);
+}
+
+
+
 async function handleRuntimeEvent(messageId){
   if(!isBoundCharacter() || !hasActiveChat()) return;
   const context=globalThis.SillyTavern?.getContext?.()||{};
@@ -646,6 +668,11 @@ async function handleRuntimeEvent(messageId){
   if(!message || message.is_user) return;
 
   const state=runtimeState();
+  if(runtimeMessageAlreadyProcessed(state,messageId)){
+    console.info(`[MÉMÉ OS] runtime event skipped: assistant message ${messageId} already processed`);
+    return;
+  }
+
   state.shop=state.shop||{dynamic:[],plotTurn:0};
   state.shop.plotTurn=(Number(state.shop.plotTurn)||0)+1;
   state.shop.dynamic=(state.shop.dynamic||[]).filter(item=>Number(item.expiresTurn||0)>=state.shop.plotTurn);
@@ -899,6 +926,12 @@ async function handleRuntimeEvent(messageId){
   }
 
   if(decayMenBuckets(state,touchedMenIds)) changed=true;
+
+  // The whole assistant message is one idempotent runtime event.
+  // Once marked, refresh/reload/repeated event dispatches and swipes on the same
+  // message slot cannot settle it a second time.
+  markRuntimeMessageProcessed(state,messageId);
+  changed=true;
 
   // Hidden eligibility is recalculated here too, without auto-unlocking.
   const milestones=state.permission?.milestones||{};
@@ -2444,6 +2477,7 @@ async function ensureCleanStart(){
   };
   state.shop={dynamic:[],plotTurn:0};
   state.reactivity={recentChanges:[],recentIssues:[],recentReactions:[]};
+  state.runtime={processedAssistantMessages:[]};
   state.dev={...(state.dev||{}),testGrant1000:true,cleanStartV074:true};
 
   await saveState(state);
