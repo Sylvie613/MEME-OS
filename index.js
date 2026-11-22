@@ -7,9 +7,9 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.2';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.2';
-import { isBoundCharacter } from './src/binding.js?v=0.10.2';
+} from './src/state.js?v=0.10.3';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.3';
+import { isBoundCharacter } from './src/binding.js?v=0.10.3';
 
 /**
  * MÉMÉ OS v0.10.3
