@@ -1,0 +1,31 @@
+name: Build character card PNG
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "cards/MEME-OS-alpha.json"
+      - "scripts/build_card_png.py"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build PNG character card
+        run: python3 scripts/build_card_png.py
+      - name: Commit generated PNG
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add cards/MEME-OS-alpha.png
+          if git diff --cached --quiet; then
+            echo "PNG already up to date."
+          else
+            git commit -m "build: refresh MEME OS character card PNG"
+            git push
+          fi
