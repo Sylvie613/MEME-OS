@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 10;
+const SCHEMA_VERSION = 11;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -39,6 +39,8 @@ const DEFAULT_STATE = Object.freeze({
         status: 'ONLINE',
         attitudeStage: 0,
         pageUnlocked: false,
+        accessStage: 'locked',
+        accessChangedAt: null,
         name: null,
         namingRightOffered: false,
         namingOfferedAt: null,
@@ -171,6 +173,14 @@ function mergeState(raw) {
     merged.resources.ap = Math.max(0, Number(merged.resources.ap) || 0);
     merged.resources.sv = Math.max(0, Number(merged.resources.sv) || 0);
     merged.host.charm = Math.max(0, Number(merged.host.charm) || 0);
+    const allowedAccessStages = ['locked','peek','open','private'];
+    if (!allowedAccessStages.includes(merged.system.accessStage)) {
+        merged.system.accessStage = merged.system.pageUnlocked ? 'open' : 'locked';
+    }
+    if (merged.system.pageUnlocked && merged.system.accessStage === 'locked') {
+        merged.system.accessStage = 'open';
+    }
+    merged.system.pageUnlocked = merged.system.accessStage !== 'locked';
     merged.tasks.storyDay = Math.max(1, Number(merged.tasks.storyDay) || 1);
     for (const key of Object.keys(base.host.body)) {
         merged.host.body[key] = Math.max(0, Number(merged.host.body[key]) || 0);
