@@ -1,9 +1,10 @@
 /**
- * MÉMÉ OS v0.2.1
- * Visual-only succubus shell. Keeps the proven timing-safe launcher mount.
+ * MÉMÉ OS v0.2.2
+ * Separate backdrop + panel structure for iOS/SillyTavern compatibility.
  */
 const MEME_ID = 'meme-os-heart-launcher';
-const OVERLAY_ID = 'meme-os-overlay';
+const BACKDROP_ID = 'meme-os-backdrop';
+const PANEL_ID = 'meme-os-panel';
 
 function positionLauncher(button) {
   const send = document.getElementById('send_but');
@@ -59,7 +60,6 @@ function makeLauncher() {
   button.title = '打开 MÉMÉ OS';
   button.setAttribute('aria-label', '打开 MÉMÉ OS');
   button.innerHTML = heartMarkup();
-
   button.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -72,225 +72,157 @@ function makeLauncher() {
 
 function moduleCard(key, sigil, title, sub) {
   return `
-    <button type="button" class="meme-module meme-module--${key}" data-meme-module="${key}">
+    <button type="button" class="meme-module" data-meme-module="${key}">
       <span class="meme-module-sigil">${sigil}</span>
-      <span class="meme-module-copy">
-        <b>${title}</b>
-        <small>${sub}</small>
-      </span>
+      <span class="meme-module-copy"><b>${title}</b><small>${sub}</small></span>
       <span class="meme-module-arrow">›</span>
     </button>
   `;
 }
 
-function shellMarkup() {
+function panelMarkup() {
   return `
-    <div class="meme-os-dim" data-meme-close></div>
+    <div class="meme-ambient meme-ambient--pink"></div>
+    <div class="meme-ambient meme-ambient--violet"></div>
+    <div class="meme-horn meme-horn--left"></div>
+    <div class="meme-horn meme-horn--right"></div>
 
-    <section class="meme-os-window" role="dialog" aria-modal="true" aria-label="MÉMÉ OS">
-      <div class="meme-ambient meme-ambient--pink"></div>
-      <div class="meme-ambient meme-ambient--violet"></div>
+    <header class="meme-head">
+      <div>
+        <span class="meme-kicker">SUCCUBUS PROTOCOL</span>
+        <div class="meme-title"><span>MÉMÉ</span><i>OS</i></div>
+      </div>
+      <button class="meme-close" type="button" data-meme-close aria-label="关闭">×</button>
+    </header>
 
-      <div class="meme-horn meme-horn--left"></div>
-      <div class="meme-horn meme-horn--right"></div>
-
-      <header class="meme-head">
-        <div>
-          <span class="meme-kicker">SUCCUBUS PROTOCOL</span>
-          <div class="meme-title"><span>MÉMÉ</span><i>OS</i></div>
+    <main class="meme-scroll">
+      <section class="meme-contract">
+        <div class="meme-contract-top">
+          <span class="meme-status"><i></i> BOUND</span>
+          <span class="meme-code">HOST · 001</span>
         </div>
-        <button class="meme-close" type="button" data-meme-close aria-label="关闭">×</button>
-      </header>
 
-      <main class="meme-scroll">
-        <section class="meme-contract">
-          <div class="meme-contract-top">
-            <span class="meme-status"><i></i> BOUND</span>
-            <span class="meme-code">HOST · 001</span>
-          </div>
+        <div class="meme-seal">
+          <span class="meme-seal-ring"></span>
+          <span class="meme-seal-heart">♥</span>
+        </div>
 
-          <div class="meme-seal">
-            <span class="meme-seal-ring"></span>
-            <span class="meme-seal-heart">♥</span>
-          </div>
+        <p class="meme-contract-label">DESIRE ENGINE</p>
+        <h2>初始改造阶段</h2>
+        <p class="meme-contract-copy">外貌、欲望、奖励与代价，都将被系统记录。</p>
 
-          <p class="meme-contract-label">DESIRE ENGINE</p>
-          <h2>初始改造阶段</h2>
-          <p class="meme-contract-copy">外貌、欲望、奖励与代价，都将被系统记录。</p>
+        <div class="meme-progress"><span></span></div>
 
-          <div class="meme-progress"><span></span></div>
+        <div class="meme-stat-grid">
+          <article><small>AP</small><strong>000</strong><em>改造点</em></article>
+          <article><small>SV</small><strong>000</strong><em>精液值</em></article>
+          <article><small>CHARM</small><strong>03</strong><em>综合魅力</em></article>
+        </div>
+      </section>
 
-          <div class="meme-stat-grid">
-            <article>
-              <small>AP</small>
-              <strong>000</strong>
-              <em>改造点</em>
-            </article>
-            <article>
-              <small>SV</small>
-              <strong>000</strong>
-              <em>精液值</em>
-            </article>
-            <article>
-              <small>CHARM</small>
-              <strong>03</strong>
-              <em>综合魅力</em>
-            </article>
-          </div>
-        </section>
+      <section class="meme-modules">
+        <div class="meme-section-head">
+          <div><small>PRIVATE ACCESS</small><h3>欲望系统</h3></div>
+          <span>7 / 7</span>
+        </div>
 
-        <section class="meme-modules">
-          <div class="meme-section-head">
-            <div>
-              <small>PRIVATE ACCESS</small>
-              <h3>欲望系统</h3>
-            </div>
-            <span>7 / 7</span>
-          </div>
+        <div class="meme-module-grid">
+          ${moduleCard('me','♡','ME','宿主改造')}
+          ${moduleCard('task','✦','TASK','任务与奖励')}
+          ${moduleCard('shop','◇','SHOP','欲望商城')}
+          ${moduleCard('men','♂','MEN','对象档案')}
+          ${moduleCard('system','♛','SYSTEM','管理员')}
+          ${moduleCard('record','≋','RECORD','成长记录')}
+          ${moduleCard('home','⌂','HOME','系统总览')}
+        </div>
+      </section>
 
-          <div class="meme-module-grid">
-            ${moduleCard('me','♡','ME','宿主改造')}
-            ${moduleCard('task','✦','TASK','任务与奖励')}
-            ${moduleCard('shop','◇','SHOP','欲望商城')}
-            ${moduleCard('men','♂','MEN','对象档案')}
-            ${moduleCard('system','♛','SYSTEM','管理员')}
-            ${moduleCard('record','≋','RECORD','成长记录')}
-            ${moduleCard('home','⌂','HOME','系统总览')}
-          </div>
-        </section>
+      <section class="meme-whisper">
+        <span class="meme-whisper-mark">♥</span>
+        <div>
+          <small>SYSTEM WHISPER</small>
+          <p>“别急。你现在还只是绑定成功而已。”</p>
+        </div>
+      </section>
+    </main>
 
-        <section class="meme-whisper">
-          <span class="meme-whisper-mark">♥</span>
-          <div>
-            <small>SYSTEM WHISPER</small>
-            <p>“别急。你现在还只是绑定成功而已。”</p>
-          </div>
-        </section>
-      </main>
-
-      <footer class="meme-footer">
-        <span>PRIVATE CONTRACT</span>
-        <b>♥</b>
-        <span>NO ESCAPE</span>
-      </footer>
-    </section>
+    <footer class="meme-footer">
+      <span>PRIVATE CONTRACT</span><b>♥</b><span>NO ESCAPE</span>
+    </footer>
   `;
 }
 
-function ensureOverlay() {
-  let overlay = document.getElementById(OVERLAY_ID);
-  if (overlay) return overlay;
+function ensureShell() {
+  let backdrop = document.getElementById(BACKDROP_ID);
+  let panel = document.getElementById(PANEL_ID);
 
-  overlay = document.createElement('div');
-  overlay.id = OVERLAY_ID;
-  overlay.className = 'meme-os-overlay';
-  overlay.setAttribute('aria-hidden', 'true');
-  overlay.innerHTML = shellMarkup();
-
-  // Hard-pin the modal to the real viewport. This avoids SillyTavern theme/layout
-  // transforms and iOS Safari stacking contexts swallowing the visual window.
-  overlay.style.setProperty('position', 'fixed', 'important');
-  overlay.style.setProperty('inset', '0', 'important');
-  overlay.style.setProperty('width', '100vw', 'important');
-  overlay.style.setProperty('height', '100dvh', 'important');
-  overlay.style.setProperty('z-index', '2147483000', 'important');
-  overlay.style.setProperty('display', 'block', 'important');
-  overlay.style.setProperty('opacity', '0', 'important');
-  overlay.style.setProperty('pointer-events', 'none', 'important');
-  overlay.style.setProperty('transform', 'none', 'important');
-  overlay.style.setProperty('overflow', 'visible', 'important');
-
-  const dim = overlay.querySelector('.meme-os-dim');
-  if (dim) {
-    dim.style.setProperty('position', 'fixed', 'important');
-    dim.style.setProperty('inset', '0', 'important');
-    dim.style.setProperty('width', '100vw', 'important');
-    dim.style.setProperty('height', '100dvh', 'important');
-    dim.style.setProperty('z-index', '2147483001', 'important');
+  if (!backdrop) {
+    backdrop = document.createElement('div');
+    backdrop.id = BACKDROP_ID;
+    backdrop.addEventListener('click', closeMemeOS);
+    document.body.appendChild(backdrop);
   }
 
-  const win = overlay.querySelector('.meme-os-window');
-  if (win) {
-    win.style.setProperty('position', 'fixed', 'important');
-    win.style.setProperty('left', '50%', 'important');
-    win.style.setProperty('right', 'auto', 'important');
-    win.style.setProperty('top', 'auto', 'important');
-    win.style.setProperty('bottom', 'max(18px, env(safe-area-inset-bottom))', 'important');
-    win.style.setProperty('width', 'min(390px, calc(100vw - 20px))', 'important');
-    win.style.setProperty('max-height', '78dvh', 'important');
-    win.style.setProperty('z-index', '2147483002', 'important');
-    win.style.setProperty('display', 'flex', 'important');
-    win.style.setProperty('visibility', 'visible', 'important');
-    win.style.setProperty('opacity', '1', 'important');
-    win.style.setProperty('transform', 'translateX(-50%) translateY(14px) scale(.985)', 'important');
+  if (!panel) {
+    panel = document.createElement('section');
+    panel.id = PANEL_ID;
+    panel.className = 'meme-os-window';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    panel.setAttribute('aria-label', 'MÉMÉ OS');
+    panel.innerHTML = panelMarkup();
+
+    panel.addEventListener('click', (event) => {
+      if (event.target.closest('[data-meme-close]')) {
+        closeMemeOS();
+        return;
+      }
+
+      const card = event.target.closest('[data-meme-module]');
+      if (card) {
+        card.classList.remove('meme-module-pulse');
+        void card.offsetWidth;
+        card.classList.add('meme-module-pulse');
+      }
+    });
+
+    document.body.appendChild(panel);
   }
 
-  overlay.addEventListener('click', (event) => {
-    if (event.target.closest('[data-meme-close]')) {
-      closeMemeOS();
-      return;
-    }
-
-    const card = event.target.closest('[data-meme-module]');
-    if (card) {
-      card.classList.remove('meme-module-pulse');
-      void card.offsetWidth;
-      card.classList.add('meme-module-pulse');
-    }
-  });
-
-  document.documentElement.appendChild(overlay);
-  return overlay;
+  return { backdrop, panel };
 }
 
 function openMemeOS() {
-  const overlay = ensureOverlay();
-  const win = overlay.querySelector('.meme-os-window');
-  overlay.setAttribute('aria-hidden', 'false');
-  overlay.classList.add('is-open');
-  overlay.style.setProperty('opacity', '1', 'important');
-  overlay.style.setProperty('pointer-events', 'auto', 'important');
-  if (win) {
-    win.style.setProperty('transform', 'translateX(-50%) translateY(0) scale(1)', 'important');
-  }
+  const { backdrop, panel } = ensureShell();
+  backdrop.classList.add('is-open');
+  panel.classList.add('is-open');
   document.documentElement.classList.add('meme-os-open');
 }
 
 function closeMemeOS() {
-  const overlay = document.getElementById(OVERLAY_ID);
-  if (!overlay) return;
-  const win = overlay.querySelector('.meme-os-window');
-  overlay.setAttribute('aria-hidden', 'true');
-  overlay.classList.remove('is-open');
-  overlay.style.setProperty('opacity', '0', 'important');
-  overlay.style.setProperty('pointer-events', 'none', 'important');
-  if (win) {
-    win.style.setProperty('transform', 'translateX(-50%) translateY(14px) scale(.985)', 'important');
-  }
+  document.getElementById(BACKDROP_ID)?.classList.remove('is-open');
+  document.getElementById(PANEL_ID)?.classList.remove('is-open');
   document.documentElement.classList.remove('meme-os-open');
 }
 
 function mount() {
   const button = makeLauncher();
   positionLauncher(button);
-  return true;
 }
 
 function start() {
   mount();
-  ensureOverlay();
+  ensureShell();
 
-  const timer = setInterval(mount, 1000);
-  globalThis.__meme_os_probe_timer__ = timer;
-
+  globalThis.__meme_os_probe_timer__ = setInterval(mount, 1000);
   window.addEventListener('resize', mount, { passive: true });
   window.addEventListener('orientationchange', () => setTimeout(mount, 150), { passive: true });
 }
 
 if (globalThis.jQuery) {
-  globalThis.jQuery(() => start());
+  globalThis.jQuery(start);
 } else if (globalThis.$) {
-  globalThis.$(() => start());
+  globalThis.$(start);
 } else {
   setTimeout(start, 1000);
 }
