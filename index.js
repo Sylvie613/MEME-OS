@@ -6,13 +6,14 @@ import {
   getState,
   hasActiveChat,
   removePendingAction,
+  resetStateForCurrentChat,
   saveState,
 } from './src/state.js?v=0.10.1';
 import { appendToInput, removeFromInput } from './src/input.js?v=0.10.1';
 import { isBoundCharacter } from './src/binding.js?v=0.10.1';
 
 /**
- * MÉMÉ OS v0.10.1
+ * MÉMÉ OS v0.10.2
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -2651,9 +2652,17 @@ function bindSillyTavernEvents(){
     await handleRuntimeEvent(messageId);
     installRuntimePrompt();
   });
-  if(events.CHAT_CHANGED) source.on(events.CHAT_CHANGED,async()=>{
-    renderView('home',false);
+  if(events.CHAT_CREATED) source.on(events.CHAT_CREATED,async()=>{
+    await resetStateForCurrentChat();
     await ensureCleanStart();
+    renderView('home',false);
+    installRuntimePrompt();
+  });
+  if(events.CHAT_CHANGED) source.on(events.CHAT_CHANGED,async()=>{
+    // getState() is chatId-scoped; rendering after the switch automatically
+    // selects this chat's own MÉMÉ OS state.
+    await ensureCleanStart();
+    renderView('home',false);
     installRuntimePrompt();
   });
   globalThis.__meme_os_events_bound__=true;
