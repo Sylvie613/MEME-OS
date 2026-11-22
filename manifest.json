@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS shared-card cleanup: host Persona stays player-owned; administrator personality remains fixed.",
-  "js": "index.js?v=0.8.3",
-  "css": "style.css?v=0.8.3",
+  "description": "MÉMÉ OS: cross-world administrator identity, concealed host naming right, late-love naming confession.",
+  "js": "index.js?v=0.8.4",
+  "css": "style.css?v=0.8.4",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
