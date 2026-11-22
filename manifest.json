@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.9.6",
+  "version": "0.9.7",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS: deliberately slow-burn administrator romance with multi-day, multi-event, cooldown and major-choice gates.",
-  "js": "index.js?v=0.9.6",
-  "css": "style.css?v=0.9.6",
+  "description": "MÉMÉ OS: narrative task verification with immediate extension-side reward settlement in the same reply.",
+  "js": "index.js?v=0.9.7",
+  "css": "style.css?v=0.9.7",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
