@@ -215,7 +215,7 @@ function mergeState(raw) {
     merged.system.attitudeStage = tone.attitudeStage;
     merged.resources.ap = Math.max(0, Number(merged.resources.ap) || 0);
     merged.resources.sv = Math.max(0, Number(merged.resources.sv) || 0);
-    merged.host.charm = Math.max(0, Number(merged.host.charm) || 0);
+    merged.host.charm = Math.min(100, Math.max(0, Number(merged.host.charm) || 0));
     merged.host.progress = Math.min(100, Math.max(0, merged.host.charm));
     const allowedAccessStages = ['locked','peek','open','private'];
     if (!allowedAccessStages.includes(merged.system.accessStage)) {
@@ -364,7 +364,7 @@ function applyEffect(state, effect) {
     }
 
     if (Number.isFinite(effect.charmDelta)) {
-        state.host.charm = Math.max(0, state.host.charm + effect.charmDelta);
+        state.host.charm = Math.min(100, Math.max(0, state.host.charm + effect.charmDelta));
     }
 
     if (effect.host && typeof effect.host === 'object') {
