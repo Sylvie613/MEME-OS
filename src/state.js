@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 21;
+const SCHEMA_VERSION = 22;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -50,10 +50,6 @@ const DEFAULT_STATE = Object.freeze({
         namingRightOffered: false,
         namingOfferedAt: null,
         namedAt: null,
-    },
-    dev: {
-        testGrant1000: true,
-        cleanStartV074: false,
     },
     permission: {
         systemEligible: false,
@@ -156,7 +152,6 @@ function mergeState(raw) {
                     : [],
             },
         },
-        dev: { ...base.dev, ...(raw.dev ?? {}) },
         permission: {
             ...base.permission,
             ...(raw.permission ?? {}),
@@ -287,20 +282,22 @@ export function getState() {
         return fresh;
     }
 
+    // Legacy pre-chatKey state: adopt it only for an already-used chat.
+    // A newly created chat usually has no user message yet; if it inherited old
+    // metadata, treat it as a fresh run instead of binding that old state.
+    if (chatKey && raw && !raw?.runtime?.chatKey) {
+        const hasUserMessage = Array.isArray(context.chat) && context.chat.some(message => message?.is_user);
+        if (!hasUserMessage) {
+            const fresh = freshStateForChat(context);
+            context.chatMetadata[META_KEY] = fresh;
+            return fresh;
+        }
+    }
+
     const merged = mergeState(raw);
     if (chatKey && !merged.runtime.chatKey) merged.runtime.chatKey = chatKey;
     context.chatMetadata[META_KEY] = merged;
     return merged;
-}
-
-export async function resetStateForCurrentChat() {
-    const context = getContext();
-    if (!context?.chatMetadata) return freshStateForChat(context);
-
-    const fresh = freshStateForChat(context);
-    context.chatMetadata[META_KEY] = fresh;
-    if (typeof context.saveMetadata === 'function') await context.saveMetadata();
-    return fresh;
 }
 
 export async function saveState(state) {
