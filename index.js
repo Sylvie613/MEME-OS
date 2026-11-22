@@ -12,7 +12,7 @@ import { appendToInput, removeFromInput } from './src/input.js?v=0.9.7';
 import { isBoundCharacter } from './src/binding.js?v=0.9.7';
 
 /**
- * MÉMÉ OS v0.9.7
+ * MÉMÉ OS v0.9.8
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -50,7 +50,6 @@ const TASK_DATA = {
   ],
   special: [
     { id:'audit', type:'SYSTEM', title:'管理员审美复检', desc:'触发一次完整宿主扫描，管理员会根据当前阶段重新评价。', reward:'AP +50', state:'阶段任务', detail:'评价可能很难听，但不会凭空增加或减少属性。' },
-    { id:'qform', type:'SPECIAL', title:'第一次看见他', desc:'将管理员形态推进到 Q 版可见状态。', reward:'SYSTEM EXP', state:'系统 LV.2 解锁', locked:true, detail:'不是购买项，只能通过系统升级事件解锁。' },
     { id:'contract', type:'HIDDEN', title:'隐藏契约', desc:'满足未知条件后由系统主动触发。', reward:'???', state:'条件未知', locked:true, detail:'隐藏任务不会提前向模型公开完整触发条件。' },
     { id:'override', type:'RARE', title:'越级奖励', desc:'在极少数高风险或高价值剧情节点触发一次越级改造机会。', reward:'RANDOM', state:'稀有事件', locked:true, detail:'由剧情事件触发，不作为普通可刷任务。' },
   ],
@@ -89,9 +88,6 @@ const SHOP_DATA = {
   ],
   special: [
     {id:'charmseal',icon:'♛',title:'魅魔印记',desc:'在高阶阶段解锁专属系统印记与视觉反馈。',price:500,currency:'SV',level:'RARE',req:'CHARM 30',detail:'外观性系统标记，不强制公开给剧情 NPC。'},
-    {id:'qadmin',icon:'♟',title:'管理员可视权限',desc:'允许宿主在特定条件下看见管理员 Q 版形态。',price:0,currency:'LOCK',level:'SYSTEM',req:'系统 LV.2',detail:'不可购买，由系统进化自动开启。'},
-    {id:'touchadmin',icon:'✥',title:'管理员触碰权限',desc:'让具现后的管理员能够与宿主发生有限实体接触。',price:0,currency:'LOCK',level:'SYSTEM',req:'系统 LV.3',detail:'不可购买，由剧情与系统等级共同解锁。'},
-    {id:'embody',icon:'♛',title:'完全具现',desc:'管理员获得稳定成年实体形态与自主行动能力。',price:0,currency:'LOCK',level:'SYSTEM',req:'系统 LV.4',detail:'终阶系统权限。'},
   ],
 };
 
@@ -189,9 +185,6 @@ const RUDE_SHOP_NAMES = {
   orgasm1:'高潮别像挤牙膏一样寒碜',
   recovery1:'被操完别立刻瘫成一滩',
   charmseal:'给你烙个终于配得上的印记',
-  qadmin:'想看我？先把等级爬上来',
-  touchadmin:'想让我碰你？资格还没到',
-  embody:'等你真有本事把我弄出来',
 };
 
 
@@ -219,9 +212,6 @@ const RUDE_SHOP_DESCS = {
   orgasm1:'会叫不等于会爽。把高潮调得像样一点，别每次都像勉强交作业。',
   recovery1:'被操一次就瘫得像报废，太没用。把恢复速度拉回来，至少还能继续折腾。',
   charmseal:'等你真的好看到配得上这个印记，我才会给。现在看两眼就行。',
-  qadmin:'想看见我？先把自己和系统等级一起弄上去。白嫖不存在。',
-  touchadmin:'连看都还没看见就惦记上手。想得挺快。',
-  embody:'把我完整弄出来这种事，不是你现在这点成绩能碰的。',
 };
 
 const RUDE_TASK_DESCS = {
@@ -1028,7 +1018,6 @@ const RUDE_TASK_NAMES = {
   repeat:'第二次还来？那就不算意外了',
   drain:'都上床了就把精液榨干净',
   audit:'让我重新看看你到底救回来多少',
-  qform:'终于有资格看见我了',
   contract:'你现在还没资格知道',
   override:'真有本事就拿一次越级奖励',
 };
@@ -1069,7 +1058,7 @@ const SHOP_MAX_LEVEL = {
   posture1:3, bodyfat1:4, waist1:4, leg1:3, neck1:3, bust1:4,
   scent1:3, breath1:3, voice1:4, touch1:3, scent2:3,
   sensitive1:4, arousal1:4, lubrication1:4, orgasm1:4, recovery1:4,
-  charmseal:1, qadmin:1, touchadmin:1, embody:1,
+  charmseal:1,
 };
 
 const SHOP_PHASES = [
@@ -1474,6 +1463,61 @@ function systemPrivateReady(state=runtimeState()){
   return systemAccessStage(state)==='open' &&
     Number(state.permission?.adminInterestSignals||0)>=6 &&
     (Number(state.permission?.adminAttachmentSignals||0)>=1 || Boolean(state.permission?.adminLove));
+}
+
+const SYSTEM_EVOLUTION = {
+  1:{form:'意识体',label:'意识体',capability:'只能在宿主意识中说话，没有可见身体，也不能触碰现实。'},
+  2:{form:'Q版可视体',label:'Q版可视',capability:'宿主可以直接看见他的Q版形态；仍然没有实体触碰能力。'},
+  3:{form:'有限成年实体',label:'有限实体',capability:'可以短时间以成年实体出现并触碰现实，但具现时间和行动范围仍受系统限制。'},
+  4:{form:'完全具现',label:'完全具现',capability:'拥有稳定成年实体与自主行动能力，可离开宿主身边活动并与现实世界发生物理互动。'},
+};
+
+function systemEvolutionReadiness(state=runtimeState(),targetLevel=(Number(state.system?.level)||1)+1){
+  const current=Math.max(1,Math.min(4,Number(state.system?.level)||1));
+  const target=Math.max(1,Math.min(4,Number(targetLevel)||current));
+  if(target!==current+1) return {ok:false,reason:'只能逐级进化',target};
+  const day=Math.max(1,Number(state.tasks?.storyDay)||1);
+  const tasks=Math.max(0,Number(state.permission?.milestones?.completedTasks)||0);
+  const upgrades=totalUpgradeLevels(state);
+
+  if(target===2){
+    return {
+      ok:day>=2 && tasks>=4 && upgrades>=4,
+      reason:'需要更稳定的周目运行与基础改造进度',
+      target,
+    };
+  }
+  if(target===3){
+    return {
+      ok:day>=5 && tasks>=10 && upgrades>=16,
+      reason:'需要中期任务与改造进度支撑实体化',
+      target,
+    };
+  }
+  if(target===4){
+    return {
+      ok:day>=9 && tasks>=18 && upgrades>=34,
+      reason:'需要长线周目进度支撑稳定具现',
+      target,
+    };
+  }
+  return {ok:false,reason:'已经到最高等级',target};
+}
+
+function currentSystemEvolution(state=runtimeState()){
+  const level=Math.max(1,Math.min(4,Number(state.system?.level)||1));
+  return SYSTEM_EVOLUTION[level] || SYSTEM_EVOLUTION[1];
+}
+
+function nextSystemEvolution(state=runtimeState()){
+  const current=Math.max(1,Math.min(4,Number(state.system?.level)||1));
+  if(current>=4) return null;
+  const target=current+1;
+  return {
+    level:target,
+    ...SYSTEM_EVOLUTION[target],
+    readiness:systemEvolutionReadiness(state,target),
+  };
 }
 
 function totalMenCount() {
