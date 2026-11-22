@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 16;
+const SCHEMA_VERSION = 17;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -84,6 +84,9 @@ const DEFAULT_STATE = Object.freeze({
         recentChanges: [],
         recentIssues: [],
         recentReactions: [],
+    },
+    runtime: {
+        processedAssistantMessages: [],
     },
     upgrades: {},
     tasks: {
@@ -176,6 +179,16 @@ function mergeState(raw) {
             recentChanges: Array.isArray(raw.reactivity?.recentChanges) ? raw.reactivity.recentChanges.slice(0, 8) : [],
             recentIssues: Array.isArray(raw.reactivity?.recentIssues) ? raw.reactivity.recentIssues.slice(0, 8) : [],
             recentReactions: Array.isArray(raw.reactivity?.recentReactions) ? raw.reactivity.recentReactions.slice(0, 8) : [],
+        },
+        runtime: {
+            ...base.runtime,
+            ...(raw.runtime ?? {}),
+            processedAssistantMessages: Array.isArray(raw.runtime?.processedAssistantMessages)
+                ? raw.runtime.processedAssistantMessages
+                    .map(value => Number(value))
+                    .filter(Number.isInteger)
+                    .slice(-4000)
+                : [],
         },
         upgrades: { ...base.upgrades, ...(raw.upgrades ?? {}) },
         tasks: {
