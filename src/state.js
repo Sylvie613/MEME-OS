@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -16,6 +16,10 @@ const DEFAULT_STATE = Object.freeze({
         status: 'ONLINE',
         attitudeStage: 0,
         pageUnlocked: false,
+        name: null,
+        namingRightOffered: false,
+        namingOfferedAt: null,
+        namedAt: null,
     },
     dev: {
         testGrant1000: true,
