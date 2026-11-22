@@ -6,33 +6,18 @@ import {
   getState,
   hasActiveChat,
   removePendingAction,
-  resetStateForCurrentChat,
   saveState,
 } from './src/state.js?v=0.10.2';
 import { appendToInput, removeFromInput } from './src/input.js?v=0.10.2';
 import { isBoundCharacter } from './src/binding.js?v=0.10.2';
 
 /**
- * MÉMÉ OS v0.10.2
+ * MÉMÉ OS v0.10.3
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
 const MEME_ID = 'meme-os-heart-launcher';
 const DIALOG_ID = 'meme-os-dialog';
-
-const PREVIEW_STATE = {
-  ap: 0,
-  sv: 0,
-  charm: 0,
-  stage: '初始改造阶段',
-  systemLevel: 1,
-  systemForm: '意识体',
-  men: {
-    current: [],
-    recent: [],
-    returning: [],
-  },
-};
 
 const TASK_DATA = {
   daily: [
@@ -2525,122 +2510,6 @@ async function handleMessageSent(messageId){
   installRuntimePrompt();
 }
 
-async function migratePendingCharmGains(){
-  const state=runtimeState();
-  if(!Array.isArray(state.pending) || !state.pending.length) return;
-
-  const textarea=document.querySelector('#send_textarea');
-  let changed=false;
-
-  for(const action of state.pending){
-    const id=action.effect?.purchase?.id;
-    if(!id || !(id in CHARM_GAIN)) continue;
-
-    const desired=Number(CHARM_GAIN[id]||0);
-    const current=Number(action.effect?.charmDelta||0);
-    if(current===desired) continue;
-
-    const oldText=action.text || '';
-    action.effect.charmDelta=desired;
-
-    const replaceCharm=(value)=>{
-      if(/CHARM \+[0-9.]+/.test(value)){
-        return value.replace(/CHARM \+[0-9.]+/, desired>0 ? `CHARM +${desired}` : '').replace(/；；/g,'；');
-      }
-      return value;
-    };
-
-    action.text=replaceCharm(action.text || '');
-    action.summary=replaceCharm(action.summary || '');
-
-    if(textarea && oldText && textarea.value.includes(oldText)){
-      textarea.value=textarea.value.replace(oldText,action.text);
-      textarea.dispatchEvent(new Event('input',{bubbles:true}));
-    }
-
-    changed=true;
-  }
-
-  if(changed){
-    await saveState(state);
-    renderView(currentView(),false);
-    globalThis.toastr?.info?.('“我把魅力涨幅重算了。别想买两件东西就飞升。”');
-  }
-}
-
-async function ensureCleanStart(){
-  if(!isBoundCharacter() || !hasActiveChat()) return;
-  const state=runtimeState();
-  if(state.dev?.cleanStartV074) return;
-
-  const textarea=document.querySelector('#send_textarea');
-  if(textarea && Array.isArray(state.pending)){
-    for(const action of state.pending){
-      if(action?.text && textarea.value.includes(action.text)){
-        textarea.value=textarea.value.replace(action.text,'').replace(/\n{3,}/g,'\n\n').trim();
-      }
-    }
-    textarea.dispatchEvent(new Event('input',{bubbles:true}));
-  }
-
-  state.resources.ap=0;
-  state.resources.sv=0;
-  state.host.charm=0;
-  state.host.progress=0;
-  state.host.stage='初始改造阶段';
-  state.host.body={
-    lips:0,face:0,eyes:0,skin:0,hair:0,posture:0,bodyShape:0,waistHip:0,legs:0,
-    neckShoulders:0,bust:0,scent:0,breath:0,voice:0,touch:0,sensitivity:0,
-    arousal:0,lubrication:0,orgasm:0,recovery:0,specialMark:0,
-  };
-  state.upgrades={};
-  state.tasks={storyDay:1,active:{},generated:[],lastGeneratedDesireDay:0,completed:{},dailyCompleted:{},everCompleted:{}};
-  state.pending=[];
-  state.history=[];
-  state.men={current:[],recent:[],returning:[],archive:{}};
-  state.system.level=1;
-  state.system.form='意识体';
-  state.system.evolution={history:[],lastChangedAt:null,lastReason:null};
-  state.system.pageUnlocked=false;
-  state.system.accessStage='locked';
-  state.system.accessChangedAt=null;
-  state.system.attitudeStage=0;
-  state.system.name=null;
-  state.system.namingRightOffered=false;
-  state.system.namingOfferedAt=null;
-  state.system.namedAt=null;
-  state.permission={
-    systemEligible:false,
-    systemInviteReady:false,
-    systemUnlockedByAdmin:false,
-    adminInterestSignals:0,
-    adminDesireSignals:0,
-    adminAttachmentSignals:0,
-    adminLove:false,
-    adminBond:{
-      moments:[],
-      firstInterestAt:null,
-      firstDesireAt:null,
-      firstAttachmentAt:null,
-      loveAt:null,
-    },
-    milestones:{
-      completedTasks:0,
-      taskSettlements:0,
-      purchasedUpgrades:0,
-      returningMen:0,
-    },
-  };
-  state.shop={dynamic:[],plotTurn:0};
-  state.reactivity={recentChanges:[],recentIssues:[],recentReactions:[]};
-  state.runtime={processedAssistantMessages:[]};
-  state.dev={...(state.dev||{}),testGrant1000:true,cleanStartV074:true};
-
-  await saveState(state);
-  renderView('home',false);
-  globalThis.toastr?.success?.('“测试结束。钱、魅力、记录，全给你清干净了。现在从零开始。”');
-}
-
 function bindSillyTavernEvents(){
   if(globalThis.__meme_os_events_bound__) return;
   const context=globalThis.SillyTavern?.getContext?.();
@@ -2652,18 +2521,10 @@ function bindSillyTavernEvents(){
     await handleRuntimeEvent(messageId);
     installRuntimePrompt();
   });
-  if(events.CHAT_CREATED) source.on(events.CHAT_CREATED,async()=>{
-    // Let SillyTavern finish switching context before touching metadata.
-    await new Promise(resolve=>setTimeout(resolve,0));
-    await resetStateForCurrentChat();
-    await ensureCleanStart();
-    renderView('home',false);
-    installRuntimePrompt();
-  });
   if(events.CHAT_CHANGED) source.on(events.CHAT_CHANGED,async()=>{
-    // getState() is chatId-scoped; rendering after the switch automatically
-    // selects this chat's own MÉMÉ OS state.
-    await ensureCleanStart();
+    // getState() is chatId-scoped. Switching chats only re-renders the state
+    // that belongs to that chat; it never clears or mutates another save.
+    runtimeState();
     renderView('home',false);
     installRuntimePrompt();
   });
@@ -2806,9 +2667,6 @@ function start() {
   ensureDialog();
   bindSillyTavernEvents();
   installRuntimePrompt();
-  setTimeout(async()=>{
-    await ensureCleanStart();
-  },700);
   globalThis.__meme_os_probe_timer__ = setInterval(mount, 1000);
   window.addEventListener('resize', mount, { passive:true });
   window.addEventListener('orientationchange', () => setTimeout(mount,150), { passive:true });
