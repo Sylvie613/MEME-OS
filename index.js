@@ -12,7 +12,7 @@ import { appendToInput, removeFromInput } from './src/input.js?v=0.9.9';
 import { isBoundCharacter } from './src/binding.js?v=0.9.9';
 
 /**
- * MÉMÉ OS v0.9.9
+ * MÉMÉ OS v0.10.0
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -35,21 +35,21 @@ const PREVIEW_STATE = {
 
 const TASK_DATA = {
   daily: [
-    { id:'clean', type:'DAILY', title:'先把自己收拾干净', desc:'完成洗头、洗澡、换洗衣物与基础口腔清洁。系统拒绝给“脏乱”找借口。', reward:'AP +20', state:'可接取', detail:'完成后由剧情状态确认。每个剧情日可结算一次；跨入新的一天后重新开放。' },
-    { id:'mirror', type:'DAILY', title:'镜前扫描', desc:'在镜子前完整观察当前外貌三分钟，不遮脸、不跳过身体状态。', reward:'AP +10', state:'可接取', detail:'用于建立宿主对当前状态的客观认知。' },
-    { id:'walk', type:'DAILY', title:'动起来', desc:'连续完成一次不少于二十分钟的步行或低强度活动。', reward:'AP +25', state:'可接取', detail:'系统只判定“完成 / 未完成”，不计算现实热量。' },
-    { id:'posture', type:'DAILY', title:'别塌着', desc:'在一段完整场景中保持肩颈舒展、坐姿或站姿不持续蜷缩。', reward:'AP +15', state:'可接取', detail:'用于解锁后续姿态类改造。' },
-    { id:'outfit', type:'DAILY', title:'像样地出门', desc:'搭配一套干净、合身、没有明显邋遢感的外出服。', reward:'AP +20', state:'可接取', detail:'不要求昂贵，只要求“看起来像认真收拾过”。' },
+    { id:'clean', type:'DAILY', title:'先把自己收拾干净', desc:'完成洗头、洗澡、换洗衣物与基础口腔清洁。系统拒绝给“脏乱”找借口。', reward:'AP +120', state:'可接取', detail:'完成后由剧情状态确认。每个剧情日可结算一次；跨入新的一天后重新开放。' },
+    { id:'mirror', type:'DAILY', title:'镜前扫描', desc:'在镜子前完整观察当前外貌三分钟，不遮脸、不跳过身体状态。', reward:'AP +70', state:'可接取', detail:'用于建立宿主对当前状态的客观认知。' },
+    { id:'walk', type:'DAILY', title:'动起来', desc:'连续完成一次不少于二十分钟的步行或低强度活动。', reward:'AP +150', state:'可接取', detail:'系统只判定“完成 / 未完成”，不计算现实热量。' },
+    { id:'posture', type:'DAILY', title:'别塌着', desc:'在一段完整场景中保持肩颈舒展、坐姿或站姿不持续蜷缩。', reward:'AP +100', state:'可接取', detail:'用于解锁后续姿态类改造。' },
+    { id:'outfit', type:'DAILY', title:'像样地出门', desc:'搭配一套干净、合身、没有明显邋遢感的外出服。', reward:'AP +110', state:'可接取', detail:'不要求昂贵，只要求“看起来像认真收拾过”。' },
   ],
   desire: [
-    { id:'spark', type:'DESIRE', title:'先让男人真的对你起色心', desc:'让一名成年对象明确对你产生性欲，不算礼貌夸奖，不算客套，得是真想碰你、想睡你。', reward:'AP +80 · SV +10', state:'CHARM 8 解锁', locked:true, detail:'不用真的上床，但对方必须出现明确、可识别的成人性欲。' },
-    { id:'sample', type:'DESIRE', title:'第一次把精液交上来', desc:'从成年对象处拿到第一次可结算的精液。别拿暧昧当成果，系统收的是精液，不是空气。', reward:'AP +120 · SV +40', state:'CHARM 12 解锁', locked:true, detail:'结算成功后，该对象按剧情进入 MEN 的 CURRENT 或 RECENT。' },
-    { id:'oral', type:'DESIRE', title:'嘴别只会顶嘴', desc:'和成年对象完成一次口交，并拿到系统认可的射精结算。嘴硬不算本事，真把活干完才算。', reward:'AP +160 · SV +60', state:'CHARM 15 解锁', locked:true, detail:'欲望任务，不按日常任务无限刷。' },
-    { id:'repeat', type:'DESIRE', title:'第二次不是偶然', desc:'与同一成年对象发生第二次明确的性接触或欲望事件。', reward:'AP +180 · SV +50', state:'CHARM 18 解锁', locked:true, detail:'若对象曾淡出，完成后会被 MEN 自动提升为 RETURNING。' },
-    { id:'drain', type:'DESIRE', title:'真有本事就把他榨干', desc:'在一次成人性场景里把成年对象操到系统判定的“完全采集”，别做到一半就只顾自己爽。', reward:'AP +260 · SV +100', state:'CHARM 25 解锁', locked:true, detail:'高阶SV任务。睡过也不等于恋爱，系统只记结果和关系事实。' },
+    { id:'spark', type:'DESIRE', title:'先让男人真的对你起色心', desc:'让一名成年对象明确对你产生性欲，不算礼貌夸奖，不算客套，得是真想碰你、想睡你。', reward:'AP +250 · SV +10', state:'CHARM 8 解锁', locked:true, detail:'一次性里程碑。不用真的上床，但对方必须出现明确、可识别的成人性欲。' },
+    { id:'sample', type:'DESIRE', title:'第一次把精液交上来', desc:'从成年对象处拿到第一次可结算的精液。别拿暧昧当成果，系统收的是精液，不是空气。', reward:'AP +350 · SV +50', repeatable:'daily', repeatReward:'SV +50', state:'CHARM 12 解锁', locked:true, detail:'首次完成给里程碑奖励；之后每个剧情日可再采集一次，仅结算 SV。' },
+    { id:'oral', type:'DESIRE', title:'嘴别只会顶嘴', desc:'和成年对象完成一次口交，并拿到系统认可的射精结算。嘴硬不算本事，真把活干完才算。', reward:'AP +450 · SV +70', repeatable:'daily', repeatReward:'SV +80', state:'CHARM 15 解锁', locked:true, detail:'首次完成给里程碑奖励；之后每个剧情日最多再结算一次，仅产出 SV。' },
+    { id:'repeat', type:'DESIRE', title:'第二次不是偶然', desc:'与同一成年对象发生第二次明确的性接触或欲望事件。', reward:'AP +550 · SV +70', state:'CHARM 18 解锁', locked:true, detail:'一次性里程碑。若对象曾淡出，完成后会被 MEN 自动提升为 RETURNING。' },
+    { id:'drain', type:'DESIRE', title:'真有本事就把他榨干', desc:'在一次成人性场景里把成年对象操到系统判定的“完全采集”，别做到一半就只顾自己爽。', reward:'AP +800 · SV +120', repeatable:'daily', repeatReward:'SV +130', state:'CHARM 25 解锁', locked:true, detail:'首次完成是高阶里程碑；之后每个剧情日最多再结算一次，仅产出 SV。' },
   ],
   special: [
-    { id:'audit', type:'SYSTEM', title:'管理员审美复检', desc:'触发一次完整宿主扫描，管理员会根据当前阶段重新评价。', reward:'AP +50', state:'阶段任务', detail:'评价可能很难听，但不会凭空增加或减少属性。' },
+    { id:'audit', type:'SYSTEM', title:'管理员审美复检', desc:'触发一次完整宿主扫描，管理员会根据当前阶段重新评价。', reward:'AP +200', state:'阶段任务', detail:'一次性阶段任务。评价可能很难听，但不会凭空增加或减少属性。' },
     { id:'contract', type:'HIDDEN', title:'隐藏契约', desc:'满足未知条件后由系统主动触发。', reward:'???', state:'条件未知', locked:true, detail:'隐藏任务不会提前向模型公开完整触发条件。' },
     { id:'override', type:'RARE', title:'越级奖励', desc:'在极少数高风险或高价值剧情节点触发一次越级改造机会。', reward:'RANDOM', state:'稀有事件', locked:true, detail:'由剧情事件触发，不作为普通可刷任务。' },
   ],
@@ -57,37 +57,37 @@ const TASK_DATA = {
 
 const SHOP_DATA = {
   appearance: [
-    {id:'lip1',icon:'♡',title:'唇部修复Ⅰ',desc:'改善干裂、暗沉与边缘粗糙感。',price:400,currency:'AP',level:'LV.1',req:'无',detail:'完成后只改变基础状态，不直接赋予“漂亮”标签。'},
-    {id:'hair1',icon:'⌁',title:'发质修复Ⅰ',desc:'降低毛躁、油腻与枯涩感，让头发更顺。',price:450,currency:'AP',level:'LV.1',req:'无',detail:'先从“像洗过头”开始。'},
-    {id:'skin1',icon:'◇',title:'皮肤细化Ⅰ',desc:'改善粗糙、暗沉与肤质不均。',price:800,currency:'AP',level:'LV.1',req:'无',detail:'提升细腻度与基础光泽，不改变肤色种族特征。'},
-    {id:'face1',icon:'✦',title:'轮廓收束Ⅰ',desc:'轻度优化面部浮肿感与轮廓松散。',price:1200,currency:'AP',level:'LV.1',req:'CHARM 5',detail:'属于缓慢改造，不会一夜换脸。'},
-    {id:'eye1',icon:'◉',title:'眼型优化Ⅰ',desc:'改善眼周疲态与比例，让眼神更干净。',price:1500,currency:'AP',level:'LV.1',req:'CHARM 8',detail:'不会改变身份识别，只做比例与状态优化。'},
-    {id:'face2',icon:'♢',title:'五官协调Ⅰ',desc:'小幅调整五官之间的比例协调度。',price:1800,currency:'AP',level:'LV.1',req:'CHARM 10',detail:'高于单项修复，属于整体面部优化。'},
+    {id:'lip1',icon:'♡',title:'唇部修复Ⅰ',desc:'改善干裂、暗沉与边缘粗糙感。',price:160,currency:'AP',level:'LV.1',req:'无',detail:'完成后只改变基础状态，不直接赋予“漂亮”标签。'},
+    {id:'hair1',icon:'⌁',title:'发质修复Ⅰ',desc:'降低毛躁、油腻与枯涩感，让头发更顺。',price:180,currency:'AP',level:'LV.1',req:'无',detail:'先从“像洗过头”开始。'},
+    {id:'skin1',icon:'◇',title:'皮肤细化Ⅰ',desc:'改善粗糙、暗沉与肤质不均。',price:300,currency:'AP',level:'LV.1',req:'无',detail:'提升细腻度与基础光泽，不改变肤色种族特征。'},
+    {id:'face1',icon:'✦',title:'轮廓收束Ⅰ',desc:'轻度优化面部浮肿感与轮廓松散。',price:450,currency:'AP',level:'LV.1',req:'CHARM 5',detail:'属于缓慢改造，不会一夜换脸。'},
+    {id:'eye1',icon:'◉',title:'眼型优化Ⅰ',desc:'改善眼周疲态与比例，让眼神更干净。',price:550,currency:'AP',level:'LV.1',req:'CHARM 8',detail:'不会改变身份识别，只做比例与状态优化。'},
+    {id:'face2',icon:'♢',title:'五官协调Ⅰ',desc:'小幅调整五官之间的比例协调度。',price:650,currency:'AP',level:'LV.1',req:'CHARM 10',detail:'高于单项修复，属于整体面部优化。'},
   ],
   body: [
-    {id:'posture1',icon:'↟',title:'姿态矫正Ⅰ',desc:'改善含胸、塌肩与习惯性蜷缩。',price:700,currency:'AP',level:'LV.1',req:'完成日常任务',detail:'优先改变视觉体态，再进入比例改造。'},
-    {id:'bodyfat1',icon:'⌇',title:'体脂重塑Ⅰ',desc:'缓慢调整整体体型与脂肪分布趋势。',price:1200,currency:'AP',level:'LV.1',req:'CHARM 6',detail:'系统改造效果按剧情阶段逐步体现。'},
-    {id:'waist1',icon:'⌁',title:'腰臀比例Ⅰ',desc:'让腰臀线条更清晰，但仍保持自然比例。',price:1400,currency:'AP',level:'LV.1',req:'体脂重塑Ⅰ',detail:'不是夸张沙漏体型，只做第一阶段比例优化。'},
-    {id:'leg1',icon:'Ⅱ',title:'腿型修正Ⅰ',desc:'调整站姿、膝踝线条与整体腿部观感。',price:1100,currency:'AP',level:'LV.1',req:'姿态矫正Ⅰ',detail:'优先修正视觉线条。'},
-    {id:'neck1',icon:'⌃',title:'肩颈线条Ⅰ',desc:'让肩颈过渡更舒展、轻盈。',price:900,currency:'AP',level:'LV.1',req:'姿态矫正Ⅰ',detail:'与体态类效果叠加。'},
-    {id:'bust1',icon:'◡',title:'胸型调整Ⅰ',desc:'改善胸部轮廓与位置，使整体比例更协调。',price:1600,currency:'AP',level:'LV.1',req:'CHARM 12',detail:'仅为虚构系统中的外形改造。'},
+    {id:'posture1',icon:'↟',title:'姿态矫正Ⅰ',desc:'改善含胸、塌肩与习惯性蜷缩。',price:260,currency:'AP',level:'LV.1',req:'完成日常任务',detail:'优先改变视觉体态，再进入比例改造。'},
+    {id:'bodyfat1',icon:'⌇',title:'体脂重塑Ⅰ',desc:'缓慢调整整体体型与脂肪分布趋势。',price:450,currency:'AP',level:'LV.1',req:'CHARM 6',detail:'系统改造效果按剧情阶段逐步体现。'},
+    {id:'waist1',icon:'⌁',title:'腰臀比例Ⅰ',desc:'让腰臀线条更清晰，但仍保持自然比例。',price:520,currency:'AP',level:'LV.1',req:'体脂重塑Ⅰ',detail:'不是夸张沙漏体型，只做第一阶段比例优化。'},
+    {id:'leg1',icon:'Ⅱ',title:'腿型修正Ⅰ',desc:'调整站姿、膝踝线条与整体腿部观感。',price:380,currency:'AP',level:'LV.1',req:'姿态矫正Ⅰ',detail:'优先修正视觉线条。'},
+    {id:'neck1',icon:'⌃',title:'肩颈线条Ⅰ',desc:'让肩颈过渡更舒展、轻盈。',price:300,currency:'AP',level:'LV.1',req:'姿态矫正Ⅰ',detail:'与体态类效果叠加。'},
+    {id:'bust1',icon:'◡',title:'胸型调整Ⅰ',desc:'改善胸部轮廓与位置，使整体比例更协调。',price:600,currency:'AP',level:'LV.1',req:'CHARM 12',detail:'仅为虚构系统中的外形改造。'},
   ],
   sensory: [
-    {id:'scent1',icon:'✧',title:'体香优化Ⅰ',desc:'降低汗味与油腻气味，形成干净的基础体香。',price:500,currency:'AP',level:'LV.1',req:'无',detail:'最基础的近距离感官优化。'},
-    {id:'breath1',icon:'○',title:'口腔气息Ⅰ',desc:'维持清洁、清新的近距离呼吸气味。',price:300,currency:'AP',level:'LV.1',req:'无',detail:'不带强制魅惑效果。'},
-    {id:'voice1',icon:'♪',title:'声线柔化Ⅰ',desc:'让音色更稳定柔和，减少刺耳与含混。',price:650,currency:'AP',level:'LV.1',req:'无',detail:'改变听感，不直接改变说话内容。'},
-    {id:'touch1',icon:'≈',title:'肌肤触感Ⅰ',desc:'提升皮肤柔软度与细腻触感。',price:900,currency:'AP',level:'LV.1',req:'皮肤细化Ⅰ',detail:'属于触觉向改造。'},
-    {id:'scent2',icon:'✧',title:'诱导体香Ⅰ',desc:'让体香在近距离更容易被成年对象注意。',price:80,currency:'SV',level:'LV.1',req:'CHARM 15',detail:'仅增强存在感，不控制他人意志。'},
+    {id:'scent1',icon:'✧',title:'体香优化Ⅰ',desc:'降低汗味与油腻气味，形成干净的基础体香。',price:180,currency:'AP',level:'LV.1',req:'无',detail:'最基础的近距离感官优化。'},
+    {id:'breath1',icon:'○',title:'口腔气息Ⅰ',desc:'维持清洁、清新的近距离呼吸气味。',price:120,currency:'AP',level:'LV.1',req:'无',detail:'不带强制魅惑效果。'},
+    {id:'voice1',icon:'♪',title:'声线柔化Ⅰ',desc:'让音色更稳定柔和，减少刺耳与含混。',price:220,currency:'AP',level:'LV.1',req:'无',detail:'改变听感，不直接改变说话内容。'},
+    {id:'touch1',icon:'≈',title:'肌肤触感Ⅰ',desc:'提升皮肤柔软度与细腻触感。',price:320,currency:'AP',level:'LV.1',req:'皮肤细化Ⅰ',detail:'属于触觉向改造。'},
+    {id:'scent2',icon:'✧',title:'诱导体香Ⅰ',desc:'让体香在近距离更容易被成年对象注意。',price:50,currency:'SV',level:'LV.1',req:'CHARM 15',detail:'仅增强存在感，不控制他人意志。'},
   ],
   desire: [
-    {id:'sensitive1',icon:'♥',title:'敏感度微调Ⅰ',desc:'轻度提高成人性刺激下的身体反馈。',price:100,currency:'SV',level:'LV.1',req:'首次精液采集',detail:'只影响宿主自身感受，不改变他人。'},
-    {id:'arousal1',icon:'♢',title:'欲望阈值Ⅰ',desc:'让宿主更容易识别并接受自身成人欲望。',price:80,currency:'SV',level:'LV.1',req:'CHARM 12',detail:'不会强制进入发情或失去判断力。'},
-    {id:'lubrication1',icon:'⌁',title:'分泌反应Ⅰ',desc:'增强成人性唤起时的自然润滑反应。',price:120,currency:'SV',level:'LV.1',req:'CHARM 15',detail:'虚构系统生理改造项。'},
-    {id:'orgasm1',icon:'✦',title:'高潮感受Ⅰ',desc:'提高达到高潮时的主观强度上限。',price:180,currency:'SV',level:'LV.1',req:'CHARM 20',detail:'不会让宿主无条件自动高潮。'},
-    {id:'recovery1',icon:'↺',title:'亲密恢复Ⅰ',desc:'缩短成人性活动后的疲惫恢复时间。',price:150,currency:'SV',level:'LV.1',req:'CHARM 20',detail:'仅用于虚构剧情数值，不对应现实医学效果。'},
+    {id:'sensitive1',icon:'♥',title:'敏感度微调Ⅰ',desc:'轻度提高成人性刺激下的身体反馈。',price:60,currency:'SV',level:'LV.1',req:'首次精液采集',detail:'只影响宿主自身感受，不改变他人。'},
+    {id:'arousal1',icon:'♢',title:'欲望阈值Ⅰ',desc:'让宿主更容易识别并接受自身成人欲望。',price:50,currency:'SV',level:'LV.1',req:'CHARM 12',detail:'不会强制进入发情或失去判断力。'},
+    {id:'lubrication1',icon:'⌁',title:'分泌反应Ⅰ',desc:'增强成人性唤起时的自然润滑反应。',price:70,currency:'SV',level:'LV.1',req:'CHARM 15',detail:'虚构系统生理改造项。'},
+    {id:'orgasm1',icon:'✦',title:'高潮感受Ⅰ',desc:'提高达到高潮时的主观强度上限。',price:100,currency:'SV',level:'LV.1',req:'CHARM 20',detail:'不会让宿主无条件自动高潮。'},
+    {id:'recovery1',icon:'↺',title:'亲密恢复Ⅰ',desc:'缩短成人性活动后的疲惫恢复时间。',price:90,currency:'SV',level:'LV.1',req:'CHARM 20',detail:'仅用于虚构剧情数值，不对应现实医学效果。'},
   ],
   special: [
-    {id:'charmseal',icon:'♛',title:'魅魔印记',desc:'在高阶阶段解锁专属系统印记与视觉反馈。',price:500,currency:'SV',level:'RARE',req:'CHARM 30',detail:'外观性系统标记，不强制公开给剧情 NPC。'},
+    {id:'charmseal',icon:'♛',title:'魅魔印记',desc:'在高阶阶段解锁专属系统印记与视觉反馈。',price:250,currency:'SV',level:'RARE',req:'CHARM 30',detail:'外观性系统标记，不强制公开给剧情 NPC。'},
   ],
 };
 
@@ -1112,34 +1112,15 @@ const RUDE_TASK_NAMES = {
 };
 
 const CHARM_GAIN = {
-  // Small cleanup / polish: +0.25
-  lip1:0.25,
-  hair1:0.25,
-  skin1:0.25,
-  posture1:0.25,
-  leg1:0.25,
-  neck1:0.25,
-  scent1:0.25,
-  breath1:0.25,
-  voice1:0.25,
-  touch1:0.25,
+  // Appearance/presentation cleanup: each permanent level moves objective CHARM a little.
+  lip1:1.3, hair1:1.3, skin1:1.3, posture1:1.3, leg1:1.3, neck1:1.3,
+  scent1:1.3, breath1:1.3, voice1:1.3, touch1:1.3, scent2:1.3, charmseal:1.3,
 
-  // Noticeable structural / attraction upgrades: +0.5
-  face1:0.5,
-  eye1:0.5,
-  face2:0.5,
-  bodyfat1:0.5,
-  waist1:0.5,
-  bust1:0.5,
-  scent2:0.5,
-  charmseal:0.5,
+  // Structural/proportion work has a larger visible effect.
+  face1:2.1, eye1:2.1, face2:2.1, bodyfat1:2.1, waist1:2.1, bust1:2.1,
 
   // Adult-response upgrades change experience, not outward CHARM.
-  sensitive1:0,
-  arousal1:0,
-  lubrication1:0,
-  orgasm1:0,
-  recovery1:0,
+  sensitive1:0, arousal1:0, lubrication1:0, orgasm1:0, recovery1:0,
 };
 
 const SHOP_MAX_LEVEL = {
@@ -1157,7 +1138,7 @@ const SHOP_PHASES = [
   {id:'advanced', minLevels:35, label:'高阶货架', code:'ADVANCED', level:4},
 ];
 
-const SHOP_PRICE_MULTIPLIERS = [1,1.7,2.7,4.2];
+const SHOP_PRICE_MULTIPLIERS = [1,1.45,2.05,2.8];
 const ROMAN_LEVELS = ['Ⅰ','Ⅱ','Ⅲ','Ⅳ'];
 const SHOP_LEVEL_PREFIXES = {
   2:['半成品别急着得意','既然救回来了就继续修','总算配做第二轮了','别卡在能看这一步'],
@@ -1199,6 +1180,8 @@ const BODY_AXES = new Set([
 
 const REQUIRE_UPGRADE = {
   waist1:'bodyfat1',
+  leg1:'posture1',
+  neck1:'posture1',
   touch1:'skin1',
 };
 
