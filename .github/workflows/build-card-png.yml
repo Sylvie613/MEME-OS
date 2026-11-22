@@ -6,7 +6,11 @@ on:
     branches: [main]
     paths:
       - "cards/MEME-OS-alpha.json"
+      - "cards/MEME-OS-avatar.b64"
       - "scripts/build_card_png.py"
+      - "index.js"
+      - "src/state.js"
+      - ".github/workflows/build-card-png.yml"
 
 permissions:
   contents: write
