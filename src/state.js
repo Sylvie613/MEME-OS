@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -18,7 +18,18 @@ const DEFAULT_STATE = Object.freeze({
         pageUnlocked: false,
     },
     dev: {
-        testGrant1000: false,
+        testGrant1000: true,
+        cleanStartV074: false,
+    },
+    permission: {
+        systemEligible: false,
+        systemInviteReady: false,
+        systemUnlockedByAdmin: false,
+        milestones: {
+            completedTasks: 0,
+            purchasedUpgrades: 0,
+            returningMen: 0,
+        },
     },
     upgrades: {},
     tasks: {
@@ -63,6 +74,14 @@ function mergeState(raw) {
         host: { ...base.host, ...(raw.host ?? {}) },
         system: { ...base.system, ...(raw.system ?? {}) },
         dev: { ...base.dev, ...(raw.dev ?? {}) },
+        permission: {
+            ...base.permission,
+            ...(raw.permission ?? {}),
+            milestones: {
+                ...base.permission.milestones,
+                ...(raw.permission?.milestones ?? {}),
+            },
+        },
         upgrades: { ...base.upgrades, ...(raw.upgrades ?? {}) },
         tasks: {
             active: { ...base.tasks.active, ...(raw.tasks?.active ?? {}) },
@@ -202,6 +221,10 @@ function applyEffect(state, effect) {
 
     if (effect.system && typeof effect.system === 'object') {
         Object.assign(state.system, effect.system);
+    }
+
+    if (effect.permission && typeof effect.permission === 'object') {
+        Object.assign(state.permission, effect.permission);
     }
 
     if (effect.purchase && typeof effect.purchase === 'object') {
