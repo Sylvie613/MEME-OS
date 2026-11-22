@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.10.3",
+  "version": "0.10.4",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS: release QA build with per-chat save isolation, extension-authoritative economy, hardened idempotent runtime events and pre-release test cleanup.",
-  "js": "index.js?v=0.10.3",
-  "css": "style.css?v=0.10.3",
+  "description": "MÉMÉ OS: release QA build with stable per-turn idempotency across swipes/deletions, per-chat save isolation and extension-authoritative economy.",
+  "js": "index.js?v=0.10.4",
+  "css": "style.css?v=0.10.4",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
