@@ -1,21 +1,48 @@
-import { initMemeOS } from './src/ui.js';
+// MÉMÉ OS bootstrap diagnostic v0.1.3
+// Intentionally has zero local imports. If this button appears, manifest + index.js loading works.
+(function () {
+    const ID = 'meme-os-bootstrap-test';
 
-const LOAD_FLAG = '__meme_os_v012_loaded__';
+    function mount() {
+        if (document.getElementById(ID)) return;
 
-function boot() {
-    if (globalThis[LOAD_FLAG]) return;
-    try {
-        initMemeOS();
-        globalThis[LOAD_FLAG] = true;
-    } catch (error) {
-        console.error('[MÉMÉ OS] Initialization failed:', error);
+        const button = document.createElement('button');
+        button.id = ID;
+        button.type = 'button';
+        button.textContent = 'MÉ TEST';
+        button.setAttribute('aria-label', 'MÉMÉ OS bootstrap test');
+        Object.assign(button.style, {
+            position: 'fixed',
+            right: '14px',
+            bottom: '86px',
+            zIndex: '2147483647',
+            display: 'block',
+            visibility: 'visible',
+            opacity: '1',
+            width: '72px',
+            height: '44px',
+            borderRadius: '22px',
+            border: '2px solid #6d4b75',
+            background: '#f7eefb',
+            color: '#4d3156',
+            fontWeight: '800',
+            fontSize: '13px',
+            boxShadow: '0 4px 18px rgba(0,0,0,.25)',
+        });
+        button.addEventListener('click', () => {
+            if (globalThis.toastr?.success) {
+                globalThis.toastr.success('MÉMÉ OS index.js 已成功运行。');
+            } else {
+                alert('MÉMÉ OS index.js 已成功运行。');
+            }
+        });
+        document.body.appendChild(button);
+        console.log('[MÉMÉ OS] bootstrap diagnostic v0.1.3 mounted');
     }
-}
 
-// Third-party extension scripts may execute after APP_READY has already fired.
-// Mount immediately when the document is ready; do not depend solely on APP_READY.
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot, { once: true });
-} else {
-    boot();
-}
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', mount, { once: true });
+    } else {
+        mount();
+    }
+})();
