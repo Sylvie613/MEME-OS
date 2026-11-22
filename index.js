@@ -1,5 +1,5 @@
 /**
- * MÉMÉ OS v0.1.9
+ * MÉMÉ OS v0.1.10
  * Pink heart launcher. Keeps the proven timing-safe mount logic.
  */
 const MEME_ID = 'meme-os-stable-probe';
@@ -16,7 +16,7 @@ function positionLauncher(button) {
   const width = 44;
   const height = 40;
   const gap = 18;
-  const left = rect.left + (rect.width - width) / 2;
+  const left = Math.min(window.innerWidth - width - 10, rect.left + (rect.width - width) / 2 - 8);
   const top = Math.max(8, rect.top - height - gap);
 
   button.style.left = left + 'px';
@@ -94,7 +94,7 @@ function mount() {
     });
 
     document.body.appendChild(button);
-    console.info('[MÉMÉ OS] v0.1.9 heart launcher mounted');
+    console.info('[MÉMÉ OS] v0.1.10 heart launcher mounted');
   }
 
   positionLauncher(button);
