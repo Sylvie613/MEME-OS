@@ -1458,6 +1458,8 @@ function menPersonCard(person) {
         ${labelValue('关系状态', person.relation || '未判定')}
         ${labelValue('欲望信号', person.desire || '未记录')}
         ${labelValue('最近接触', person.lastContact || '暂无')}
+        ${labelValue('接触次数', String(person.contactCount||0), person.returnCount ? `再遇 ${person.returnCount} 次` : '')}
+        ${labelValue('时间', `DAY ${String(person.lastSeenDay||1).padStart(3,'0')}`, `初见 DAY ${String(person.firstSeenDay||1).padStart(3,'0')}`)}
         ${person.note ? `<p class="meme-men-note">${person.note}</p>` : ''}
       </div>
     </article>
@@ -1907,7 +1909,7 @@ async function ensureCleanStart(){
   state.tasks={storyDay:1,active:{},completed:{},dailyCompleted:{},everCompleted:{}};
   state.pending=[];
   state.history=[];
-  state.men={current:[],recent:[],returning:[]};
+  state.men={current:[],recent:[],returning:[],archive:{}};
   state.system.pageUnlocked=false;
   state.system.attitudeStage=0;
   state.system.name=null;
