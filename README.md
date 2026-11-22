@@ -48,3 +48,25 @@ MEME-OS/
 ## 说明
 
 本仓库目前为私有开发仓库，仍处于早期原型阶段。
+
+
+## 角色卡绑定
+
+MÉMÉ OS 不会对所有角色卡全局启用。只有角色卡包含以下扩展标记时，MÉ 按钮才会出现：
+
+```json
+{
+  "data": {
+    "extensions": {
+      "meme_os": {
+        "enabled": true,
+        "profile": "beauty_reconstruction_v1",
+        "schema_version": 1,
+        "minimum_extension_version": "0.1.1"
+      }
+    }
+  }
+}
+```
+
+切换到没有该标记的角色卡时，MÉMÉ OS 会隐藏面板并停止该卡的状态操作。
