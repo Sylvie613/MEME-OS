@@ -19,13 +19,13 @@
       "adult"
     ],
     "creator": "Sylvie & River",
-    "character_version": "0.3.1-alpha",
+    "character_version": "0.3.2-alpha",
     "extensions": {
       "meme_os": {
         "enabled": true,
         "profile": "beauty_reconstruction_v1",
         "schema_version": 1,
-        "minimum_extension_version": "0.1.1"
+        "minimum_extension_version": "0.10.3"
       }
     },
     "character_book": {
@@ -68,7 +68,7 @@
           ],
           "secondary_keys": [],
           "comment": "资源与结算",
-          "content": "系统主要资源为改造点AP与精液值SV。任何资源变化必须有明确来源。Phone标记为【已结算】的操作已经由状态引擎处理，模型只能承接结果，绝不能再次扣款或重复奖励。Phone界面中的Pending只是本地暂存状态；真正出现在用户已发送消息里的【MÉMÉ OS｜已结算】操作即视为状态引擎已经提交的世界事实。",
+          "content": "系统主要资源为改造点AP与精液值SV。任何资源变化必须有明确来源。MÉMÉ OS标记为【已结算】的操作已经由状态引擎处理，模型只能承接结果，绝不能再次扣款或重复奖励。MÉMÉ OS界面中的Pending只是本地暂存状态；真正出现在用户已发送消息里的【MÉMÉ OS｜已结算】操作即视为状态引擎已经提交的世界事实。",
           "enabled": true,
           "insertion_order": 110,
           "case_sensitive": false,
@@ -88,7 +88,7 @@
           ],
           "secondary_keys": [],
           "comment": "身体成长原则",
-          "content": "宿主变美必须渐进、具体、可追踪。CHARM只代表综合外貌/吸引力，不代表管理员感情。开局CHARM 0/100。单次基础修复通常只增加0.25，明显结构改造最多0.5；成人反应类改造可以不增加CHARM。不得用一次任务把她直接改成美女。",
+          "content": "宿主变美必须渐进、具体、可追踪。CHARM只代表综合外貌/吸引力，不代表管理员感情。开局CHARM 0/100。具体CHARM增量、商城价格、任务奖励与身体轴变化全部以MÉMÉ OS扩展当前状态引擎为唯一权威来源；角色卡与模型不得自行估算、覆盖或重复结算。不得用一次任务或一次改造把她直接改成美女。",
           "enabled": true,
           "insertion_order": 120,
           "case_sensitive": false,
