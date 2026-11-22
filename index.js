@@ -12,7 +12,7 @@ import { appendToInput, removeFromInput } from './src/input.js?v=0.9.2';
 import { isBoundCharacter } from './src/binding.js?v=0.9.2';
 
 /**
- * MÉMÉ OS v0.9.2
+ * MÉMÉ OS v0.9.3
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -333,6 +333,128 @@ function sanitizeSceneReaction(raw,state=runtimeState()){
     plotTurn:Number(state.shop?.plotTurn)||0,
     recordedAt:Date.now(),
   };
+}
+
+
+function sanitizeMenUpdate(raw,state=runtimeState()){
+  if(!raw || typeof raw!=='object' || raw.qualifies===false) return null;
+  const name=String(raw.name||'').trim().slice(0,40);
+  if(!name) return null;
+  const metaRaw=String(raw.meta||'NPC').trim().slice(0,60);
+  const meta=/adult/i.test(metaRaw) ? metaRaw : `ADULT · ${metaRaw}`;
+  const generatedId=`man_${hashId(name.toLowerCase()+'|'+meta.toLowerCase()).toString(36)}`;
+  const id=String(raw.id||generatedId).replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48) || generatedId;
+  const badges=Array.isArray(raw.badges)
+    ? raw.badges.map(x=>String(x).trim().slice(0,20)).filter(Boolean).slice(0,4)
+    : [];
+  return {
+    id,
+    name,
+    meta,
+    summary:String(raw.summary||'').trim().slice(0,100),
+    relation:String(raw.relation||'未判定').trim().slice(0,60),
+    desire:String(raw.desire||'未记录').trim().slice(0,80),
+    lastContact:String(raw.lastContact||'').trim().slice(0,100),
+    note:String(raw.note||'').trim().slice(0,140),
+    badges,
+    present:raw.present!==false,
+    contactDelta:Math.max(0,Math.min(5,Math.round(Number(raw.contactDelta)||0))),
+    storyDay:Number(state.tasks?.storyDay)||1,
+    plotTurn:Number(state.shop?.plotTurn)||0,
+  };
+}
+
+function removeManFromVisibleBuckets(state,id){
+  for(const key of ['current','recent','returning']){
+    state.men[key]=(state.men[key]||[]).filter(person=>person.id!==id);
+  }
+}
+
+function pushManToBucket(state,person,bucket){
+  removeManFromVisibleBuckets(state,person.id);
+  state.men[bucket]=[person,...(state.men[bucket]||[]).filter(old=>old.id!==person.id)];
+
+  if(bucket==='current' && state.men.current.length>3){
+    const overflow=state.men.current.splice(3);
+    for(const old of overflow){
+      const archived=state.men.archive?.[old.id]||old;
+      archived.status='recent';
+      state.men.archive[old.id]=archived;
+      state.men.recent=[archived,...state.men.recent.filter(x=>x.id!==old.id)];
+    }
+  }
+
+  if(bucket==='returning' && state.men.returning.length>5){
+    const overflow=state.men.returning.splice(5);
+    for(const old of overflow){
+      const archived=state.men.archive?.[old.id]||old;
+      archived.status='recent';
+      state.men.archive[old.id]=archived;
+      state.men.recent=[archived,...state.men.recent.filter(x=>x.id!==old.id)];
+    }
+  }
+
+  state.men.recent=(state.men.recent||[]).slice(0,8);
+}
+
+function applyMenUpdate(raw,state=runtimeState()){
+  const incoming=sanitizeMenUpdate(raw,state);
+  if(!incoming) return null;
+  state.men=state.men||{current:[],recent:[],returning:[],archive:{}};
+  state.men.archive=state.men.archive||{};
+  const existing=state.men.archive[incoming.id]||null;
+  const previousStatus=existing?.status||null;
+  const wasKnown=Boolean(existing);
+  const returningNow=incoming.present && wasKnown && (previousStatus==='recent' || previousStatus==='returning');
+  const status=!incoming.present ? 'recent' : returningNow ? 'returning' : 'current';
+  const contactCount=Math.max(0,Number(existing?.contactCount)||0)+incoming.contactDelta;
+  const returnCount=Math.max(0,Number(existing?.returnCount)||0)+(returningNow && previousStatus!=='returning' ? 1 : 0);
+
+  const person={
+    ...existing,
+    ...incoming,
+    summary:incoming.summary || existing?.summary || '档案待补充',
+    relation:incoming.relation || existing?.relation || '未判定',
+    desire:incoming.desire || existing?.desire || '未记录',
+    lastContact:incoming.lastContact || existing?.lastContact || '暂无',
+    note:incoming.note || existing?.note || '',
+    badges:incoming.badges.length ? incoming.badges : (existing?.badges||[]),
+    status,
+    contactCount,
+    returnCount,
+    firstSeenAt:existing?.firstSeenAt||Date.now(),
+    firstSeenDay:existing?.firstSeenDay||incoming.storyDay,
+    lastSeenAt:Date.now(),
+    lastSeenDay:incoming.storyDay,
+    lastSeenTurn:incoming.plotTurn,
+  };
+
+  state.men.archive[person.id]=person;
+  pushManToBucket(state,person,status);
+  if(returningNow && previousStatus!=='returning'){
+    state.permission.milestones.returningMen=Math.max(0,Number(state.permission.milestones.returningMen)||0)+1;
+  }
+  return person;
+}
+
+function decayMenBuckets(state,touchedIds=new Set()){
+  state.men=state.men||{current:[],recent:[],returning:[],archive:{}};
+  state.men.archive=state.men.archive||{};
+  const turn=Number(state.shop?.plotTurn)||0;
+  let changed=false;
+  for(const bucket of ['current','returning']){
+    for(const person of [...(state.men[bucket]||[])]){
+      if(touchedIds.has(person.id)) continue;
+      const archived=state.men.archive[person.id]||person;
+      const lastTurn=Number(archived.lastSeenTurn)||0;
+      if(turn-lastTurn<2) continue;
+      archived.status='recent';
+      state.men.archive[person.id]=archived;
+      pushManToBucket(state,archived,'recent');
+      changed=true;
+    }
+  }
+  return changed;
 }
 
 
