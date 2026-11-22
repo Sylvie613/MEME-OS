@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 19;
+const SCHEMA_VERSION = 20;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -94,6 +94,7 @@ const DEFAULT_STATE = Object.freeze({
         storyDay: 1,
         active: {},
         generated: [],
+        lastGeneratedDesireDay: 0,
         completed: {},
         dailyCompleted: {},
         everCompleted: {},
@@ -197,6 +198,7 @@ function mergeState(raw) {
             storyDay: Math.max(1, Number(raw.tasks?.storyDay) || 1),
             active: { ...base.tasks.active, ...(raw.tasks?.active ?? {}) },
             generated: Array.isArray(raw.tasks?.generated) ? raw.tasks.generated.slice(0, 8) : [],
+            lastGeneratedDesireDay: Math.max(0, Number(raw.tasks?.lastGeneratedDesireDay) || 0),
             completed: { ...base.tasks.completed, ...(raw.tasks?.completed ?? {}) },
             dailyCompleted: { ...base.tasks.dailyCompleted, ...(raw.tasks?.dailyCompleted ?? {}) },
             everCompleted: { ...base.tasks.everCompleted, ...(raw.tasks?.everCompleted ?? {}), ...(raw.tasks?.completed ?? {}) },
