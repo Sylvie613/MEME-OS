@@ -2653,6 +2653,8 @@ function bindSillyTavernEvents(){
     installRuntimePrompt();
   });
   if(events.CHAT_CREATED) source.on(events.CHAT_CREATED,async()=>{
+    // Let SillyTavern finish switching context before touching metadata.
+    await new Promise(resolve=>setTimeout(resolve,0));
     await resetStateForCurrentChat();
     await ensureCleanStart();
     renderView('home',false);
