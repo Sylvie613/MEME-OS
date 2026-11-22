@@ -6,9 +6,9 @@ const DEFAULT_STATE = Object.freeze({
     resources: { ap: 0, sv: 0 },
     host: {
         level: 1,
-        charm: 3,
+        charm: 0,
         stage: '初始改造阶段',
-        progress: 0.3,
+        progress: 0,
     },
     system: {
         level: 1,
