@@ -216,6 +216,7 @@ function mergeState(raw) {
     merged.resources.ap = Math.max(0, Number(merged.resources.ap) || 0);
     merged.resources.sv = Math.max(0, Number(merged.resources.sv) || 0);
     merged.host.charm = Math.max(0, Number(merged.host.charm) || 0);
+    merged.host.progress = Math.min(100, Math.max(0, merged.host.charm));
     const allowedAccessStages = ['locked','peek','open','private'];
     if (!allowedAccessStages.includes(merged.system.accessStage)) {
         merged.system.accessStage = merged.system.pageUnlocked ? 'open' : 'locked';
@@ -337,7 +338,7 @@ function refreshDerivedState(state) {
     const tone = charmToStage(state.host.charm);
     state.host.stage = tone.stage;
     state.system.attitudeStage = tone.attitudeStage;
-    state.host.progress = Math.min(100, Math.max(Number(state.host.progress) || 0, state.host.charm * 1.45));
+    state.host.progress = Math.min(100, Math.max(0, Number(state.host.charm) || 0));
 
     const milestones = state.permission.milestones;
     state.permission.systemEligible =
@@ -474,7 +475,7 @@ function applyEffect(state, effect) {
     const tone = charmToStage(state.host.charm);
     state.host.stage = tone.stage;
     state.system.attitudeStage = tone.attitudeStage;
-    state.host.progress = Math.min(100, Math.max(Number(state.host.progress) || 0, state.host.charm * 1.45));
+    state.host.progress = Math.min(100, Math.max(0, Number(state.host.charm) || 0));
 
     const milestones = state.permission.milestones;
     state.permission.systemEligible =
