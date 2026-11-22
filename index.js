@@ -226,7 +226,6 @@ const RUDE_TASK_DESCS = {
   repeat:'同一个男人第二次还想睡你，才说明上次不是一时脑热。让我看看你到底有没有本事让人操完还惦记。',
   drain:'都做到床上去了就别装矜持。把人榨到射干净，再把SV给我带回来。',
   audit:'站好。让我重新从头扫一遍，看看到底救回来多少，还是你只会自我感觉良好。',
-  qform:'等我愿意让你看见的时候，你自然会看见。现在急也没用。',
   contract:'隐藏就是不想让你提前知道。老实玩，别总想翻答案。',
   override:'真碰到值得越级奖励的事，我会自己开。你没资格手动刷。',
 };
@@ -1330,10 +1329,8 @@ function taskReward(task){
 
 function taskUnlock(task,state=runtimeState()){
   const charm=Number(state.host?.charm)||0;
-  const sys=Number(state.system?.level)||1;
   const map={spark:8,sample:12,oral:15,repeat:18,drain:25};
   if(map[task.id] && charm<map[task.id]) return {ok:false,reason:`CHARM ${map[task.id]}`};
-  if(task.id==='qform' && sys<2) return {ok:false,reason:'SYSTEM LV.2'};
   if(task.id==='contract') return {ok:false,reason:'条件未知'};
   if(task.id==='override') return {ok:false,reason:'由剧情触发'};
   return {ok:true,reason:''};
@@ -1952,6 +1949,26 @@ function menMarkup() {
   `;
 }
 
+function systemEvolutionLadderMarkup(state=runtimeState()){
+  const level=Math.max(1,Math.min(4,Number(state.system?.level)||1));
+  const next=nextSystemEvolution(state);
+  const rows=[
+    [1,'意识体','脑内声音 · 不可见 · 不可触碰'],
+    [2,'Q版可视','宿主可见 · 无实体触碰'],
+    [3,'有限成年实体','短时具现 · 可触碰 · 行动受限'],
+    [4,'完全具现','稳定成年实体 · 自主行动'],
+  ];
+  return `
+    <div class="meme-system-levels">
+      ${rows.map(row=>`<article class="${level>=row[0]?'is-on':''}"><span>0${row[0]}</span><div><b>${row[1]}</b><small>${row[2]}</small></div></article>`).join('')}
+    </div>
+    <div class="meme-info-row">
+      <span><small>NEXT EVOLUTION</small><b>${next ? `LV.${next.level} · ${next.label}` : 'MAX LEVEL'}</b></span>
+      <em>${next ? (next.readiness.ok ? '资格已满足 · 等他自己触发' : '周目进度还不够') : '具现能力已完整'}</em>
+    </div>
+  `;
+}
+
 function systemAccessLadder(state=runtimeState()){
   const rank=systemAccessRank(state);
   const rows=[
@@ -1996,6 +2013,8 @@ function systemMarkup() {
   const stage=systemAccessStage(state);
   const rank=systemAccessRank(state);
   const access=systemAccessMeta(state);
+  const evolution=currentSystemEvolution(state);
+  const nextEvolution=nextSystemEvolution(state);
   const next=VOICE_STAGES[Math.min(VOICE_STAGES.length-1,toneIndex(state)+1)];
   const intro={
     peek:'只准你看一眼。能看到什么就看什么，手别往里面伸。',
@@ -2008,6 +2027,7 @@ function systemMarkup() {
       <div class="meme-card-title"><small>SYSTEM SNAPSHOT</small><h3>${rank===1?'只许看这些':'基础资料'}</h3></div>
       ${labelValue('识别',state.system?.name || 'SYSTEM / ADMINISTRATOR',state.system?.name?'HOST-NAMED':'SYSTEM ID')}
       ${labelValue('当前形态',state.system?.form || '意识体',`SYSTEM LV.${state.system?.level||1}`)}
+      ${labelValue('当前能力',evolution.capability)}
       ${labelValue('运行状态',state.system?.status || 'ONLINE','ACTIVE')}
       ${labelValue('系统经历','跨世界、多类型任务','不是第一次上岗')}
       ${labelValue('本次绑定','纯随机','NO DESTINY')}
@@ -2032,13 +2052,9 @@ function systemMarkup() {
     </section>
 
     <section class="meme-page-card">
-      <div class="meme-card-title"><small>EVOLUTION</small><h3>想看见我？慢慢爬。</h3></div>
-      <div class="meme-system-levels">
-        <article class="${state.system.level>=1?'is-on':''}"><span>01</span><div><b>意识体</b><small>脑内声音 · 当前基础形态</small></div></article>
-        <article class="${state.system.level>=2?'is-on':''}"><span>02</span><div><b>Q 版可视</b><small>只有宿主能看见</small></div></article>
-        <article class="${state.system.level>=3?'is-on':''}"><span>03</span><div><b>有限实体</b><small>短时触碰 · 仍受限制</small></div></article>
-        <article class="${state.system.level>=4?'is-on':''}"><span>04</span><div><b>完全具现</b><small>稳定成年实体 · 自主行动</small></div></article>
-      </div>
+      <div class="meme-card-title"><small>EVOLUTION</small><h3>我的身体不是你花钱买来的。</h3></div>
+      ${systemEvolutionLadderMarkup(state)}
+      ${state.system?.evolution?.lastReason ? `<p class="meme-men-rule-note">上一次进化：${state.system.evolution.lastReason}</p>` : ''}
     </section>
 
     <section class="meme-page-card">
@@ -2394,6 +2410,9 @@ async function ensureCleanStart(){
   state.pending=[];
   state.history=[];
   state.men={current:[],recent:[],returning:[],archive:{}};
+  state.system.level=1;
+  state.system.form='意识体';
+  state.system.evolution={history:[],lastChangedAt:null,lastReason:null};
   state.system.pageUnlocked=false;
   state.system.accessStage='locked';
   state.system.accessChangedAt=null;
