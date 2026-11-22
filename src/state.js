@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 13;
+const SCHEMA_VERSION = 14;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -84,6 +84,7 @@ const DEFAULT_STATE = Object.freeze({
     tasks: {
         storyDay: 1,
         active: {},
+        verified: {},
         completed: {},
         dailyCompleted: {},
         everCompleted: {},
@@ -166,6 +167,7 @@ function mergeState(raw) {
         tasks: {
             storyDay: Math.max(1, Number(raw.tasks?.storyDay) || 1),
             active: { ...base.tasks.active, ...(raw.tasks?.active ?? {}) },
+            verified: { ...base.tasks.verified, ...(raw.tasks?.verified ?? {}) },
             completed: { ...base.tasks.completed, ...(raw.tasks?.completed ?? {}) },
             dailyCompleted: { ...base.tasks.dailyCompleted, ...(raw.tasks?.dailyCompleted ?? {}) },
             everCompleted: { ...base.tasks.everCompleted, ...(raw.tasks?.everCompleted ?? {}), ...(raw.tasks?.completed ?? {}) },
@@ -294,6 +296,10 @@ export async function commitPendingActions(sentText) {
     if (state.history.length > 240) state.history = state.history.slice(-240);
     await saveState(state);
     return { state, committed };
+}
+
+function refreshDerivedState(state) {
+    refreshDerivedState(state);
 }
 
 function applyEffect(state, effect) {
@@ -431,6 +437,73 @@ function applyEffect(state, effect) {
     state.permission.systemInviteReady =
         state.permission.systemEligible &&
         state.permission.adminInterestSignals >= 2;
+}
+
+export async function claimVerifiedTaskReward({ id, title, category, ap = 0, sv = 0 }) {
+    const state = getState();
+    const storyDay = Math.max(1, Number(state.tasks?.storyDay) || 1);
+    const active = state.tasks?.active?.[id];
+    const verified = state.tasks?.verified?.[id];
+
+    if (!active || !verified) return { ok: false, reason: 'not_verified', state };
+    if (category === 'daily' && Number(verified.storyDay || 0) !== storyDay) {
+        return { ok: false, reason: 'expired_daily_verification', state };
+    }
+    if (category === 'daily' && Number(state.tasks?.dailyCompleted?.[id]?.day || 0) === storyDay) {
+        return { ok: false, reason: 'already_claimed', state };
+    }
+    if (category !== 'daily' && state.tasks?.completed?.[id]) {
+        return { ok: false, reason: 'already_claimed', state };
+    }
+
+    const wasEverCompleted = Boolean(state.tasks.everCompleted?.[id]);
+    state.resources.ap = Math.max(0, Number(state.resources.ap || 0) + Math.max(0, Number(ap) || 0));
+    state.resources.sv = Math.max(0, Number(state.resources.sv || 0) + Math.max(0, Number(sv) || 0));
+
+    delete state.tasks.active[id];
+    delete state.tasks.verified[id];
+
+    if (category === 'daily') {
+        const previous = state.tasks.dailyCompleted?.[id] || {};
+        state.tasks.dailyCompleted[id] = {
+            id,
+            title,
+            category,
+            day: storyDay,
+            count: Math.max(0, Number(previous.count) || 0) + 1,
+            completedAt: Date.now(),
+        };
+    } else {
+        state.tasks.completed[id] = {
+            id,
+            title,
+            category,
+            completedAt: Date.now(),
+        };
+    }
+
+    state.tasks.everCompleted[id] = {
+        id,
+        title,
+        category,
+        firstCompletedAt: state.tasks.everCompleted?.[id]?.firstCompletedAt || Date.now(),
+    };
+    if (!wasEverCompleted) state.permission.milestones.completedTasks += 1;
+
+    state.history.push({
+        id: `meme_task_claim_${Date.now()}_${id}`,
+        type: 'task_claim',
+        recordType: 'task',
+        title: `领取：${title}`,
+        text: `TASK REWARD CLAIMED: ${id}`,
+        summary: `任务「${title}」验收通过并领取奖励：AP +${Math.max(0, Number(ap) || 0)}${Number(sv) > 0 ? ` / SV +${Math.max(0, Number(sv) || 0)}` : ''}。`,
+        committedAt: Date.now(),
+    });
+    if (state.history.length > 240) state.history = state.history.slice(-240);
+
+    refreshDerivedState(state);
+    await saveState(state);
+    return { ok: true, state };
 }
 
 export function createPendingAction({
