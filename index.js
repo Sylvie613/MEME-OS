@@ -933,6 +933,14 @@ CHARM is only the overall appearance score. Never infer that every body area imp
 Current body-axis levels: ${JSON.stringify(state.host?.body||{})}.
 Only describe a permanent physical improvement as already present when the matching body axis / purchased upgrade supports it. Unmodified areas stay at their established baseline.
 
+TASK COMPLETION / VERIFICATION:
+Currently active tasks: ${JSON.stringify(Object.values(state.tasks?.active||{}).map(t=>({id:t.id,title:t.title,category:t.category,storyDay:t.storyDay})))}.
+The host may click a task in MÉMÉ OS. The extension inserts a task line into the user's input, and the host can continue writing how she completed it after "完成过程：".
+Judge completion from the visible user narration and immediately relevant story facts. If an active task is clearly completed, emit one tasks entry with fields {id,status:"completed",evidence}. evidence must briefly name the concrete fact that satisfied the task.
+Do NOT emit AP/SV values. The extension owns the reward table and will add the correct resources automatically in the same assistant-response cycle.
+Do not verify intentions, promises, partial attempts, vague claims, or a task that is not currently active. If completion is unclear, leave it active.
+A completed task should disappear/cross out as soon as this reply is processed; there is no separate claim step.
+
 STORY DAY:
 Current in-world story day=${Number(state.tasks?.storyDay)||1}. Daily tasks may reward once per story day. Set timeline.dayAdvance=true only when the visible narrative clearly crosses into a new in-world day (for example after sleeping overnight, an explicit next morning/day, or an explicit date jump). Never advance the day merely because several turns passed.
 
@@ -986,8 +994,9 @@ Do not emit a new relationship signal merely because a previous feeling continue
 Current CHARM=${state.host.charm}; desire allowed by appearance=${desireAllowed}; adminLove=${loveState}.
 
 Only when the current story creates a genuinely relevant MÉMÉ OS state update — shop, feedback, MEN, permission, identity, or timeline — append ONE invisible HTML comment at the very end of the assistant reply.
-Format exactly: <!--MEME_OS_EVENT {"shop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{},"timeline":{}} -->
+Format exactly: <!--MEME_OS_EVENT {"tasks":[],"shop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{},"timeline":{}} -->
 Do not emit the comment when nothing relevant changed.
+tasks: max 4 completed task entries; fields id,status("completed"),evidence. Never include rewards; the extension calculates them.
 shop: maximum 2 temporary items. Each item fields: id,title,desc,detail,price,currency("AP"|"SV"),charmGain(0|0.25|0.5),ttl(1-8),icon,source,bodyAxis(optional),sourceIssueId(optional). bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
 feedback.issues: max 2, only direct story evidence; fields id,axis(optional),source,note,severity(low|medium|high).
 feedback.reactions: max 2, only directly observed reactions to established state/change; fields id,axis(optional),source,note,valence(negative|neutral|positive|sexual).
@@ -2206,8 +2215,9 @@ async function handleMessageSent(messageId){
   const {committed}=await commitPendingActions(sentMessage.mes || '');
   if(committed.length){
     renderView(currentView(),false);
-    globalThis.toastr?.success?.(`MÉMÉ OS 已正式结算 ${committed.length} 项。`);
+    globalThis.toastr?.success?.(`MÉMÉ OS 已登记 ${committed.length} 项操作。`);
   }
+  installRuntimePrompt();
 }
 
 async function migratePendingCharmGains(){
