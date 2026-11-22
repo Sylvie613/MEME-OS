@@ -12,7 +12,7 @@ import { appendToInput, removeFromInput } from './src/input.js?v=0.10.5';
 import { isBoundCharacter } from './src/binding.js?v=0.10.5';
 
 /**
- * MÉMÉ OS v0.10.5
+ * MÉMÉ OS v0.10.6
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -1125,7 +1125,7 @@ MÉMÉ OS is first and foremost a vulgar erotic game / 黄油 transformation sys
 Do not turn TASK into "date him", "make him like you", "get praised", "raise affection", "have a sweet moment" or other romance-game objectives. The administrator normally issues, comments on and verifies missions; he is not the default erotic mission target. If later plot and his physical form naturally make him relevant, that may happen organically, but never because the task generator is trying to push an admin route.
 
 ADULT MALE NPC POOL:
-Erotic/task male NPCs may be adults of any adult age, including visibly older or elderly men. They may have any profession, class, height, face, style, temperament or social status; do not bias toward young, tall, handsome, rich or idealized men. This rule explicitly supersedes any older card/worldbook instruction that says to avoid elderly or visibly old men. HOWEVER, two hard exclusions apply to generated erotic/task men: never generate men who are severely obese / "肥猪型", and never generate men with frightening, overpowering, nauseating or room-filling body odor. Ordinary sweat, age, roughness, plainness, ugliness, scars, baldness, disability, poverty, awkwardness or unconventional appearance are not disqualifiers by themselves. All sexual participants must be explicit adults.
+Erotic/task male NPCs must be explicit adults, but do NOT generate visibly elderly/old men. Profession, class, face, style, temperament, height and social status may vary widely; do not bias toward rich, elite or conventionally handsome men. Body build, however, should default to physically appealing and functional: fit, proportionate, sturdy, athletic, lean-muscular or otherwise clearly in decent shape. Hard exclusions: no severely obese/"肥猪型" men, no emaciated/bony/"瘦排骨" men, and no men with frightening, overpowering, nauseating or room-filling body odor. Ordinary sweat, roughness, plainness, ugliness, scars, baldness, disability, poverty, awkwardness or unconventional facial appearance are not disqualifiers by themselves.
 
 COPY OWNERSHIP RULE:
 MÉMÉ OS itself is an intentionally vulgar adult system. Every newly generated player-facing name or piece of prose that belongs to MÉMÉ OS must sound like something this administrator personally chose to call or write, filtered through his current personality, relationship state and attitude stage.
@@ -1190,7 +1190,7 @@ A dynamic SHOP item should preferably answer a concrete exposed issue from the c
 Permanent improvements persist across later scenes. Negative or neutral feedback may remain even after some unrelated body axis improves.
 
 MEN AUTO-ARCHIVE:
-The male NPC pool follows the ADULT MALE NPC POOL rule above: adult age may range from young adult to elderly; profession/appearance/status may be anything, with no beauty or wealth bias. Never generate a severely obese/"肥猪型" erotic/task man and never generate one whose defining trait is frightening, overpowering, nauseating body odor.
+The male NPC pool follows the ADULT MALE NPC POOL rule above: adult ages may vary, but visibly elderly/old men are excluded. Profession, face and status may vary widely, while body build should normally be fit, proportionate, sturdy, athletic or lean-muscular. Never generate a severely obese/"肥猪型" man, an emaciated/bony/"瘦排骨" man, or one whose defining trait is frightening, overpowering, nauseating body odor.
 Current visible MEN state: ${JSON.stringify({
   current:(state.men?.current||[]).map(p=>({id:p.id,name:p.name,meta:p.meta,relation:p.relation,desire:p.desire,contactCount:p.contactCount,status:p.status})),
   recent:(state.men?.recent||[]).map(p=>({id:p.id,name:p.name,meta:p.meta,relation:p.relation,desire:p.desire,contactCount:p.contactCount,status:p.status})),
