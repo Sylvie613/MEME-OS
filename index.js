@@ -245,13 +245,31 @@ function hashId(value=''){
 }
 
 
+const PLOT_PRICE_BANDS = {
+  AP: {
+    rescue:[120,360],
+    refine:[220,520],
+    beauty:[350,760],
+    advanced:[500,1100],
+  },
+  SV: {
+    rescue:[30,60],
+    refine:[40,90],
+    beauty:[60,130],
+    advanced:[80,180],
+  },
+};
+
 const MEME_RUNTIME_PROMPT_ID='meme_os_runtime_bridge';
 
 function sanitizeDynamicItem(raw,state=runtimeState()){
   if(!raw || typeof raw!=='object') return null;
   const id=String(raw.id || `plot_${Date.now()}_${Math.random().toString(36).slice(2,6)}`).replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48);
   const currency=raw.currency==='SV'?'SV':'AP';
-  const price=Math.max(0,Math.min(9999,Math.round(Number(raw.price)||0)));
+  const phase=currentShopPhase(state);
+  const [priceMin,priceMax]=PLOT_PRICE_BANDS[currency]?.[phase.id] || (currency==='SV'?[30,180]:[120,1100]);
+  const requestedPrice=Math.round(Number(raw.price)||priceMin);
+  const price=Math.max(priceMin,Math.min(priceMax,requestedPrice));
   const charmGain=Math.max(0,Math.min(0.5,Number(raw.charmGain)||0));
   const ttl=Math.max(1,Math.min(8,Math.round(Number(raw.ttl)||4)));
   const title=String(raw.title||'临时改造').slice(0,40);
@@ -467,9 +485,11 @@ function settleTaskFromModel(state,rawTask,messageId){
   if(!task || !active) return false;
 
   const currentDay=Math.max(1,Number(state.tasks?.storyDay)||1);
-  if(task.category==='daily' && Number(active.storyDay||0)!==currentDay) return false;
-  if(task.category==='daily' && Number(state.tasks?.dailyCompleted?.[id]?.day||0)===currentDay) return false;
-  if(task.category!=='daily' && state.tasks?.completed?.[id]) return false;
+  const repeatable=task.repeatable==='daily';
+  const dailyLike=task.category==='daily' || repeatable;
+  if(dailyLike && Number(active.storyDay||0)!==currentDay) return false;
+  if(dailyLike && Number(state.tasks?.dailyCompleted?.[id]?.day||0)===currentDay) return false;
+  if(!dailyLike && task.category!=='daily' && state.tasks?.completed?.[id]) return false;
 
   const evidence=String(rawTask.evidence||'').replace(/\s+/g,' ').trim().slice(0,180);
   if(!evidence) return false;
@@ -477,15 +497,15 @@ function settleTaskFromModel(state,rawTask,messageId){
   const historyId=`meme_task_verified_${messageId}_${id}`;
   if((state.history||[]).some(entry=>entry.id===historyId)) return false;
 
-  const reward=taskReward(task);
-  const title=active.title || taskVoiceName(task,state);
   const wasEverCompleted=Boolean(state.tasks?.everCompleted?.[id]);
+  const reward=taskReward(task,state);
+  const title=active.title || taskVoiceName(task,state);
 
   state.resources.ap=Math.max(0,Number(state.resources.ap||0)+reward.ap);
   state.resources.sv=Math.max(0,Number(state.resources.sv||0)+reward.sv);
   delete state.tasks.active[id];
 
-  if(task.category==='daily'){
+  if(dailyLike){
     const previous=state.tasks.dailyCompleted?.[id]||{};
     state.tasks.dailyCompleted[id]={
       id,
@@ -496,7 +516,9 @@ function settleTaskFromModel(state,rawTask,messageId){
       evidence,
       completedAt:Date.now(),
     };
-  }else{
+  }
+
+  if(task.category!=='daily' && !wasEverCompleted){
     state.tasks.completed[id]={
       id,
       title,
@@ -512,13 +534,15 @@ function settleTaskFromModel(state,rawTask,messageId){
     category:task.category,
     firstCompletedAt:state.tasks.everCompleted?.[id]?.firstCompletedAt||Date.now(),
   };
+
+  state.permission.milestones.taskSettlements=Math.max(0,Number(state.permission.milestones.taskSettlements)||0)+1;
   if(!wasEverCompleted) state.permission.milestones.completedTasks+=1;
 
   state.history.push({
     id:historyId,
     type:'task_complete',
     recordType:'task',
-    title:`完成：${title}`,
+    title:`${wasEverCompleted && repeatable?'重复结算':'完成'}：${title}`,
     summary:`任务「${title}」验收通过；AP +${reward.ap}${reward.sv?` / SV +${reward.sv}`:''}。证据：${evidence}`,
     text:`TASK VERIFIED AND SETTLED: ${id}`,
     committedAt:Date.now(),
@@ -742,7 +766,8 @@ async function handleRuntimeEvent(messageId){
         state.tasks=state.tasks||{storyDay:1,active:{},completed:{},dailyCompleted:{},everCompleted:{}};
         state.tasks.storyDay=Math.max(1,(Number(state.tasks.storyDay)||1)+1);
         for(const [taskId,activeTask] of Object.entries(state.tasks.active||{})){
-          if(activeTask?.category==='daily') delete state.tasks.active[taskId];
+          const task=findTask(taskId);
+          if(activeTask?.category==='daily' || task?.repeatable==='daily') delete state.tasks.active[taskId];
         }
         changed=true;
         state.history.push({
@@ -1337,10 +1362,21 @@ function pendingFor(kind,id,state=runtimeState()){
   }) || false;
 }
 
-function taskReward(task){
-  const ap=Number(task.reward.match(/AP \+(\d+)/)?.[1]||0);
-  const sv=Number(task.reward.match(/SV \+(\d+)/)?.[1]||0);
+function parseTaskReward(label=''){
+  const text=String(label||'');
+  const ap=Number(text.match(/AP \+(\d+)/)?.[1]||0);
+  const sv=Number(text.match(/SV \+(\d+)/)?.[1]||0);
   return {ap,sv};
+}
+
+function taskReward(task,state=runtimeState()){
+  const repeated=task.repeatable==='daily' && Boolean(state.tasks?.everCompleted?.[task.id]);
+  return parseTaskReward(repeated ? (task.repeatReward||task.reward) : task.reward);
+}
+
+function taskRewardLabel(task,state=runtimeState()){
+  const repeated=task.repeatable==='daily' && Boolean(state.tasks?.everCompleted?.[task.id]);
+  return repeated ? (task.repeatReward||task.reward) : task.reward;
 }
 
 function taskUnlock(task,state=runtimeState()){
@@ -1364,6 +1400,10 @@ function shopRequirement(item,state=runtimeState()){
   if(view.nextLevel===1 && min && charm<min) return {ok:false,reason:`CHARM ${min}`};
   const needUpgrade=REQUIRE_UPGRADE[item.id];
   if(view.nextLevel===1 && needUpgrade && !state.upgrades?.[needUpgrade]) return {ok:false,reason:'前置改造未完成'};
+  if(view.nextLevel===1 && item.id==='posture1'){
+    const dailyDone=['clean','mirror','walk','posture','outfit'].some(id=>Boolean(state.tasks?.everCompleted?.[id]));
+    if(!dailyDone) return {ok:false,reason:'先完成至少一项日常任务'};
+  }
   const needTask=REQUIRE_TASK[item.id];
   if(view.nextLevel===1 && needTask && !state.tasks?.completed?.[needTask]) return {ok:false,reason:'前置欲望任务未完成'};
   return {ok:true,reason:''};
