@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -15,6 +15,10 @@ const DEFAULT_STATE = Object.freeze({
         form: '意识体',
         status: 'ONLINE',
         attitudeStage: 0,
+        pageUnlocked: false,
+    },
+    dev: {
+        testGrant1000: false,
     },
     upgrades: {},
     tasks: {
@@ -58,6 +62,7 @@ function mergeState(raw) {
         resources: { ...base.resources, ...(raw.resources ?? {}) },
         host: { ...base.host, ...(raw.host ?? {}) },
         system: { ...base.system, ...(raw.system ?? {}) },
+        dev: { ...base.dev, ...(raw.dev ?? {}) },
         upgrades: { ...base.upgrades, ...(raw.upgrades ?? {}) },
         tasks: {
             active: { ...base.tasks.active, ...(raw.tasks?.active ?? {}) },
