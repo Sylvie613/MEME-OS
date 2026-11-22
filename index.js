@@ -1396,15 +1396,19 @@ async function handleTaskAction(id){
     globalThis.toastr?.warning?.(`没资格。先把 ${unlock.reason} 做到。`);
     return;
   }
-  if(state.tasks?.completed?.[id]){
-    globalThis.toastr?.info?.('这份差已经交过了。别想重复领。');
+  const storyDay=Math.max(1,Number(state.tasks?.storyDay)||1);
+  const completedToday=task.category==='daily' && Number(state.tasks?.dailyCompleted?.[id]?.day||0)===storyDay;
+  const completedPermanent=task.category!=='daily' && Boolean(state.tasks?.completed?.[id]);
+  if(completedToday || completedPermanent){
+    globalThis.toastr?.info?.(task.category==='daily'?'今天这份交过了。等剧情真跨天再来。':'这份差已经交过了。别想重复领。');
     return;
   }
 
   const voiced=taskVoiceName(task,state);
   if(state.tasks?.active?.[id]){
     const reward=taskReward(task);
-    const text=`【MÉMÉ OS｜已结算｜勿重复结算】完成任务「${voiced}」；AP +${reward.ap}${reward.sv?`；SV +${reward.sv}`:''}。扩展已负责数值结算，正文只承认结果。`;
+    const dayTag=task.category==='daily'?`DAY ${String(storyDay).padStart(3,'0')} · `:'';
+    const text=`【MÉMÉ OS｜已结算｜勿重复结算】${dayTag}完成任务「${voiced}」；AP +${reward.ap}${reward.sv?`；SV +${reward.sv}`:''}。扩展已负责数值结算，正文只承认结果。`;
     await queueAction(createPendingAction({
       type:'task_complete',
       recordType:'task',
@@ -1458,6 +1462,9 @@ async function handleShopAction(id){
 
   const voiced=shopVoiceName(item,state);
   const charmGain=Number(item.dynamic ? item.charmGain : (CHARM_GAIN[item.id]||0));
+  const bodyDelta=item.dynamic
+    ? (item.bodyAxis ? {[item.bodyAxis]:1} : {})
+    : (BODY_EFFECTS[item.id] || {});
   const apDelta=item.currency==='AP'?-item.price:0;
   const svDelta=item.currency==='SV'?-item.price:0;
   const text=`【MÉMÉ OS｜已结算｜勿重复结算】购入「${voiced}」；${item.currency} -${item.price}${charmGain?`；CHARM +${charmGain}`:''}。扩展已完成扣款与改造记录，正文只描写改造后的结果。`;
@@ -1472,6 +1479,7 @@ async function handleShopAction(id){
       apDelta,
       svDelta,
       charmDelta:charmGain,
+      bodyDelta,
       purchase:{id:item.id,title:voiced,category:item.category,level:1},
     },
   }));
@@ -1567,8 +1575,13 @@ async function ensureCleanStart(){
   state.host.charm=0;
   state.host.progress=0;
   state.host.stage='初始改造阶段';
+  state.host.body={
+    lips:0,face:0,eyes:0,skin:0,hair:0,posture:0,bodyShape:0,waistHip:0,legs:0,
+    neckShoulders:0,bust:0,scent:0,breath:0,voice:0,touch:0,sensitivity:0,
+    arousal:0,lubrication:0,orgasm:0,recovery:0,specialMark:0,
+  };
   state.upgrades={};
-  state.tasks={active:{},completed:{}};
+  state.tasks={storyDay:1,active:{},completed:{},dailyCompleted:{},everCompleted:{}};
   state.pending=[];
   state.history=[];
   state.men={current:[],recent:[],returning:[]};
