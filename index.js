@@ -9,8 +9,8 @@ function boot() {
 }
 
 try {
-    const { eventSource, event_types } = SillyTavern.getContext();
-    eventSource.on(event_types.APP_READY, boot);
+    const { eventSource, eventTypes } = SillyTavern.getContext();
+    eventSource.on(eventTypes.APP_READY, boot);
 } catch (error) {
     console.error('[MÉMÉ OS] Failed to register APP_READY listener.', error);
 }
