@@ -773,13 +773,23 @@ async function handleRuntimeEvent(messageId){
       state.reactivity=state.reactivity||{recentChanges:[],recentIssues:[],recentReactions:[]};
 
       if(Array.isArray(event.taskOffers)){
-        state.tasks=state.tasks||{storyDay:1,active:{},generated:[],completed:{},dailyCompleted:{},everCompleted:{}};
+        state.tasks=state.tasks||{storyDay:1,active:{},generated:[],lastGeneratedDesireDay:0,completed:{},dailyCompleted:{},everCompleted:{}};
         state.tasks.generated=Array.isArray(state.tasks.generated)?state.tasks.generated:[];
-        for(const rawOffer of event.taskOffers.slice(0,2)){
-          const task=sanitizeGeneratedDesireTask(rawOffer,state);
-          if(!task) continue;
-          state.tasks.generated=[task,...state.tasks.generated].slice(0,8);
-          changed=true;
+        const currentDay=Math.max(1,Number(state.tasks.storyDay)||1);
+        const boardOpen=state.tasks.generated.filter(task=>!state.tasks.completed?.[task.id]).length;
+        const canGenerate=Number(state.tasks.lastGeneratedDesireDay||0)!==currentDay && boardOpen<3;
+        if(canGenerate){
+          const task=sanitizeGeneratedDesireTask(event.taskOffers[0],state);
+          if(task){
+            const combined=[task,...state.tasks.generated.filter(old=>old.id!==task.id)];
+            combined.sort((a,b)=>
+              Number(Boolean(state.tasks.active?.[b.id]))-
+              Number(Boolean(state.tasks.active?.[a.id]))
+            );
+            state.tasks.generated=combined.slice(0,8);
+            state.tasks.lastGeneratedDesireDay=currentDay;
+            changed=true;
+          }
         }
       }
 
@@ -1092,6 +1102,18 @@ CHARM is only the overall appearance score. Never infer that every body area imp
 Current body-axis levels: ${JSON.stringify(state.host?.body||{})}.
 Only describe a permanent physical improvement as already present when the matching body axis / purchased upgrade supports it. Unmodified areas stay at their established baseline.
 
+DYNAMIC DESIRE MISSION BOARD:
+Fixed desire tasks (spark/sample/oral/repeat/drain) are only the foundational milestones. MÉMÉ OS should continue creating many different one-time erotic missions over a long playthrough.
+Current generated uncompleted missions: ${JSON.stringify((state.tasks?.generated||[]).map(t=>({id:t.id,title:t.title,tier:t.tier,desc:t.desc,createdDay:t.createdDay})))}.
+Distinct erotic missions already completed: ${distinctEroticTaskCount(state)}.
+Last story day on which a new generated desire mission was created: ${Number(state.tasks?.lastGeneratedDesireDay)||0}.
+When fewer than 3 generated desire missions are available and no generated mission has been created on the current story day, you may create ONE fitting new mission through taskOffers. Do not generate one every reply merely to fill space; prefer moments where the current plot, NPC, location, body state or unlocked sexual capability suggests a fresh challenge.
+Generated erotic missions are one-time challenges, not repeatable collection farming. They should vary meaningfully in act, constraint, target, setting, social risk, collection goal, endurance, control, presentation or other adult scenario structure. Do not merely rename an old task or paraphrase a completed one.
+Choose tier by challenge/progression: tier 1 requires CHARM 8+, tier 2 CHARM 18+, tier 3 CHARM 35+, tier 4 CHARM 55+. Never offer a tier above the current CHARM gate.
+taskOffers entries contain only {title,desc,detail,tier,source}. Do NOT choose AP/SV rewards or ids; the extension creates a deterministic id and assigns the tier reward.
+All generated task names/descriptions are written in the administrator's vulgar personal voice, not neutral quest prose.
+Only the first completion of each distinct erotic mission counts toward administrator evolution. Repeating sample/oral/drain for SV never counts as another different mission.
+
 TASK COMPLETION / VERIFICATION:
 Currently active tasks: ${JSON.stringify(Object.values(state.tasks?.active||{}).map(t=>({id:t.id,title:t.title,category:t.category,storyDay:t.storyDay})))}.
 The host may click a task in MÉMÉ OS. The extension inserts a task line into the user's input, and the host can continue writing how she completed it after "完成过程：".
@@ -1154,8 +1176,9 @@ Do not emit a new relationship signal merely because a previous feeling continue
 Current CHARM=${state.host.charm}; desire allowed by appearance=${desireAllowed}; adminLove=${loveState}.
 
 Only when the current story creates a genuinely relevant MÉMÉ OS state update — tasks, shop, feedback, MEN, evolution, permission, identity, or timeline — append ONE invisible HTML comment at the very end of the assistant reply.
-Format exactly: <!--MEME_OS_EVENT {"tasks":[],"shop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{},"timeline":{}} -->
+Format exactly: <!--MEME_OS_EVENT {"taskOffers":[],"tasks":[],"shop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{},"timeline":{}} -->
 Do not emit the comment when nothing relevant changed.
+taskOffers: maximum 1 new generated erotic mission; fields title,desc,detail,tier(1-4),source. Never include id or rewards.
 tasks: max 4 completed task entries; fields id,status("completed"),evidence. Never include rewards; the extension calculates them.
 shop: maximum 2 temporary items. Each item fields: id,title,desc,detail,price,currency("AP"|"SV"),charmGain(0|0.25|0.5),ttl(1-8),icon,source,bodyAxis(optional),sourceIssueId(optional). bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
 feedback.issues: max 2, only direct story evidence; fields id,axis(optional),source,note,severity(low|medium|high).
@@ -1952,7 +1975,8 @@ function taskMarkup() {
     <section class="meme-page-card meme-task-rules">
       <div class="meme-card-title"><small>MY RULES</small><h3>听清楚再接</h3></div>
       ${labelValue('日常',`DAY ${String(Math.max(1,Number(state.tasks?.storyDay)||1)).padStart(3,'0')} · 每项每天可结算一次，剧情跨天后刷新。`)}
-      ${labelValue('欲望','首次完成给里程碑奖励；部分采集任务之后每天还能再做一次，只发 SV，不重复发大额 AP。')}
+      ${labelValue('欲望','五个基础里程碑之外，系统会随剧情继续生成新的成人任务；每个不同任务只计一次进化进度，重复采集只负责赚 SV。')}
+      ${labelValue('不同任务',`${distinctEroticTaskCount(state)} 个已完成`,'重复做同一任务不重复计数')}
       ${labelValue('特殊','我什么时候想发，什么时候才有。')}
       ${labelValue('结算','接取后把完成过程写在同一条或后续剧情里；模型验收通过的那条回复中，扩展直接发奖励并划掉任务。')}
     </section>
@@ -2569,7 +2593,7 @@ async function ensureCleanStart(){
     arousal:0,lubrication:0,orgasm:0,recovery:0,specialMark:0,
   };
   state.upgrades={};
-  state.tasks={storyDay:1,active:{},generated:[],completed:{},dailyCompleted:{},everCompleted:{}};
+  state.tasks={storyDay:1,active:{},generated:[],lastGeneratedDesireDay:0,completed:{},dailyCompleted:{},everCompleted:{}};
   state.pending=[];
   state.history=[];
   state.men={current:[],recent:[],returning:[],archive:{}};
