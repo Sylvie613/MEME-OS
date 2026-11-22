@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 15;
+const SCHEMA_VERSION = 16;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -38,6 +38,11 @@ const DEFAULT_STATE = Object.freeze({
         form: '意识体',
         status: 'ONLINE',
         attitudeStage: 0,
+        evolution: {
+            history: [],
+            lastChangedAt: null,
+            lastReason: null,
+        },
         pageUnlocked: false,
         accessStage: 'locked',
         accessChangedAt: null,
@@ -133,7 +138,17 @@ function mergeState(raw) {
                 ...(raw.host?.body ?? {}),
             },
         },
-        system: { ...base.system, ...(raw.system ?? {}) },
+        system: {
+            ...base.system,
+            ...(raw.system ?? {}),
+            evolution: {
+                ...base.system.evolution,
+                ...(raw.system?.evolution ?? {}),
+                history: Array.isArray(raw.system?.evolution?.history)
+                    ? raw.system.evolution.history.slice(-8)
+                    : [],
+            },
+        },
         dev: { ...base.dev, ...(raw.dev ?? {}) },
         permission: {
             ...base.permission,
@@ -195,6 +210,14 @@ function mergeState(raw) {
         merged.system.accessStage = 'open';
     }
     merged.system.pageUnlocked = merged.system.accessStage !== 'locked';
+    merged.system.level = Math.max(1, Math.min(4, Math.round(Number(merged.system.level) || 1)));
+    const systemForms = {
+        1: '意识体',
+        2: 'Q版可视体',
+        3: '有限成年实体',
+        4: '完全具现',
+    };
+    merged.system.form = systemForms[merged.system.level] || '意识体';
     merged.tasks.storyDay = Math.max(1, Number(merged.tasks.storyDay) || 1);
     for (const key of Object.keys(base.host.body)) {
         merged.host.body[key] = Math.max(0, Number(merged.host.body[key]) || 0);
