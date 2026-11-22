@@ -53,6 +53,16 @@ function dynamicDesireRewardLabel(tier=1){
   return `AP +${meta.ap} · SV +${meta.sv}`;
 }
 
+const DYNAMIC_DAILY_REWARDS = {
+  light:{ap:70,label:'LIGHT'},
+  normal:{ap:100,label:'NORMAL'},
+  hard:{ap:150,label:'HARD'},
+};
+
+function dynamicDailyRewardMeta(difficulty='normal'){
+  return DYNAMIC_DAILY_REWARDS[String(difficulty||'normal').toLowerCase()] || DYNAMIC_DAILY_REWARDS.normal;
+}
+
 const SHOP_DATA = {
   appearance: [
     {id:'lip1',icon:'♡',title:'唇部修复Ⅰ',desc:'改善干裂、暗沉与边缘粗糙感。',price:160,currency:'AP',level:'LV.1',req:'无',detail:'完成后只改变基础状态，不直接赋予“漂亮”标签。'},
@@ -297,6 +307,42 @@ function sanitizeGeneratedDesireTask(raw,state=runtimeState()){
     createdDay:Number(state.tasks?.storyDay)||1,
     createdTurn:Number(state.shop?.plotTurn)||0,
     source:String(raw.source||'当前剧情').replace(/\s+/g,' ').trim().slice(0,80),
+  };
+}
+
+function sanitizeGeneratedDailyTask(raw,state=runtimeState()){
+  if(!raw || typeof raw!=='object') return null;
+  const title=String(raw.title||'').replace(/\s+/g,' ').trim().slice(0,48);
+  const desc=String(raw.desc||'').replace(/\s+/g,' ').trim().slice(0,180);
+  const detail=String(raw.detail||'').replace(/\s+/g,' ').trim().slice(0,180);
+  if(!title || !desc) return null;
+
+  const difficulty=['light','normal','hard'].includes(String(raw.difficulty||'').toLowerCase())
+    ? String(raw.difficulty).toLowerCase()
+    : 'normal';
+  const reward=dynamicDailyRewardMeta(difficulty);
+  const source=String(raw.source||'当前剧情').replace(/\s+/g,' ').trim().slice(0,80);
+  const fingerprint=`${title.toLowerCase()}|${desc.toLowerCase()}|${source.toLowerCase()}`;
+  const id=`daily_${hashId(fingerprint).toString(36)}`;
+  if(state.tasks?.everCompleted?.[id]) return null;
+  if((state.tasks?.generatedDaily||[]).some(task=>task.id===id)) return null;
+  if(state.tasks?.active?.[id]) return null;
+
+  return {
+    id,
+    type:'DAILY',
+    category:'daily',
+    dynamicDailyTask:true,
+    difficulty,
+    title,
+    desc,
+    detail:detail || '根据当前剧情生成的一次性日常任务。完成后从任务板移除。',
+    reward:`AP +${reward.ap}`,
+    state:'剧情生成',
+    locked:false,
+    createdDay:Number(state.tasks?.storyDay)||1,
+    createdTurn:Number(state.shop?.plotTurn)||0,
+    source,
   };
 }
 
@@ -556,6 +602,7 @@ function settleTaskFromModel(state,rawTask,messageId){
       count:Math.max(0,Number(previous.count)||0)+1,
       evidence,
       completedAt:Date.now(),
+      completedTurn:Number(state.shop?.plotTurn)||0,
     };
   }
 
@@ -595,6 +642,67 @@ function settleTaskFromModel(state,rawTask,messageId){
     title:`${wasEverCompleted && repeatable?'重复结算':'完成'}：${title}`,
     summary:`任务「${title}」验收通过；${rewardText}。证据：${evidence}`,
     text:`TASK VERIFIED AND SETTLED: ${id}`,
+    committedAt:Date.now(),
+  });
+  if(state.history.length>240) state.history=state.history.slice(-240);
+  return true;
+}
+
+function settleStoryRewardFromModel(state,rawReward,messageId){
+  if(!rawReward || typeof rawReward!=='object') return false;
+  const title=String(rawReward.title||'').replace(/\s+/g,' ').trim().slice(0,48);
+  const evidence=String(rawReward.evidence||'').replace(/\s+/g,' ').trim().slice(0,180);
+  if(!title || !evidence) return false;
+
+  const difficulty=['light','normal','hard'].includes(String(rawReward.difficulty||'').toLowerCase())
+    ? String(rawReward.difficulty).toLowerCase()
+    : 'normal';
+  const reward=dynamicDailyRewardMeta(difficulty);
+  const source=String(rawReward.source||'当前剧情').replace(/\s+/g,' ').trim().slice(0,80);
+  const id=`story_${hashId((title+'|'+evidence+'|'+source).toLowerCase()).toString(36)}`;
+  const historyId=`meme_story_reward_${messageId}_${id}`;
+  if((state.history||[]).some(entry=>entry.id===historyId) || state.tasks?.everCompleted?.[id]) return false;
+
+  state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
+  state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
+  const task={
+    id,
+    type:'DAILY',
+    category:'daily',
+    dynamicDailyTask:true,
+    difficulty,
+    title,
+    desc:evidence,
+    detail:'剧情中临时触发并当场完成的一次性任务。',
+    reward:`AP +${reward.ap}`,
+    state:'已完成',
+    locked:false,
+    createdDay:Number(state.tasks.storyDay)||1,
+    createdTurn:Number(state.shop?.plotTurn)||0,
+    source,
+  };
+  state.tasks.generatedDaily=[task,...state.tasks.generatedDaily.filter(old=>old.id!==id)].slice(0,8);
+  state.resources.ap=Math.max(0,Number(state.resources.ap||0)+reward.ap);
+  state.tasks.dailyCompleted[id]={
+    id,
+    title,
+    category:'daily',
+    day:Number(state.tasks.storyDay)||1,
+    count:1,
+    evidence,
+    completedAt:Date.now(),
+    completedTurn:Number(state.shop?.plotTurn)||0,
+  };
+  state.tasks.everCompleted[id]={id,title,category:'daily',firstCompletedAt:Date.now()};
+  state.permission.milestones.taskSettlements=Math.max(0,Number(state.permission.milestones.taskSettlements)||0)+1;
+  state.permission.milestones.completedTasks=Math.max(0,Number(state.permission.milestones.completedTasks)||0)+1;
+  state.history.push({
+    id:historyId,
+    type:'story_task_complete',
+    recordType:'task',
+    title:`剧情任务完成：${title}`,
+    summary:`剧情临时任务验收；AP +${reward.ap}。证据：${evidence}`,
+    text:`STORY TASK VERIFIED AND SETTLED: ${id}`,
     committedAt:Date.now(),
   });
   if(state.history.length>240) state.history=state.history.slice(-240);
@@ -1609,6 +1717,8 @@ function findShopItem(id){
 }
 
 function findTask(id,state=runtimeState()){
+  const generatedDaily=(state.tasks?.generatedDaily||[]).find(task=>task.id===id);
+  if(generatedDaily) return {...generatedDaily,category:'daily',dynamicDailyTask:true};
   const generated=(state.tasks?.generated||[]).find(task=>task.id===id);
   if(generated) return {...generated,category:'desire',dynamicTask:true};
   for(const [category,tasks] of Object.entries(TASK_DATA)){
