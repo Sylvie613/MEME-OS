@@ -306,7 +306,6 @@ function distinctEroticTaskCount(state=runtimeState()){
 
 function sanitizeDynamicItem(raw,state=runtimeState()){
   if(!raw || typeof raw!=='object') return null;
-  const id=String(raw.id || `plot_${Date.now()}_${Math.random().toString(36).slice(2,6)}`).replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48);
   const currency=raw.currency==='SV'?'SV':'AP';
   const phase=currentShopPhase(state);
   const price=Number(PLOT_PRICES[currency]?.[phase.id] || (currency==='SV'?45:220));
@@ -315,6 +314,8 @@ function sanitizeDynamicItem(raw,state=runtimeState()){
   const desc=String(raw.desc||'系统临时上架。').slice(0,140);
   const detail=String(raw.detail||'根据当前剧情临时出现，过期后自动撤架。').slice(0,180);
   const bodyAxis=BODY_AXES.has(String(raw.bodyAxis||'')) ? String(raw.bodyAxis) : null;
+  const fingerprint=`${title.toLowerCase()}|${desc.toLowerCase()}|${bodyAxis||'none'}|${currency}|${String(raw.source||'')}`;
+  const id=`plot_${hashId(fingerprint).toString(36)}`;
   const charmGain=PLOT_CHARM_AXES.has(bodyAxis) ? 0.5 : PLOT_POLISH_AXES.has(bodyAxis) ? 0.25 : 0;
   return {
     id,
@@ -1169,7 +1170,7 @@ Format exactly: <!--MEME_OS_EVENT {"taskOffers":[],"tasks":[],"shop":[],"feedbac
 Do not emit the comment when nothing relevant changed.
 taskOffers: maximum 1 new generated erotic mission; fields title,desc,detail,source. Never include tier, id or rewards.
 tasks: max 4 completed task entries; fields id,status("completed"),evidence. Never include rewards; the extension calculates them.
-shop: maximum 2 temporary items. Each item fields: id,title,desc,detail,currency("AP"|"SV"),ttl(1-8),icon,source,bodyAxis(optional),sourceIssueId(optional). Never include price or charmGain; the extension assigns both. bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
+shop: maximum 2 temporary items. Each item fields: title,desc,detail,currency("AP"|"SV"),ttl(1-8),icon,source,bodyAxis(optional),sourceIssueId(optional). Never include id, price or charmGain; the extension assigns all three. bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
 feedback.issues: max 2, only direct story evidence; fields id,axis(optional),source,note,severity(low|medium|high).
 feedback.reactions: max 2, only directly observed reactions to established state/change; fields id,axis(optional),source,note,valence(negative|neutral|positive|sexual).
 men: max 3 qualifying adult men updates; fields id(optional for new),name,meta,summary,relation,desire,lastContact,note,badges,present,contactDelta,qualifies.
