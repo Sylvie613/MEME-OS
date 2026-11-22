@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS: unique administrator copy, locked SYSTEM permissions, and one-time +1000 AP purchase-test grant.",
-  "js": "index.js?v=0.7.1",
-  "css": "style.css?v=0.7.1",
+  "description": "MÉMÉ OS: slower CHARM progression with 0.25/0.5 gains and pending-purchase migration.",
+  "js": "index.js?v=0.7.2",
+  "css": "style.css?v=0.7.2",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
