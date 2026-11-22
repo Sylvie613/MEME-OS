@@ -1269,3 +1269,294 @@ html.meme-os-open body{
   font-size:8px;
   line-height:1.6;
 }
+
+
+/* v0.6.0 content-complete shell */
+.meme-home-strip{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:10px;
+}
+.meme-home-strip article,
+.meme-whisper-card{
+  border:1px solid rgba(232,116,171,.13);
+  border-radius:15px;
+  background:rgba(14,5,17,.20);
+}
+.meme-home-strip article{
+  padding:10px 11px;
+}
+.meme-home-strip small,
+.meme-whisper-card small{
+  display:block;
+  color:#906980;
+  font-size:6px;
+  font-weight:900;
+  letter-spacing:.17em;
+}
+.meme-home-strip b{
+  display:block;
+  margin:4px 0 2px;
+  color:#f4e4ee;
+  font-size:9px;
+}
+.meme-home-strip em{
+  color:#7d5c70;
+  font-size:7px;
+  font-style:normal;
+}
+.meme-whisper-card{
+  display:grid;
+  grid-template-columns:31px 1fr;
+  gap:9px;
+  align-items:center;
+  margin-top:8px;
+  padding:9px 11px;
+}
+.meme-whisper-card>span{
+  width:31px;
+  height:31px;
+  display:grid;
+  place-items:center;
+  border:1px solid rgba(239,126,178,.16);
+  border-radius:50%;
+  color:#eb82ad;
+  background:rgba(239,99,160,.05);
+}
+.meme-whisper-card b{
+  display:block;
+  margin-top:3px;
+  color:#cfaabd;
+  font-size:8px;
+  font-weight:600;
+}
+
+.meme-scan-list{
+  display:grid;
+  gap:9px;
+}
+.meme-scan-row{
+  display:grid;
+  grid-template-columns:minmax(112px,1.1fr) 1fr 22px;
+  gap:8px;
+  align-items:center;
+}
+.meme-scan-row span small{
+  display:block;
+  color:#876379;
+  font-size:7px;
+}
+.meme-scan-row span b{
+  display:block;
+  margin-top:2px;
+  color:#c9a9bb;
+  font-size:8px;
+  font-weight:600;
+}
+.meme-scan-meter{
+  height:4px;
+  overflow:hidden;
+  border-radius:99px;
+  background:rgba(255,255,255,.045);
+}
+.meme-scan-meter i{
+  display:block;
+  height:100%;
+  border-radius:inherit;
+  background:#c75b8a;
+}
+.meme-scan-meter i.low{background:#a96b92}
+.meme-scan-row em{
+  color:#8e6980;
+  font-size:8px;
+  font-style:normal;
+  text-align:right;
+}
+
+.meme-task-detail,
+.meme-shop-detail{
+  display:none;
+  margin-top:8px;
+  padding:8px 9px;
+  border-radius:10px;
+  background:rgba(237,96,158,.035);
+  color:#8e697f;
+  font-size:8px;
+  line-height:1.55;
+}
+.meme-task-card.is-open .meme-task-detail,
+.meme-shop-card.is-open .meme-shop-detail{
+  display:block;
+}
+.meme-task-card.is-locked,
+.meme-shop-card.is-locked{
+  opacity:.63;
+}
+.meme-task-rules{
+  margin-top:10px;
+}
+
+.meme-shop-balance{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:16px;
+  margin-bottom:10px;
+  padding:9px 12px;
+  border:1px solid rgba(231,115,170,.11);
+  border-radius:14px;
+  background:rgba(13,5,16,.19);
+}
+.meme-shop-balance span{
+  display:flex;
+  align-items:baseline;
+  gap:6px;
+}
+.meme-shop-balance small{
+  color:#8f6980;
+  font-size:7px;
+  font-weight:900;
+  letter-spacing:.16em;
+}
+.meme-shop-balance b{
+  color:#f2dce8;
+  font-size:12px;
+}
+.meme-shop-balance i{
+  width:1px;
+  height:18px;
+  background:rgba(232,118,171,.10);
+}
+.meme-shop-filter button{
+  flex:none;
+  padding:6px 10px;
+  border:1px solid rgba(230,117,170,.10);
+  border-radius:99px;
+  background:transparent;
+  color:#8d687f;
+  font-size:8px;
+}
+.meme-shop-filter button.is-active{
+  border-color:rgba(239,125,177,.22);
+  background:rgba(240,102,161,.08);
+  color:#e8abc5;
+}
+
+.meme-system-meters{
+  display:grid;
+  gap:7px;
+  margin-bottom:10px;
+}
+.meme-system-meters article{
+  display:grid;
+  grid-template-columns:78px 34px 1fr;
+  gap:8px;
+  align-items:center;
+  padding:8px 10px;
+  border:1px solid rgba(230,115,169,.11);
+  border-radius:13px;
+  background:rgba(12,4,15,.18);
+}
+.meme-system-meters small{
+  color:#8d687e;
+  font-size:7px;
+}
+.meme-system-meters b{
+  color:#dcb7ca;
+  font-size:9px;
+  text-align:right;
+}
+.meme-system-meters span{
+  height:4px;
+  overflow:hidden;
+  border-radius:99px;
+  background:rgba(255,255,255,.045);
+}
+.meme-system-meters i{
+  display:block;
+  height:100%;
+  border-radius:inherit;
+  background:linear-gradient(90deg,#aa61d7,#ed659d);
+}
+.meme-system-levels{
+  display:grid;
+  gap:6px;
+}
+.meme-system-levels article{
+  display:grid;
+  grid-template-columns:29px 1fr;
+  gap:9px;
+  align-items:center;
+  padding:8px 9px;
+  border:1px solid rgba(231,116,170,.08);
+  border-radius:12px;
+  background:rgba(10,3,12,.16);
+  opacity:.48;
+}
+.meme-system-levels article.is-on{
+  opacity:1;
+  border-color:rgba(239,126,178,.18);
+}
+.meme-system-levels article>span{
+  width:29px;
+  height:29px;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  background:rgba(238,99,159,.06);
+  color:#d887aa;
+  font-size:8px;
+}
+.meme-system-levels b{
+  display:block;
+  color:#f0dce7;
+  font-size:9px;
+}
+.meme-system-levels small{
+  display:block;
+  margin-top:2px;
+  color:#87647a;
+  font-size:7px;
+}
+.meme-admin-quote{
+  padding:12px 13px;
+  border:1px solid rgba(232,116,171,.12);
+  border-radius:15px;
+  background:linear-gradient(145deg,rgba(52,16,47,.65),rgba(21,7,26,.75));
+}
+.meme-admin-quote small{
+  color:#946c85;
+  font-size:7px;
+  font-weight:900;
+  letter-spacing:.18em;
+}
+.meme-admin-quote p{
+  margin:5px 0 0;
+  color:#d4adbf;
+  font-size:9px;
+  line-height:1.55;
+}
+
+.meme-record-filter{
+  display:flex;
+  gap:5px;
+  margin-bottom:9px;
+  overflow:auto;
+  scrollbar-width:none;
+}
+.meme-record-filter::-webkit-scrollbar{display:none}
+.meme-record-filter button{
+  flex:none;
+  padding:6px 9px;
+  border:1px solid rgba(230,117,170,.10);
+  border-radius:99px;
+  background:transparent;
+  color:#866278;
+  font-size:8px;
+}
+.meme-record-filter button.is-active{
+  border-color:rgba(239,125,177,.21);
+  background:rgba(240,102,161,.075);
+  color:#e6a8c2;
+}
