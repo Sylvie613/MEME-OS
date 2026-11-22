@@ -730,6 +730,45 @@ async function handleRuntimeEvent(messageId){
         });
       }
 
+      if(event.evolution?.targetLevel){
+        const targetLevel=Math.round(Number(event.evolution.targetLevel)||0);
+        const currentLevel=Math.max(1,Math.min(4,Number(state.system?.level)||1));
+        const reason=String(event.evolution?.reason||'').replace(/\s+/g,' ').trim().slice(0,180);
+        const historyId=`meme_system_evolution_${messageId}_${targetLevel}`;
+        const alreadyHandled=(state.history||[]).some(entry=>entry.id===historyId);
+        const gate=systemEvolutionReadiness(state,targetLevel);
+
+        if(!alreadyHandled && reason && targetLevel===currentLevel+1 && gate.ok){
+          const meta=SYSTEM_EVOLUTION[targetLevel];
+          const now=Date.now();
+          state.system.level=targetLevel;
+          state.system.form=meta.form;
+          state.system.evolution=state.system.evolution||{history:[],lastChangedAt:null,lastReason:null};
+          state.system.evolution.history=[
+            ...(state.system.evolution.history||[]),
+            {
+              level:targetLevel,
+              form:meta.form,
+              reason,
+              storyDay:Number(state.tasks?.storyDay)||1,
+              changedAt:now,
+            },
+          ].slice(-8);
+          state.system.evolution.lastChangedAt=now;
+          state.system.evolution.lastReason=reason;
+          state.history.push({
+            id:historyId,
+            type:'system_evolution',
+            recordType:'system',
+            title:`SYSTEM LV.${targetLevel} · ${meta.label}`,
+            summary:`管理员完成形态进化：${meta.form}。原因：${reason}`,
+            text:`SYSTEM EVOLUTION: LV.${targetLevel}`,
+            committedAt:now,
+          });
+          changed=true;
+        }
+      }
+
       const loveReadinessBeforeSignal=canAdminLove(state,normalizeBondTag(event.permission?.loveTag));
 
       if(event.permission?.signal){
@@ -893,6 +932,8 @@ function installRuntimePrompt(){
   const accessStage=systemAccessStage(state);
   const openReady=systemOpenReady(state);
   const privateReady=systemPrivateReady(state);
+  const evolution=currentSystemEvolution(state);
+  const nextEvolution=nextSystemEvolution(state);
   const prompt=`[MÉMÉ OS runtime bridge]
 HOST PERSONA RULE:
 Do not define the host's name, age beyond adulthood, height, job, personality, hobbies, romantic style or personal history here. The host's identity/personality comes from the current SillyTavern Persona and the live conversation. MÉMÉ OS may define only the system-specific starting transformation condition and tracked state. Never overwrite or homogenize the user's Persona.
@@ -984,14 +1025,30 @@ Do not emit a new relationship signal merely because a previous feeling continue
 Current CHARM=${state.host.charm}; desire allowed by appearance=${desireAllowed}; adminLove=${loveState}.
 
 Only when the current story creates a genuinely relevant MÉMÉ OS state update — shop, feedback, MEN, permission, identity, or timeline — append ONE invisible HTML comment at the very end of the assistant reply.
-Format exactly: <!--MEME_OS_EVENT {"tasks":[],"shop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{},"timeline":{}} -->
+Format exactly: <!--MEME_OS_EVENT {"tasks":[],"shop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{},"timeline":{}} -->
 Do not emit the comment when nothing relevant changed.
 tasks: max 4 completed task entries; fields id,status("completed"),evidence. Never include rewards; the extension calculates them.
 shop: maximum 2 temporary items. Each item fields: id,title,desc,detail,price,currency("AP"|"SV"),charmGain(0|0.25|0.5),ttl(1-8),icon,source,bodyAxis(optional),sourceIssueId(optional). bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
 feedback.issues: max 2, only direct story evidence; fields id,axis(optional),source,note,severity(low|medium|high).
 feedback.reactions: max 2, only directly observed reactions to established state/change; fields id,axis(optional),source,note,valence(negative|neutral|positive|sexual).
 men: max 3 qualifying adult men updates; fields id(optional for new),name,meta,summary,relation,desire,lastContact,note,badges,present,contactDelta,qualifies.
+evolution: only when a visible, mechanically-ready one-step administrator form evolution actually happens; fields targetLevel(2|3|4),reason. Never use it for ordinary mood/relationship changes.
 Temporary shop items must arise from the just-written plot, not random catalog filler. Their names/descriptions are spoken by the male administrator in his current tone: ${voice.label}. Current CHARM=${state.host.charm}.
+SYSTEM EVOLUTION LADDER:
+Current administrator system level=${state.system?.level||1}; current form=${evolution.form}.
+Current capability: ${evolution.capability}
+Next evolution: ${nextEvolution ? `LV.${nextEvolution.level} ${nextEvolution.form}; mechanically ready=${nextEvolution.readiness.ok}` : 'MAX LEVEL'}.
+
+Evolution is separate from romance. Attraction, sex, jealousy, attachment or love do not automatically make him more physical. Progression is supported by the host's long-term task/upgrade/story progress, then the administrator must actually undergo a fitting in-story system change.
+If next evolution is not mechanically ready, do not evolve him.
+If it is ready, he still does NOT evolve automatically. Wait for a fitting narrative moment where the change genuinely occurs in visible prose. Only then append evolution.targetLevel for exactly the next level plus a concise evolution.reason.
+Never skip levels.
+LV.1 意识体: voice/consciousness only. He cannot be seen, touch anything, or physically appear.
+LV.2 Q版可视体: the adult male system consciousness gains a small chibi visual avatar visible to the host only. This is a stylized avatar, NOT a child and does not make his personality childish. He still cannot physically touch the host or world.
+LV.3 有限成年实体: he may temporarily manifest as his adult male physical form and touch/interact with the physical world, but duration/range/energy remain limited. He cannot behave as permanently embodied yet.
+LV.4 完全具现: stable adult physical body and autonomous movement. He may leave the host's immediate vicinity, act independently, and physically interact with the world. This grants physical capability, not romance or ownership over the host.
+Do not reveal hidden numeric evolution thresholds in visible prose.
+
 SYSTEM ACCESS LADDER:
 Current SYSTEM access=${accessStage.toUpperCase()}.
 Access progression is strictly LOCKED → PEEK → OPEN → PRIVATE. Never skip a stage, never downgrade, and never auto-upgrade from numbers alone.
