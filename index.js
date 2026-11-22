@@ -1830,7 +1830,7 @@ function taskItem(task) {
   const pending=pendingFor('taskAccept',task.id,state);
   let button='接取';
   if(!unlock.ok) button='没资格';
-  else if(completed) button='今天已完成';
+  else if(completed) button=dailyLike?'今天已完成':'已完成';
   else if(pending) button='待发送';
   else if(active) button='待验收';
   else if(repeatable && hasHistory) button='再做一次';
