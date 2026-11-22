@@ -1312,7 +1312,7 @@ function pendingTrayMarkup(state=runtimeState()){
           <button type="button" data-remove-pending="${action.id}">撤销</button>
         </div>
       `).join('')}
-      <p>还没发送就不会结算。发送后才正式改数值。</p>
+      <p>还没发送就不会生效。任务接取只登记状态；奖励要等剧情验收通过后由扩展自动结算。</p>
     </section>
   `;
 }
@@ -1646,21 +1646,21 @@ function taskItem(task) {
   const completed=task.category==='daily'
     ? Number(state.tasks?.dailyCompleted?.[task.id]?.day||0)===storyDay
     : Boolean(state.tasks?.completed?.[task.id]);
-  const pending=pendingFor(active?'taskComplete':'taskAccept',task.id,state);
-  let button='挂上';
+  const pending=pendingFor('taskAccept',task.id,state);
+  let button='接取';
   if(!unlock.ok) button='没资格';
-  else if(completed) button=task.category==='daily'?'今天交过了':'交过了';
+  else if(completed) button=task.category==='daily'?'今天已完成':'已完成';
   else if(pending) button='待发送';
-  else if(active) button='交差';
+  else if(active) button='待验收';
 
   return `
     <article class="meme-task-card ${!unlock.ok ? 'is-locked' : ''} ${completed?'is-done':''}" data-task-id="${task.id}">
-      <div class="meme-task-top"><span>${task.type}</span><em>${completed?'已完成':active?'已接取':unlock.ok?task.state:unlock.reason}</em></div>
+      <div class="meme-task-top"><span>${task.type}</span><em>${completed?'已完成':active?'等待剧情验收':unlock.ok?task.state:unlock.reason}</em></div>
       <div data-task-detail><h4>${taskVoiceName(task,state)}</h4><p>${taskVoiceDesc(task,state)}</p></div>
       <div class="meme-task-detail">${task.detail}</div>
       <div class="meme-task-foot">
         <b>${task.reward}</b>
-        <button type="button" data-task-action="${task.id}" ${(!unlock.ok||completed||pending)?'disabled':''}>${button}</button>
+        <button type="button" data-task-action="${task.id}" ${(!unlock.ok||completed||pending||active)?'disabled':''}>${button}</button>
       </div>
     </article>
   `;
@@ -1686,7 +1686,7 @@ function taskMarkup() {
       ${labelValue('日常',`DAY ${String(Math.max(1,Number(state.tasks?.storyDay)||1)).padStart(3,'0')} · 每项每天可结算一次，剧情跨天后刷新。`)}
       ${labelValue('欲望','主要产出 SV。魅力不够就别做梦。')}
       ${labelValue('特殊','我什么时候想发，什么时候才有。')}
-      ${labelValue('结算','发进聊天后才算完成操作，别让正文再扣第二次。')}
+      ${labelValue('结算','接取后把完成过程写在同一条或后续剧情里；模型验收通过的那条回复中，扩展直接发奖励并划掉任务。')}
     </section>
   `;
 }
@@ -2102,45 +2102,36 @@ async function handleTaskAction(id){
     globalThis.toastr?.warning?.(`没资格。先把 ${unlock.reason} 做到。`);
     return;
   }
+
   const storyDay=Math.max(1,Number(state.tasks?.storyDay)||1);
   const completedToday=task.category==='daily' && Number(state.tasks?.dailyCompleted?.[id]?.day||0)===storyDay;
   const completedPermanent=task.category!=='daily' && Boolean(state.tasks?.completed?.[id]);
   if(completedToday || completedPermanent){
-    globalThis.toastr?.info?.(task.category==='daily'?'今天这份交过了。等剧情真跨天再来。':'这份差已经交过了。别想重复领。');
+    globalThis.toastr?.info?.(task.category==='daily'?'今天已经做完了。':'这份任务已经结算过了。');
+    return;
+  }
+  if(state.tasks?.active?.[id]){
+    globalThis.toastr?.info?.('任务已经挂着了。把完成过程写进剧情，我会验收。');
+    return;
+  }
+  if(pendingFor('taskAccept',id,state)){
+    globalThis.toastr?.info?.('已经在输入框里了。写完你怎么做的，再一起发。');
     return;
   }
 
   const voiced=taskVoiceName(task,state);
-  if(state.tasks?.active?.[id]){
-    const reward=taskReward(task);
-    const dayTag=task.category==='daily'?`DAY ${String(storyDay).padStart(3,'0')} · `:'';
-    const text=`【MÉMÉ OS｜已结算｜勿重复结算】${dayTag}完成任务「${voiced}」；AP +${reward.ap}${reward.sv?`；SV +${reward.sv}`:''}。扩展已负责数值结算，正文只承认结果。`;
-    await queueAction(createPendingAction({
-      type:'task_complete',
-      recordType:'task',
-      title:`完成：${voiced}`,
-      summary:`完成任务「${voiced}」，获得 AP +${reward.ap}${reward.sv?` / SV +${reward.sv}`:''}。`,
-      text,
-      effect:{
-        apDelta:reward.ap,
-        svDelta:reward.sv,
-        taskComplete:{id:task.id,title:voiced,category:task.category},
-      },
-    }));
-    return;
-  }
+  const dayTag=task.category==='daily'?`DAY ${String(storyDay).padStart(3,'0')}｜`:'';
+  const text=`【MÉMÉ OS｜任务接取】${dayTag}TASK_ID:${task.id}｜「${voiced}」\n完成过程：`;
 
-  const text=`【MÉMÉ OS｜已结算｜勿重复结算】接取任务「${voiced}」。扩展已记录为进行中；正文只承认任务状态，不要重复生成或扣改数值。`;
   await queueAction(createPendingAction({
     type:'task_accept',
     recordType:'task',
     title:`接取：${voiced}`,
-    summary:`接取任务「${voiced}」。`,
+    summary:`接取任务「${voiced}」，等待剧情完成与系统验收。`,
     text,
     effect:{taskAccept:{id:task.id,title:voiced,category:task.category}},
   }));
 }
-
 async function handleShopAction(id){
   const item=findShopItem(id);
   if(!item) return;
