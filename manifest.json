@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS: event-based administrator relationship memory with concrete reasons and strictly separated interest, desire, attachment and love.",
-  "js": "index.js?v=0.9.5",
-  "css": "style.css?v=0.9.5",
+  "description": "MÉMÉ OS: deliberately slow-burn administrator romance with multi-day, multi-event, cooldown and major-choice gates.",
+  "js": "index.js?v=0.9.6",
+  "css": "style.css?v=0.9.6",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
