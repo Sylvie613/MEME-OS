@@ -12,7 +12,7 @@ import { appendToInput, removeFromInput } from './src/input.js?v=0.9.0';
 import { isBoundCharacter } from './src/binding.js?v=0.9.0';
 
 /**
- * MÉMÉ OS v0.9.0
+ * MÉMÉ OS v0.9.1
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -544,6 +544,29 @@ const CHARM_GAIN = {
   recovery1:0,
 };
 
+const SHOP_MAX_LEVEL = {
+  lip1:3, hair1:4, skin1:4, face1:3, eye1:3, face2:3,
+  posture1:3, bodyfat1:4, waist1:4, leg1:3, neck1:3, bust1:4,
+  scent1:3, breath1:3, voice1:4, touch1:3, scent2:3,
+  sensitive1:4, arousal1:4, lubrication1:4, orgasm1:4, recovery1:4,
+  charmseal:1, qadmin:1, touchadmin:1, embody:1,
+};
+
+const SHOP_PHASES = [
+  {id:'rescue', minLevels:0, label:'抢救货架', code:'RESCUE', level:1},
+  {id:'refine', minLevels:8, label:'精修货架', code:'REFINE', level:2},
+  {id:'beauty', minLevels:20, label:'美女货架', code:'BEAUTY', level:3},
+  {id:'advanced', minLevels:35, label:'高阶货架', code:'ADVANCED', level:4},
+];
+
+const SHOP_PRICE_MULTIPLIERS = [1,1.7,2.7,4.2];
+const ROMAN_LEVELS = ['Ⅰ','Ⅱ','Ⅲ','Ⅳ'];
+const SHOP_LEVEL_PREFIXES = {
+  2:['半成品别急着得意','既然救回来了就继续修','总算配做第二轮了','别卡在能看这一步'],
+  3:['现在才轮得到精修','总算能往美女那边改了','这回别把好底子糟蹋了','终于不是单纯抢救了'],
+  4:['这张脸现在值得我认真挑','别浪费现在这副身子','高阶货不卖给半成品','现在才配碰这种东西'],
+};
+
 const BODY_EFFECTS = {
   lip1:{lips:1},
   hair1:{hair:1},
@@ -608,6 +631,54 @@ function bodyStatus(keys,baseline,levels,state=runtimeState()){
   return options[Math.min(options.length-1,total-1)] || options[options.length-1];
 }
 
+function totalUpgradeLevels(state=runtimeState()){
+  return Object.values(state.upgrades||{}).reduce((sum,item)=>sum+Math.max(0,Number(item?.level)||0),0);
+}
+
+function currentShopPhase(state=runtimeState()){
+  const total=totalUpgradeLevels(state);
+  return [...SHOP_PHASES].reverse().find(phase=>total>=phase.minLevels) || SHOP_PHASES[0];
+}
+
+function shopPhaseForLevel(level=1){
+  return SHOP_PHASES[Math.max(0,Math.min(SHOP_PHASES.length-1,Number(level||1)-1))] || SHOP_PHASES[0];
+}
+
+function staticShopView(item,state=runtimeState()){
+  if(item.dynamic){
+    return {
+      currentLevel:0,
+      nextLevel:1,
+      maxLevel:1,
+      soldOut:Boolean(state.upgrades?.[item.id]),
+      price:Number(item.price)||0,
+      phase:currentShopPhase(state),
+      phaseUnlocked:true,
+    };
+  }
+  const currentLevel=Math.max(0,Number(state.upgrades?.[item.id]?.level)||0);
+  const maxLevel=Math.max(1,Number(SHOP_MAX_LEVEL[item.id])||1);
+  const nextLevel=Math.min(maxLevel,currentLevel+1);
+  const soldOut=currentLevel>=maxLevel;
+  const phase=shopPhaseForLevel(nextLevel);
+  const currentPhase=currentShopPhase(state);
+  const phaseUnlocked=currentPhase.level>=phase.level;
+  const mult=SHOP_PRICE_MULTIPLIERS[nextLevel-1] || SHOP_PRICE_MULTIPLIERS[SHOP_PRICE_MULTIPLIERS.length-1];
+  const price=Math.max(0,Math.round((Number(item.price)||0)*mult/10)*10);
+  return {currentLevel,nextLevel,maxLevel,soldOut,price,phase,phaseUnlocked,currentPhase};
+}
+
+function levelledShopTitle(item,state=runtimeState()){
+  const view=staticShopView(item,state);
+  if(item.dynamic) return item.title;
+  const clean=String(item.title||'').replace(/[ⅠⅡⅢⅣ]+$/,'').trim();
+  const roman=ROMAN_LEVELS[Math.max(0,view.nextLevel-1)] || '';
+  if(view.nextLevel<=1) return RUDE_SHOP_NAMES[item.id] || `${clean}${roman}`;
+  const prefixes=SHOP_LEVEL_PREFIXES[view.nextLevel] || SHOP_LEVEL_PREFIXES[4];
+  const prefix=prefixes[hashId(item.id+`_${view.nextLevel}`)%prefixes.length];
+  return `${prefix} · ${clean}${roman}`;
+}
+
 function attitude(state=runtimeState()){
   const charm=Number(state.host?.charm)||0;
   return VOICE_STAGES.find(stage=>charm>=stage.min && charm<=stage.max) || VOICE_STAGES[0];
@@ -628,20 +699,25 @@ function systemHomeLine(state=runtimeState()){
 }
 
 function shopVoiceName(item,state=runtimeState()){
-  const i=toneIndex(state);
-  if(i===0) return RUDE_SHOP_NAMES[item.id] || item.title;
-  if(i===1) return (RUDE_SHOP_NAMES[item.id] || item.title).replace(/先|别再|终于/g,'').replace(/Ⅰ$/,'') + ' · 修复';
-  if(i===2) return item.title.replace('Ⅰ','') + ' · 调整';
-  if(i===3) return item.title.replace('Ⅰ','') + ' · 精修';
-  return item.title.replace('Ⅰ','') + ' · 私人定制';
+  if(item.dynamic) return item.title;
+  return levelledShopTitle(item,state);
 }
 
 function shopVoiceDesc(item,state=runtimeState()){
+  if(item.dynamic) return item.desc;
+  const view=staticShopView(item,state);
   const i=toneIndex(state);
-  if(i===0) return RUDE_SHOP_DESCS[item.id] || item.desc;
+  if(view.nextLevel===1 && i===0) return RUDE_SHOP_DESCS[item.id] || item.desc;
   const remarks=STAGE_REMARKS[i] || STAGE_REMARKS[1];
-  const remark=remarks[hashId(item.id)%remarks.length];
-  return `${remark} ${item.desc}`;
+  const remark=remarks[hashId(item.id+`_${view.nextLevel}`)%remarks.length];
+  const levelNote=view.nextLevel===1
+    ? ''
+    : view.nextLevel===2
+      ? '这轮不是救命，是把上次那点半成品继续往上拽。'
+      : view.nextLevel===3
+        ? '做到这一级才算真正开始精修，别拿Ⅰ级效果冒充美女。'
+        : '这是高阶细调，已经不是给惨不忍睹阶段擦屁股的货。';
+  return `${remark} ${levelNote} ${item.desc}`.trim();
 }
 
 function taskVoiceName(task,state=runtimeState()){
@@ -699,13 +775,18 @@ function taskUnlock(task,state=runtimeState()){
 
 function shopRequirement(item,state=runtimeState()){
   const charm=Number(state.host?.charm)||0;
-  const min=Number(item.req?.match(/CHARM (\d+)/)?.[1]||0);
-  if(min && charm<min) return {ok:false,reason:`CHARM ${min}`};
+  const view=staticShopView(item,state);
+  if(view.soldOut) return {ok:false,reason:'已经改到当前上限'};
   if(item.currency==='LOCK') return {ok:false,reason:item.req||'SYSTEM LOCK'};
+  if(!view.phaseUnlocked){
+    return {ok:false,reason:`${view.phase.label} · 累计改造 ${view.phase.minLevels} 级`};
+  }
+  const min=Number(item.req?.match(/CHARM (\d+)/)?.[1]||0);
+  if(view.nextLevel===1 && min && charm<min) return {ok:false,reason:`CHARM ${min}`};
   const needUpgrade=REQUIRE_UPGRADE[item.id];
-  if(needUpgrade && !state.upgrades?.[needUpgrade]) return {ok:false,reason:'前置改造未完成'};
+  if(view.nextLevel===1 && needUpgrade && !state.upgrades?.[needUpgrade]) return {ok:false,reason:'前置改造未完成'};
   const needTask=REQUIRE_TASK[item.id];
-  if(needTask && !state.tasks?.completed?.[needTask]) return {ok:false,reason:'前置欲望任务未完成'};
+  if(view.nextLevel===1 && needTask && !state.tasks?.completed?.[needTask]) return {ok:false,reason:'前置欲望任务未完成'};
   return {ok:true,reason:''};
 }
 
