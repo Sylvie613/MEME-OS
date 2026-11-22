@@ -56,33 +56,6 @@ html.meme-os-open body {
   overflow:hidden !important;
 }
 
-.meme-os-overlay {
-  position:fixed;
-  inset:0;
-  z-index:2147483000;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:18px;
-  pointer-events:none;
-  opacity:0;
-  transition:opacity .22s ease;
-  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif;
-}
-
-.meme-os-overlay.is-open {
-  opacity:1;
-  pointer-events:auto;
-}
-
-.meme-os-dim {
-  position:absolute;
-  inset:0;
-  background:rgba(14,5,18,.64);
-  backdrop-filter:blur(8px) saturate(.85);
-  -webkit-backdrop-filter:blur(8px) saturate(.85);
-}
-
 .meme-os-window {
   position:relative;
   width:min(390px,94vw);
@@ -101,10 +74,6 @@ html.meme-os-open body {
     0 0 42px rgba(255,79,147,.11);
   transform:translateY(14px) scale(.975);
   transition:transform .24s cubic-bezier(.2,.8,.2,1);
-}
-
-.meme-os-overlay.is-open .meme-os-window {
-  transform:translateY(0) scale(1);
 }
 
 .meme-os-window::before {
@@ -590,5 +559,64 @@ html.meme-os-open body {
 
   .meme-scroll {
     padding-bottom:18px;
+  }
+}
+
+
+/* v0.2.2: separate backdrop and panel, avoiding nested fixed/stacking issues on iOS Safari */
+#meme-os-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9000 !important;
+  display: block !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  background: rgba(14,5,18,.64) !important;
+  backdrop-filter: blur(8px) saturate(.85);
+  -webkit-backdrop-filter: blur(8px) saturate(.85);
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  transition: opacity .2s ease;
+}
+
+#meme-os-backdrop.is-open {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+#meme-os-panel {
+  position: fixed !important;
+  left: 50% !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: max(18px, env(safe-area-inset-bottom)) !important;
+  z-index: 9001 !important;
+  width: min(390px, calc(100vw - 20px)) !important;
+  max-height: 78dvh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateX(-50%) translateY(18px) scale(.985) !important;
+  transition: opacity .2s ease, transform .22s cubic-bezier(.2,.8,.2,1) !important;
+}
+
+#meme-os-panel.is-open {
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: translateX(-50%) translateY(0) scale(1) !important;
+}
+
+@media (max-width: 600px) {
+  #meme-os-panel {
+    width: calc(100vw - 16px) !important;
+    max-height: 76dvh !important;
+    bottom: max(10px, env(safe-area-inset-bottom)) !important;
+    border-radius: 26px !important;
+    border-bottom: 1px solid rgba(255,146,195,.26) !important;
   }
 }
