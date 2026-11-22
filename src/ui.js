@@ -102,7 +102,7 @@ async function handleTestPurchase() {
         return;
     }
 
-    const text = '【MÉMÉ OS｜待结算】测试操作：AP +10。';
+    const text = '【MÉMÉ OS｜已结算】测试操作：AP +10。';
     const action = createPendingAction({
         type: 'dev_test',
         text,
