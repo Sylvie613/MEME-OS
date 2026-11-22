@@ -1,5 +1,5 @@
 /**
- * MÉMÉ OS v0.4.0
+ * MÉMÉ OS v0.5.0
  * Navigable content shell. Visual style + native <dialog> retained.
  * State-changing actions are intentionally preview-only in this build.
  */
@@ -13,6 +13,11 @@ const PREVIEW_STATE = {
   stage: '初始改造阶段',
   systemLevel: 1,
   systemForm: '意识体',
+  men: {
+    current: [],
+    recent: [],
+    returning: [],
+  },
 };
 
 function positionLauncher(button) {
@@ -94,11 +99,17 @@ function moduleIcon(type) {
   return icons[type] || '•';
 }
 
+function totalMenCount() {
+  const men = PREVIEW_STATE.men || {};
+  return ['current','recent','returning'].reduce((sum, key) => sum + (men[key]?.length || 0), 0);
+}
+
 function moduleCard(key, title, sub) {
+  const resolvedSub = key === 'men' ? `${sub} · ${totalMenCount()}` : sub;
   return `
     <button type="button" class="meme-module" data-meme-module="${key}">
       <span class="meme-module-icon">${moduleIcon(key)}</span>
-      <span class="meme-module-copy"><b>${title}</b><small>${sub}</small></span>
+      <span class="meme-module-copy"><b>${title}</b><small>${resolvedSub}</small></span>
       <span class="meme-module-arrow">›</span>
     </button>
   `;
@@ -259,21 +270,91 @@ function shopMarkup() {
   `;
 }
 
-function menMarkup() {
+function menPersonCard(person) {
+  const id = person.id || Math.random().toString(36).slice(2,8);
+  const badges = (person.badges || []).map(badge => `<span>${badge}</span>`).join('');
   return `
-    ${pageHeader('TARGET ARCHIVE','MEN · 对象档案','0')}
-    <section class="meme-empty-state">
-      <span class="meme-empty-symbol">♂</span>
-      <small>NO TARGET DATA</small>
-      <h3>尚未记录任何对象</h3>
-      <p>当剧情中出现需要系统长期追踪的成年男性 NPC 后，这里会自动建立档案。</p>
+    <article class="meme-men-person" data-men-person="${id}">
+      <button type="button" class="meme-men-person-head" data-men-person-toggle>
+        <span class="meme-men-avatar">${person.avatar || '♂'}</span>
+        <span class="meme-men-main">
+          <small>${person.meta || 'ADULT · NPC'}</small>
+          <b>${person.name || '未命名对象'}</b>
+          <em>${person.summary || '档案待补充'}</em>
+        </span>
+        <span class="meme-men-chevron">⌄</span>
+      </button>
+      <div class="meme-men-person-body">
+        <div class="meme-men-badges">${badges}</div>
+        ${labelValue('关系状态', person.relation || '未判定')}
+        ${labelValue('欲望信号', person.desire || '未记录')}
+        ${labelValue('最近接触', person.lastContact || '暂无')}
+        ${person.note ? `<p class="meme-men-note">${person.note}</p>` : ''}
+      </div>
+    </article>
+  `;
+}
+
+function menEmptyGroup(kind) {
+  const copy = {
+    current: ['NO ACTIVE TARGET','暂无当前对象','当前任务或近期剧情中心对象会暂存在这里。'],
+    recent: ['NO RECENT TRACE','暂无近期痕迹','发生过重要接触但已离开当前剧情的人会短暂保留。'],
+    returning: ['NO RETURNING TARGET','暂无再遇对象','只有真正再次出现的人，才会从近期痕迹重新被系统唤醒。'],
+  }[kind];
+
+  return `
+    <div class="meme-men-empty">
+      <small>${copy[0]}</small>
+      <b>${copy[1]}</b>
+      <p>${copy[2]}</p>
+    </div>
+  `;
+}
+
+function menGroupMarkup(kind, label, title, defaultOpen=false) {
+  const list = PREVIEW_STATE.men?.[kind] || [];
+  const body = list.length ? list.map(menPersonCard).join('') : menEmptyGroup(kind);
+
+  return `
+    <section class="meme-men-group ${defaultOpen ? 'is-open' : ''}" data-men-group="${kind}">
+      <button type="button" class="meme-men-group-head" data-men-group-toggle>
+        <span>
+          <small>${label}</small>
+          <b>${title}</b>
+        </span>
+        <span class="meme-men-group-meta">${String(list.length).padStart(2,'0')} <i>⌄</i></span>
+      </button>
+      <div class="meme-men-group-body">
+        ${body}
+      </div>
+    </section>
+  `;
+}
+
+function menMarkup() {
+  const count = totalMenCount();
+  return `
+    ${pageHeader('TARGET ARCHIVE','MEN · 对象档案',String(count).padStart(2,'0'))}
+
+    <section class="meme-men-summary">
+      <div><small>CURRENT</small><b>${PREVIEW_STATE.men.current.length}</b><em>当前</em></div>
+      <div><small>RECENT</small><b>${PREVIEW_STATE.men.recent.length}</b><em>近期</em></div>
+      <div><small>RETURNING</small><b>${PREVIEW_STATE.men.returning.length}</b><em>再遇</em></div>
     </section>
 
-    <section class="meme-page-card">
-      <div class="meme-card-title"><small>ARCHIVE RULE</small><h3>记录内容</h3></div>
-      ${labelValue('基础档案','姓名 / 年龄 / 职业 / 外貌')}
-      ${labelValue('关系数据','好感 / 欲望 / 风险')}
-      ${labelValue('剧情记录','关键接触与系统判定')}
+    <div class="meme-men-groups">
+      ${menGroupMarkup('current','CURRENT','当前对象',true)}
+      ${menGroupMarkup('recent','RECENT','近期痕迹',false)}
+      ${menGroupMarkup('returning','RETURNING','再遇对象',false)}
+    </div>
+
+    <section class="meme-page-card meme-men-rules">
+      <div class="meme-card-title"><small>ARCHIVE LOGIC</small><h3>档案规则</h3></div>
+      ${labelValue('建档条件','任务关联 / 性接触 / 明显欲望 / 联系方式 / 关键剧情')}
+      ${labelValue('普通路人','不建档')}
+      ${labelValue('近期衰减','长期未再出现 → 从 MEN 主界面淡出')}
+      ${labelValue('再次出现','旧档案自动唤醒 → RETURNING')}
+      <p class="meme-men-rule-note">MEN 不预设“长期对象”。一个人是否留下，只由后续剧情里他是否真的再次出现决定。</p>
     </section>
   `;
 }
@@ -400,6 +481,18 @@ function ensureDialog() {
       const view = card.dataset.memeModule || 'home';
       if (view === 'home') renderView('home');
       else renderView(view);
+      return;
+    }
+
+    const groupToggle = event.target.closest('[data-men-group-toggle]');
+    if (groupToggle) {
+      groupToggle.closest('[data-men-group]')?.classList.toggle('is-open');
+      return;
+    }
+
+    const personToggle = event.target.closest('[data-men-person-toggle]');
+    if (personToggle) {
+      personToggle.closest('[data-men-person]')?.classList.toggle('is-open');
       return;
     }
 
