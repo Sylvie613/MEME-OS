@@ -284,11 +284,19 @@ html.meme-os-open body {
   transform:translate(-50%,-50%) rotate(-45deg);
 }
 
-.meme-seal-heart {
+.meme-seal-tail {
   position:relative;
+  width:38px;
+  height:38px;
+  display:grid;
+  place-items:center;
   color:#ef77ab;
-  font-size:20px;
-  text-shadow:0 0 14px rgba(255,89,154,.28);
+  filter:drop-shadow(0 0 8px rgba(255,89,154,.28));
+}
+
+.meme-seal-tail svg {
+  display:block;
+  overflow:visible;
 }
 
 .meme-contract-label {
