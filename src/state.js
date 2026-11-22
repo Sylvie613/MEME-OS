@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 14;
+const SCHEMA_VERSION = 15;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -84,7 +84,6 @@ const DEFAULT_STATE = Object.freeze({
     tasks: {
         storyDay: 1,
         active: {},
-        verified: {},
         completed: {},
         dailyCompleted: {},
         everCompleted: {},
@@ -167,7 +166,6 @@ function mergeState(raw) {
         tasks: {
             storyDay: Math.max(1, Number(raw.tasks?.storyDay) || 1),
             active: { ...base.tasks.active, ...(raw.tasks?.active ?? {}) },
-            verified: { ...base.tasks.verified, ...(raw.tasks?.verified ?? {}) },
             completed: { ...base.tasks.completed, ...(raw.tasks?.completed ?? {}) },
             dailyCompleted: { ...base.tasks.dailyCompleted, ...(raw.tasks?.dailyCompleted ?? {}) },
             everCompleted: { ...base.tasks.everCompleted, ...(raw.tasks?.everCompleted ?? {}), ...(raw.tasks?.completed ?? {}) },
@@ -299,7 +297,21 @@ export async function commitPendingActions(sentText) {
 }
 
 function refreshDerivedState(state) {
-    refreshDerivedState(state);
+    const tone = charmToStage(state.host.charm);
+    state.host.stage = tone.stage;
+    state.system.attitudeStage = tone.attitudeStage;
+    state.host.progress = Math.min(100, Math.max(Number(state.host.progress) || 0, state.host.charm * 1.45));
+
+    const milestones = state.permission.milestones;
+    state.permission.systemEligible =
+        state.host.charm >= 10 &&
+        milestones.completedTasks >= 2 &&
+        milestones.purchasedUpgrades >= 1 &&
+        state.permission.adminInterestSignals >= 1;
+
+    state.permission.systemInviteReady =
+        state.permission.systemEligible &&
+        state.permission.adminInterestSignals >= 2;
 }
 
 function applyEffect(state, effect) {
