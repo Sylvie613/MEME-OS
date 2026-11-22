@@ -472,6 +472,7 @@ async function handleRuntimeEvent(messageId){
   const raw=String(message.mes||'');
   const matches=[...raw.matchAll(/<!--MEME_OS_EVENT\s+([\s\S]*?)-->/g)];
   let changed=false;
+  const touchedMenIds=new Set();
 
   for(const match of matches){
     try{
@@ -499,6 +500,15 @@ async function handleRuntimeEvent(messageId){
             reaction,
             ...(state.reactivity.recentReactions||[]).filter(old=>old.id!==reaction.id),
           ].slice(0,8);
+          changed=true;
+        }
+      }
+
+      if(Array.isArray(event.men)){
+        for(const rawMan of event.men.slice(0,3)){
+          const person=applyMenUpdate(rawMan,state);
+          if(!person) continue;
+          touchedMenIds.add(person.id);
           changed=true;
         }
       }
@@ -612,6 +622,8 @@ async function handleRuntimeEvent(messageId){
       console.warn('[MÉMÉ OS] runtime event parse failed',error);
     }
   }
+
+  if(decayMenBuckets(state,touchedMenIds)) changed=true;
 
   // Hidden eligibility is recalculated here too, without auto-unlocking.
   const milestones=state.permission?.milestones||{};
