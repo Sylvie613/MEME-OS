@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.10.5",
+  "version": "0.10.6",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS: eroge-first desire missions, broadened adult male NPC pool with hard exclusions, stable per-turn idempotency and per-chat save isolation.",
-  "js": "index.js?v=0.10.5",
-  "css": "style.css?v=0.10.5",
+  "description": "MÉMÉ OS: eroge-first tasks with fit adult male NPC defaults, elderly/extreme-body exclusions, stable per-turn idempotency and per-chat save isolation.",
+  "js": "index.js?v=0.10.6",
+  "css": "style.css?v=0.10.6",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
