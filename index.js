@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.7.1';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.7.1';
-import { isBoundCharacter } from './src/binding.js?v=0.7.1';
+} from './src/state.js?v=0.7.4';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.7.4';
+import { isBoundCharacter } from './src/binding.js?v=0.7.4';
 
 /**
- * MÉMÉ OS v0.7.2
+ * MÉMÉ OS v0.7.4
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -933,8 +933,13 @@ function lockedSystemMarkup(){
       <div class="meme-admin-emblem">${crownMarkup()}</div>
       <small>PRIVATE ACCESS</small>
       <h3>谁准你翻我的档案了？</h3>
-      <p>“这区什么时候开，我说了算。你现在只需要做任务、赚点数、把自己收拾得能看一点。”</p>
-      <span>等待管理员主动授权</span>
+      <p>“这区什么时候开，我说了算。不是你刷够某个数字就能进。先证明你不是个只会点按钮的废物。”</p>
+      <div class="meme-system-lock-hints">
+        <span>持续完成任务</span>
+        <span>真的发生改造</span>
+        <span>让我开始对你有兴趣</span>
+      </div>
+      <span>满足资格后，仍需管理员主动授权</span>
     </section>
   `;
 }
@@ -1264,24 +1269,48 @@ async function migratePendingCharmGains(){
   }
 }
 
-async function maybeGrantTestAP(){
+async function ensureCleanStart(){
   if(!isBoundCharacter() || !hasActiveChat()) return;
   const state=runtimeState();
-  if(state.dev?.testGrant1000) return;
-  state.resources.ap+=1000;
-  state.dev={...(state.dev||{}),testGrant1000:true};
-  state.history.push({
-    id:`meme_test_grant_${Date.now()}`,
-    type:'dev_grant',
-    recordType:'system',
-    title:'测试补助到账',
-    summary:'开发测试补助 AP +1000。',
-    text:'【MÉMÉ OS｜测试补助】AP +1000。',
-    committedAt:Date.now(),
-  });
+  if(state.dev?.cleanStartV074) return;
+
+  const textarea=document.querySelector('#send_textarea');
+  if(textarea && Array.isArray(state.pending)){
+    for(const action of state.pending){
+      if(action?.text && textarea.value.includes(action.text)){
+        textarea.value=textarea.value.replace(action.text,'').replace(/\n{3,}/g,'\n\n').trim();
+      }
+    }
+    textarea.dispatchEvent(new Event('input',{bubbles:true}));
+  }
+
+  state.resources.ap=0;
+  state.resources.sv=0;
+  state.host.charm=0;
+  state.host.progress=0;
+  state.host.stage='初始改造阶段';
+  state.upgrades={};
+  state.tasks={active:{},completed:{}};
+  state.pending=[];
+  state.history=[];
+  state.men={current:[],recent:[],returning:[]};
+  state.system.pageUnlocked=false;
+  state.system.attitudeStage=0;
+  state.permission={
+    systemEligible:false,
+    systemInviteReady:false,
+    systemUnlockedByAdmin:false,
+    milestones:{
+      completedTasks:0,
+      purchasedUpgrades:0,
+      returningMen:0,
+    },
+  };
+  state.dev={...(state.dev||{}),testGrant1000:true,cleanStartV074:true};
+
   await saveState(state);
-  renderView(currentView(),false);
-  globalThis.toastr?.success?.('“拿去。1000 AP，测试用。别以为以后也白给。”');
+  renderView('home',false);
+  globalThis.toastr?.success?.('“测试结束。钱、魅力、记录，全给你清干净了。现在从零开始。”');
 }
 
 function bindSillyTavernEvents(){
@@ -1293,8 +1322,7 @@ function bindSillyTavernEvents(){
   if(events.MESSAGE_SENT) source.on(events.MESSAGE_SENT,handleMessageSent);
   if(events.CHAT_CHANGED) source.on(events.CHAT_CHANGED,async()=>{
     renderView('home',false);
-    await migratePendingCharmGains();
-    await maybeGrantTestAP();
+    await ensureCleanStart();
   });
   globalThis.__meme_os_events_bound__=true;
 }
@@ -1435,8 +1463,7 @@ function start() {
   ensureDialog();
   bindSillyTavernEvents();
   setTimeout(async()=>{
-    await migratePendingCharmGains();
-    await maybeGrantTestAP();
+    await ensureCleanStart();
   },700);
   globalThis.__meme_os_probe_timer__ = setInterval(mount, 1000);
   window.addEventListener('resize', mount, { passive:true });
