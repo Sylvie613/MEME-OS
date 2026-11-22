@@ -684,6 +684,9 @@ function installRuntimePrompt(){
   const inviteReady=Boolean(state.permission?.systemInviteReady);
   const desireAllowed=Number(state.host?.charm||0)>=70;
   const loveState=Boolean(state.permission?.adminLove);
+  const accessStage=systemAccessStage(state);
+  const openReady=systemOpenReady(state);
+  const privateReady=systemPrivateReady(state);
   const prompt=`[MÉMÉ OS runtime bridge]
 HOST PERSONA RULE:
 Do not define the host's name, age beyond adulthood, height, job, personality, hobbies, romantic style or personal history here. The host's identity/personality comes from the current SillyTavern Persona and the live conversation. MÉMÉ OS may define only the system-specific starting transformation condition and tracked state. Never overwrite or homogenize the user's Persona.
@@ -744,14 +747,23 @@ Do not decide CURRENT/RECENT/RETURNING yourself. The extension derives the bucke
 Current CHARM=${state.host.charm}; desire allowed by appearance=${desireAllowed}; adminLove=${loveState}.
 
 Only when the current story creates a genuinely relevant MÉMÉ OS state update — shop, feedback, MEN, permission, identity, or timeline — append ONE invisible HTML comment at the very end of the assistant reply.
-Format exactly: <!--MEME_OS_EVENT {"shop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"permission":{},"identity":{},"timeline":{}} -->
+Format exactly: <!--MEME_OS_EVENT {"shop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"permission":{"systemAccess":null},"identity":{},"timeline":{}} -->
 Do not emit the comment when nothing relevant changed.
 shop: maximum 2 temporary items. Each item fields: id,title,desc,detail,price,currency("AP"|"SV"),charmGain(0|0.25|0.5),ttl(1-8),icon,source,bodyAxis(optional),sourceIssueId(optional). bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
 feedback.issues: max 2, only direct story evidence; fields id,axis(optional),source,note,severity(low|medium|high).
 feedback.reactions: max 2, only directly observed reactions to established state/change; fields id,axis(optional),source,note,valence(negative|neutral|positive|sexual).
 men: max 3 qualifying adult men updates; fields id(optional for new),name,meta,summary,relation,desire,lastContact,note,badges,present,contactDelta,qualifies.
 Temporary shop items must arise from the just-written plot, not random catalog filler. Their names/descriptions are spoken by the male administrator in his current tone: ${voice.label}. Current CHARM=${state.host.charm}.
-SYSTEM access is NEVER unlocked merely by numbers. Hidden eligibility=${eligible}; invite-ready=${inviteReady}. Set permission.signal only for genuine changes caused by the host: impressed|curious|respect|amused|annoyed-but-invested; desire only when CHARM>=70 and specific attraction actually occurs; attachment only after repeated desire plus personal investment. permission.love=true is reserved for a genuinely earned long-term emotional turning point, never beauty, sex, jealousy, system level or one dramatic scene. Set permission.unlockSystem=true only if invite-ready is true AND he personally chooses, in-story, to open the private SYSTEM area at a fitting moment. Never explain hidden mechanics in visible prose.`;
+SYSTEM ACCESS LADDER:
+Current SYSTEM access=${accessStage.toUpperCase()}.
+Access progression is strictly LOCKED → PEEK → OPEN → PRIVATE. Never skip a stage, never downgrade, and never auto-upgrade from numbers alone.
+LOCKED→PEEK qualification: hidden eligibility=${eligible}; invite-ready=${inviteReady}. Even when invite-ready is true, he must personally choose a fitting in-story moment to allow a first glimpse.
+PEEK→OPEN qualification: open-ready=${openReady}. OPEN means he deliberately allows the host to inspect ordinary system/profile material; it is not a love confession.
+OPEN→PRIVATE qualification: private-ready=${privateReady}. PRIVATE is a major act of personal trust/attachment and must be his autonomous choice. Do not grant it simply because the host asks, flirts, has sex, or reaches a CHARM number.
+When he visibly chooses to advance exactly one stage, set permission.systemAccess to "peek", "open", or "private" matching that next stage.
+PRIVATE still does NOT reveal the naming-right secret. Naming remains separately sealed until the late-love event “来自他的坦白”.
+Set permission.signal only for genuine changes caused by the host: impressed|curious|respect|amused|annoyed-but-invested; desire only when CHARM>=70 and specific attraction actually occurs; attachment only after repeated desire plus personal investment. permission.love=true is reserved for a genuinely earned long-term emotional turning point, never beauty, sex, jealousy, system level or one dramatic scene.
+Never explain hidden qualification mechanics in visible prose.`;
 
   context.setExtensionPrompt(MEME_RUNTIME_PROMPT_ID,prompt,1,2,false,0);
 }
