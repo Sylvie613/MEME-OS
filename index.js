@@ -21,7 +21,7 @@ const DIALOG_ID = 'meme-os-dialog';
 
 const TASK_DATA = {
   daily: [
-    { id:'clean', type:'DAILY', title:'先把自己收拾干净', desc:'完成洗头、洗澡、换洗衣物与基础口腔清洁。系统拒绝给“脏乱”找借口。', reward:'AP +120', state:'可接取', detail:'完成后由剧情状态确认。每个剧情日可结算一次；跨入新的一天后重新开放。' },
+    { id:'clean', type:'DAILY', title:'先把自己收拾干净', desc:'完成洗头、洗澡、换洗衣物与基础口腔清洁。系统拒绝给“脏乱”找借口。', reward:'AP +120', state:'可接取', detail:'完成后由剧情状态确认。完成当轮显示划线，下一轮从任务板移除，不会重复开放。' },
     { id:'mirror', type:'DAILY', title:'镜前扫描', desc:'在镜子前完整观察当前外貌三分钟，不遮脸、不跳过身体状态。', reward:'AP +70', state:'可接取', detail:'用于建立宿主对当前状态的客观认知。' },
     { id:'walk', type:'DAILY', title:'动起来', desc:'连续完成一次不少于二十分钟的步行或低强度活动。', reward:'AP +150', state:'可接取', detail:'系统只判定“完成 / 未完成”，不计算现实热量。' },
     { id:'posture', type:'DAILY', title:'别塌着', desc:'在一段完整场景中保持肩颈舒展、坐姿或站姿不持续蜷缩。', reward:'AP +100', state:'可接取', detail:'用于解锁后续姿态类改造。' },
@@ -573,10 +573,12 @@ function settleTaskFromModel(state,rawTask,messageId){
 
   const currentDay=Math.max(1,Number(state.tasks?.storyDay)||1);
   const repeatable=task.repeatable==='daily';
-  const dailyLike=task.category==='daily' || repeatable;
-  if(dailyLike && Number(active.storyDay||0)!==currentDay) return false;
-  if(dailyLike && Number(state.tasks?.dailyCompleted?.[id]?.day||0)===currentDay) return false;
-  if(!dailyLike && task.category!=='daily' && state.tasks?.completed?.[id]) return false;
+  const isRollingDaily=task.category==='daily';
+  const dailyLike=isRollingDaily || repeatable;
+  if(repeatable && Number(active.storyDay||0)!==currentDay) return false;
+  if(repeatable && Number(state.tasks?.dailyCompleted?.[id]?.day||0)===currentDay) return false;
+  if(isRollingDaily && state.tasks?.everCompleted?.[id]) return false;
+  if(!dailyLike && state.tasks?.completed?.[id]) return false;
 
   const evidence=String(rawTask.evidence||'').replace(/\s+/g,' ').trim().slice(0,180);
   if(!evidence) return false;
@@ -940,6 +942,7 @@ async function reconcileRecentVisibleSettlements(){
     if(state.history.length>240) state.history=state.history.slice(-240);
     await saveState(state);
     renderView(currentView(),false);
+    installRuntimePrompt();
   }
 }
 
@@ -987,7 +990,7 @@ async function handleRuntimeEvent(messageId){
         state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
         const openStatic=TASK_DATA.daily.filter(task=>!state.tasks.everCompleted?.[task.id]).length;
         const openDynamic=state.tasks.generatedDaily.filter(task=>!state.tasks.everCompleted?.[task.id]).length;
-        const canGenerate=(openStatic+openDynamic)<3 && Number(state.tasks.lastGeneratedDailyTurn||0)!==Number(state.shop.plotTurn||0);
+        const canGenerate=(openStatic+openDynamic)<5 && Number(state.tasks.lastGeneratedDailyTurn||0)!==Number(state.shop.plotTurn||0);
         if(canGenerate){
           const task=sanitizeGeneratedDailyTask(event.dailyTaskOffers[0],state);
           if(task){
@@ -1078,9 +1081,9 @@ async function handleRuntimeEvent(messageId){
       if(event.timeline?.dayAdvance===true){
         state.tasks=state.tasks||{storyDay:1,active:{},generated:[],lastGeneratedDesireDay:0,completed:{},dailyCompleted:{},everCompleted:{}};
         state.tasks.storyDay=Math.max(1,(Number(state.tasks.storyDay)||1)+1);
-        for(const [taskId,activeTask] of Object.entries(state.tasks.active||{})){
+        for(const [taskId] of Object.entries(state.tasks.active||{})){
           const task=findTask(taskId);
-          if(activeTask?.category==='daily' || task?.repeatable==='daily') delete state.tasks.active[taskId];
+          if(task?.repeatable==='daily') delete state.tasks.active[taskId];
         }
         changed=true;
         state.history.push({
@@ -1353,7 +1356,7 @@ ROLLING DAILY / STORY TASK BOARD:
 Completed daily tasks are not permanent checklist items. A just-completed daily/story task may remain visible as crossed-out for the current assistant turn only; on the next assistant turn it leaves the board permanently. Completed starter dailies do not reopen tomorrow.
 Current open starter dailies: ${JSON.stringify(TASK_DATA.daily.filter(t=>!state.tasks?.everCompleted?.[t.id]).map(t=>({id:t.id,title:t.title,desc:t.desc})))}.
 Current generated daily/story tasks: ${JSON.stringify((state.tasks?.generatedDaily||[]).filter(t=>!state.tasks?.everCompleted?.[t.id]).map(t=>({id:t.id,title:t.title,desc:t.desc,difficulty:t.difficulty,source:t.source})))}.
-When the visible daily board has fewer than 3 unfinished tasks, you SHOULD create one context-fitting replacement through dailyTaskOffers if the current plot offers a sensible mundane, appearance, hygiene, movement, social-presentation or practical challenge. Do not regenerate an already completed task under a synonym.
+When the visible daily board has fewer than 5 unfinished tasks, you SHOULD create one context-fitting replacement through dailyTaskOffers if the current plot offers a sensible mundane, appearance, hygiene, movement, social-presentation or practical challenge. Do not regenerate an already completed task under a synonym.
 dailyTaskOffers entries: maximum 1; fields {title,desc,detail,source,difficulty}. difficulty is only light|normal|hard. Never choose or print the AP reward; the extension maps difficulty to the reward.
 If the current visible scene itself unexpectedly completes a sensible one-off system challenge that was not previously active, you MAY use storyRewards to let the extension recognize it retroactively. storyRewards entries: maximum 2; fields {title,evidence,source,difficulty}. Never put AP/SV numbers in storyRewards or visible prose; the extension calculates the real reward. Do not use storyRewards for trivial actions merely to farm AP.
 
@@ -1382,7 +1385,7 @@ A completed task should disappear/cross out as soon as this reply is processed; 
 For sample, oral and drain: after their first-ever completion they become repeatable collection tasks, at most once per in-world story day. The extension automatically switches later payouts to SV-only repeat rewards. Never invent extra AP for repeated completions.
 
 STORY DAY:
-Current in-world story day=${Number(state.tasks?.storyDay)||1}. Daily tasks may reward once per story day. Set timeline.dayAdvance=true only when the visible narrative clearly crosses into a new in-world day (for example after sleeping overnight, an explicit next morning/day, or an explicit date jump). Never advance the day merely because several turns passed.
+Current in-world story day=${Number(state.tasks?.storyDay)||1}. Rolling DAILY/story tasks are one-time and do not reset on a new day; accepted rolling tasks may remain active across days. Only explicitly repeatable erotic collection tasks may reward again once per story day. Set timeline.dayAdvance=true only when the visible narrative clearly crosses into a new in-world day (for example after sleeping overnight, an explicit next morning/day, or an explicit date jump). Never advance the day merely because several turns passed.
 
 Current SHOP phase=${currentShopPhase(state).label} (${currentShopPhase(state).code}); appearance/presentation shop progress levels=${shopProgressLevels(state)}. Adult-response upgrades do not advance beauty-shelf phases.
 Dynamic plot goods must respect the current SHOP phase. They may solve a concrete problem exposed by the just-written plot, but each purchase is only one incremental body-axis step and may not claim a sudden makeover, perfect body, instant beauty, or any effect far beyond the host's current progression.
@@ -2209,7 +2212,7 @@ function taskItem(task) {
   const isRollingDaily=task.category==='daily';
   const dailyLike=isRollingDaily || repeatable;
   const activeRecord=state.tasks?.active?.[task.id];
-  const active=Boolean(activeRecord) && (!dailyLike || Number(activeRecord.storyDay||storyDay)===storyDay);
+  const active=Boolean(activeRecord) && (!repeatable || Number(activeRecord.storyDay||storyDay)===storyDay);
   const dailyRecord=state.tasks?.dailyCompleted?.[task.id];
   const justCompleted=isRollingDaily && Boolean(dailyRecord) && Number(dailyRecord.completedTurn??-1)===Number(state.shop?.plotTurn||0);
   const completed=isRollingDaily
