@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS high-fidelity succubus UI matching the approved reference design.",
-  "js": "index.js?v=0.3.0",
-  "css": "style.css?v=0.3.0",
+  "description": "MÉMÉ OS interactive content shell with navigable ME, TASK, SHOP, MEN, SYSTEM and RECORD modules.",
+  "js": "index.js?v=0.4.0",
+  "css": "style.css?v=0.4.0",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
