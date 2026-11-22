@@ -1560,3 +1560,117 @@ html.meme-os-open body{
   background:rgba(240,102,161,.075);
   color:#e6a8c2;
 }
+
+
+/* v0.7.0 live core + administrator voice */
+.meme-pending-tray{
+  margin-bottom:10px;
+  padding:10px 11px;
+  border:1px solid rgba(248,133,184,.23);
+  border-radius:15px;
+  background:linear-gradient(145deg,rgba(92,28,65,.34),rgba(34,10,35,.50));
+}
+.meme-pending-title{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:6px;
+}
+.meme-pending-title span{
+  color:#ed97bc;
+  font-size:7px;
+  font-weight:900;
+  letter-spacing:.18em;
+}
+.meme-pending-title b{
+  min-width:20px;
+  height:20px;
+  display:grid;
+  place-items:center;
+  border-radius:99px;
+  background:rgba(242,99,159,.09);
+  color:#ef9bbd;
+  font-size:8px;
+}
+.meme-pending-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:9px;
+  padding:7px 0;
+  border-top:1px solid rgba(239,126,178,.08);
+}
+.meme-pending-item span{
+  min-width:0;
+  color:#cfaabd;
+  font-size:8px;
+  line-height:1.4;
+}
+.meme-pending-item button{
+  flex:none;
+  min-width:42px;
+  height:25px;
+  border:1px solid rgba(239,126,177,.15);
+  border-radius:9px;
+  background:rgba(239,99,159,.055);
+  color:#d99ab7;
+  font-size:7px;
+}
+.meme-pending-tray>p{
+  margin:5px 0 0;
+  color:#76576a;
+  font-size:7px;
+}
+
+.meme-task-card [data-task-detail],
+.meme-shop-card [data-shop-detail]{
+  cursor:pointer;
+}
+.meme-task-card.is-done{
+  opacity:.68;
+}
+.meme-task-foot button:disabled,
+.meme-shop-buy button:disabled{
+  opacity:.48;
+  filter:saturate(.65);
+}
+
+.meme-voice-rule{
+  display:grid;
+  grid-template-columns:54px 1fr;
+  gap:9px;
+  align-items:start;
+  padding:9px 0;
+  border-top:1px solid rgba(233,122,173,.08);
+  opacity:.46;
+}
+.meme-voice-rule:first-of-type{border-top:0}
+.meme-voice-rule.is-current{
+  opacity:1;
+}
+.meme-voice-rule>span{
+  padding:5px 6px;
+  border:1px solid rgba(236,123,174,.14);
+  border-radius:9px;
+  color:#b9839f;
+  font-size:6px;
+  font-weight:900;
+  letter-spacing:.08em;
+  text-align:center;
+}
+.meme-voice-rule.is-current>span{
+  border-color:rgba(242,124,177,.28);
+  background:rgba(241,99,159,.075);
+  color:#f0a4c3;
+}
+.meme-voice-rule b{
+  display:block;
+  color:#dcbcca;
+  font-size:9px;
+}
+.meme-voice-rule p{
+  margin:3px 0 0;
+  color:#87657a;
+  font-size:8px;
+  line-height:1.55;
+}
