@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS: four-stage repeatable SHOP progression with levelled upgrades, scaling prices, and phase-safe plot goods.",
-  "js": "index.js?v=0.9.1",
-  "css": "style.css?v=0.9.1",
+  "description": "MÉMÉ OS: plot-to-shop-to-body-to-reaction loop with persistent issue and feedback memory.",
+  "js": "index.js?v=0.9.2",
+  "css": "style.css?v=0.9.2",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
