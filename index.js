@@ -2855,6 +2855,7 @@ function bindSillyTavernEvents(){
     // getState() is chatId-scoped. Switching chats only re-renders the state
     // that belongs to that chat; it never clears or mutates another save.
     runtimeState();
+    await reconcileRecentVisibleSettlements();
     renderView('home',false);
     installRuntimePrompt();
   });
