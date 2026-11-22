@@ -243,20 +243,26 @@ function hashId(value=''){
 }
 
 
-const PLOT_PRICE_BANDS = {
-  AP: {
-    rescue:[120,360],
-    refine:[220,520],
-    beauty:[350,760],
-    advanced:[500,1100],
-  },
-  SV: {
-    rescue:[30,60],
-    refine:[40,90],
-    beauty:[60,130],
-    advanced:[80,180],
-  },
+const PLOT_PRICES = {
+  AP: { rescue:220, refine:360, beauty:540, advanced:780 },
+  SV: { rescue:45, refine:65, beauty:95, advanced:130 },
 };
+
+const PLOT_CHARM_AXES = new Set([
+  'face','eyes','bodyShape','waistHip','legs','neckShoulders','bust',
+]);
+const PLOT_POLISH_AXES = new Set([
+  'lips','skin','hair','posture','scent','breath','voice','touch','specialMark',
+]);
+
+function dynamicDesireTierForState(state=runtimeState()){
+  const charm=Number(state.host?.charm)||0;
+  if(charm>=55) return 4;
+  if(charm>=35) return 3;
+  if(charm>=18) return 2;
+  if(charm>=8) return 1;
+  return 0;
+}
 
 const MEME_RUNTIME_PROMPT_ID='meme_os_runtime_bridge';
 
@@ -267,9 +273,8 @@ function sanitizeGeneratedDesireTask(raw,state=runtimeState()){
   const detail=String(raw.detail||'').replace(/\s+/g,' ').trim().slice(0,180);
   if(!title || !desc) return null;
 
-  const tier=Math.max(1,Math.min(4,Math.round(Number(raw.tier)||1)));
-  const tierMeta=DYNAMIC_DESIRE_TIERS[tier] || DYNAMIC_DESIRE_TIERS[1];
-  if(Number(state.host?.charm||0)<tierMeta.minCharm) return null;
+  const tier=dynamicDesireTierForState(state);
+  if(tier<1) return null;
 
   const fingerprint=`${title.toLowerCase()}|${desc.toLowerCase()}`;
   const id=`desire_${hashId(fingerprint).toString(36)}`;
@@ -304,15 +309,13 @@ function sanitizeDynamicItem(raw,state=runtimeState()){
   const id=String(raw.id || `plot_${Date.now()}_${Math.random().toString(36).slice(2,6)}`).replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48);
   const currency=raw.currency==='SV'?'SV':'AP';
   const phase=currentShopPhase(state);
-  const [priceMin,priceMax]=PLOT_PRICE_BANDS[currency]?.[phase.id] || (currency==='SV'?[30,180]:[120,1100]);
-  const requestedPrice=Math.round(Number(raw.price)||priceMin);
-  const price=Math.max(priceMin,Math.min(priceMax,requestedPrice));
-  const charmGain=Math.max(0,Math.min(0.5,Number(raw.charmGain)||0));
+  const price=Number(PLOT_PRICES[currency]?.[phase.id] || (currency==='SV'?45:220));
   const ttl=Math.max(1,Math.min(8,Math.round(Number(raw.ttl)||4)));
   const title=String(raw.title||'临时改造').slice(0,40);
   const desc=String(raw.desc||'系统临时上架。').slice(0,140);
   const detail=String(raw.detail||'根据当前剧情临时出现，过期后自动撤架。').slice(0,180);
   const bodyAxis=BODY_AXES.has(String(raw.bodyAxis||'')) ? String(raw.bodyAxis) : null;
+  const charmGain=PLOT_CHARM_AXES.has(bodyAxis) ? 0.5 : PLOT_POLISH_AXES.has(bodyAxis) ? 0.25 : 0;
   return {
     id,
     icon:String(raw.icon||'✦').slice(0,4),
@@ -1095,8 +1098,8 @@ Distinct erotic missions already completed: ${distinctEroticTaskCount(state)}.
 Last story day on which a new generated desire mission was created: ${Number(state.tasks?.lastGeneratedDesireDay)||0}.
 When fewer than 3 generated desire missions are available and no generated mission has been created on the current story day, you may create ONE fitting new mission through taskOffers. Do not generate one every reply merely to fill space; prefer moments where the current plot, NPC, location, body state or unlocked sexual capability suggests a fresh challenge.
 Generated erotic missions are one-time challenges, not repeatable collection farming. They should vary meaningfully in act, constraint, target, setting, social risk, collection goal, endurance, control, presentation or other adult scenario structure. Do not merely rename an old task or paraphrase a completed one.
-Choose tier by challenge/progression: tier 1 requires CHARM 8+, tier 2 CHARM 18+, tier 3 CHARM 35+, tier 4 CHARM 55+. Never offer a tier above the current CHARM gate.
-taskOffers entries contain only {title,desc,detail,tier,source}. Do NOT choose AP/SV rewards or ids; the extension creates a deterministic id and assigns the tier reward.
+Generated mission reward tier is derived automatically from current CHARM: no dynamic desire mission exists before CHARM 8, and later reward tiers rise with progression. Do not mention or choose the internal tier.
+taskOffers entries contain only {title,desc,detail,source}. Do NOT choose tier, AP/SV rewards or ids; the extension derives the tier from current CHARM, creates a deterministic id and assigns the reward.
 All generated task names/descriptions are written in the administrator's vulgar personal voice, not neutral quest prose.
 Only the first completion of each distinct erotic mission counts toward administrator evolution. Repeating sample/oral/drain for SV never counts as another different mission.
 
@@ -1164,9 +1167,9 @@ Current CHARM=${state.host.charm}; desire allowed by appearance=${desireAllowed}
 Only when the current story creates a genuinely relevant MÉMÉ OS state update — tasks, shop, feedback, MEN, evolution, permission, identity, or timeline — append ONE invisible HTML comment at the very end of the assistant reply.
 Format exactly: <!--MEME_OS_EVENT {"taskOffers":[],"tasks":[],"shop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{},"timeline":{}} -->
 Do not emit the comment when nothing relevant changed.
-taskOffers: maximum 1 new generated erotic mission; fields title,desc,detail,tier(1-4),source. Never include id or rewards.
+taskOffers: maximum 1 new generated erotic mission; fields title,desc,detail,source. Never include tier, id or rewards.
 tasks: max 4 completed task entries; fields id,status("completed"),evidence. Never include rewards; the extension calculates them.
-shop: maximum 2 temporary items. Each item fields: id,title,desc,detail,price,currency("AP"|"SV"),charmGain(0|0.25|0.5),ttl(1-8),icon,source,bodyAxis(optional),sourceIssueId(optional). bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
+shop: maximum 2 temporary items. Each item fields: id,title,desc,detail,currency("AP"|"SV"),ttl(1-8),icon,source,bodyAxis(optional),sourceIssueId(optional). Never include price or charmGain; the extension assigns both. bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
 feedback.issues: max 2, only direct story evidence; fields id,axis(optional),source,note,severity(low|medium|high).
 feedback.reactions: max 2, only directly observed reactions to established state/change; fields id,axis(optional),source,note,valence(negative|neutral|positive|sexual).
 men: max 3 qualifying adult men updates; fields id(optional for new),name,meta,summary,relation,desire,lastContact,note,badges,present,contactDelta,qualifies.
@@ -1449,7 +1452,6 @@ function pendingFor(kind,id,state=runtimeState()){
   return state.pending?.some(action=>{
     if(kind==='purchase') return action.effect?.purchase?.id===id;
     if(kind==='taskAccept') return action.effect?.taskAccept?.id===id;
-    if(kind==='taskComplete') return action.effect?.taskComplete?.id===id;
     return false;
   }) || false;
 }
