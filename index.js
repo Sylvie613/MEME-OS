@@ -12,7 +12,7 @@ import { appendToInput, removeFromInput } from './src/input.js?v=0.9.5';
 import { isBoundCharacter } from './src/binding.js?v=0.9.5';
 
 /**
- * MÉMÉ OS v0.9.5
+ * MÉMÉ OS v0.9.6
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -458,16 +458,100 @@ function decayMenBuckets(state,touchedIds=new Set()){
 }
 
 
+const BOND_INVESTMENT_TAGS = new Set([
+  'personal_priority','protective_choice','trust','vulnerability',
+  'sacrifice','habit_broken_for_host','private_disclosure','future_choice',
+]);
+
+const BOND_LOVE_TAGS = new Set([
+  'sacrifice','personal_priority','vulnerability','future_choice','identity_choice',
+]);
+
 function normalizeBondReason(value){
   return String(value||'').replace(/\s+/g,' ').trim().slice(0,180);
 }
 
-function recordAdminBondMoment(state,{kind,signal,reason,messageId}){
+function normalizeBondTag(value){
+  return String(value||'').toLowerCase().trim().replace(/[^a-z0-9_-]/g,'').slice(0,40);
+}
+
+function bondMoments(state,kind=null){
+  const list=Array.isArray(state.permission?.adminBond?.moments)?state.permission.adminBond.moments:[];
+  return kind ? list.filter(item=>item.kind===kind) : list;
+}
+
+function bondDistinctDays(state,kinds=null){
+  const allow=Array.isArray(kinds)?new Set(kinds):null;
+  const days=new Set(
+    bondMoments(state)
+      .filter(item=>!allow || allow.has(item.kind))
+      .map(item=>Number(item.storyDay)||1)
+  );
+  return days.size;
+}
+
+function lastBondDay(state,kind){
+  const list=bondMoments(state,kind);
+  return list.length ? Math.max(...list.map(item=>Number(item.storyDay)||1)) : 0;
+}
+
+function canAcceptBondSignal(state,signal,tag=''){
+  const day=Math.max(1,Number(state.tasks?.storyDay)||1);
+  const interest=Number(state.permission?.adminInterestSignals)||0;
+  const desire=Number(state.permission?.adminDesireSignals)||0;
+  const attachment=Number(state.permission?.adminAttachmentSignals)||0;
+
+  if(['impressed','curious','respect','amused','annoyed-but-invested'].includes(signal)){
+    if(lastBondDay(state,'interest')===day) return {ok:false,reason:'interest already changed today'};
+    return {ok:true};
+  }
+
+  if(signal==='desire'){
+    if(Number(state.host?.charm||0)<70) return {ok:false,reason:'beauty threshold not met'};
+    if(interest<5 || bondDistinctDays(state,['interest'])<4) return {ok:false,reason:'not enough long-term personal interest'};
+    if(lastBondDay(state,'desire')===day) return {ok:false,reason:'desire already changed today'};
+    return {ok:true};
+  }
+
+  if(signal==='attachment'){
+    if(desire<3 || bondDistinctDays(state,['desire'])<3) return {ok:false,reason:'desire history too shallow'};
+    if(interest<7) return {ok:false,reason:'personal interest too shallow'};
+    if(!BOND_INVESTMENT_TAGS.has(tag)) return {ok:false,reason:'attachment needs a real investment-type event'};
+    const last=lastBondDay(state,'attachment');
+    if(last && day-last<2) return {ok:false,reason:'attachment progression cooldown'};
+    return {ok:true};
+  }
+
+  return {ok:false,reason:'unsupported signal'};
+}
+
+function canAdminLove(state,loveTag=''){
+  const moments=bondMoments(state);
+  const attachmentMoments=bondMoments(state,'attachment');
+  const attachmentTags=new Set(attachmentMoments.map(item=>item.tag).filter(Boolean));
+  const interest=Number(state.permission?.adminInterestSignals)||0;
+  const desire=Number(state.permission?.adminDesireSignals)||0;
+  const attachment=Number(state.permission?.adminAttachmentSignals)||0;
+
+  if(Number(state.host?.charm||0)<70) return {ok:false,reason:'beauty threshold not met'};
+  if(interest<8) return {ok:false,reason:'interest too shallow'};
+  if(desire<4) return {ok:false,reason:'desire history too shallow'};
+  if(attachment<5) return {ok:false,reason:'attachment too shallow'};
+  if(bondDistinctDays(state)<10) return {ok:false,reason:'not enough distinct story days'};
+  if(bondDistinctDays(state,['attachment'])<5) return {ok:false,reason:'attachment did not mature across enough days'};
+  if(moments.length<17) return {ok:false,reason:'relationship history too short'};
+  if(attachmentTags.size<3) return {ok:false,reason:'attachment lacks varied forms of investment'};
+  if(!BOND_LOVE_TAGS.has(loveTag)) return {ok:false,reason:'love needs a major personal-choice event'};
+  return {ok:true};
+}
+
+function recordAdminBondMoment(state,{kind,signal,reason,tag,messageId}){
   const cleaned=normalizeBondReason(reason);
+  const cleanTag=normalizeBondTag(tag);
   if(!cleaned) return false;
   state.permission.adminBond=state.permission.adminBond||{moments:[],firstInterestAt:null,firstDesireAt:null,firstAttachmentAt:null,loveAt:null};
   state.permission.adminBond.moments=Array.isArray(state.permission.adminBond.moments)?state.permission.adminBond.moments:[];
-  const fingerprint=`${kind}|${signal||kind}|${cleaned.toLowerCase()}`;
+  const fingerprint=`${kind}|${signal||kind}|${cleanTag}|${cleaned.toLowerCase()}`;
   const id=`bond_${messageId}_${hashId(fingerprint).toString(36)}`;
   if(state.permission.adminBond.moments.some(item=>item.id===id)) return false;
   const now=Date.now();
@@ -475,12 +559,13 @@ function recordAdminBondMoment(state,{kind,signal,reason,messageId}){
     id,
     kind,
     signal:signal||kind,
+    tag:cleanTag||null,
     reason:cleaned,
     storyDay:Number(state.tasks?.storyDay)||1,
     plotTurn:Number(state.shop?.plotTurn)||0,
     createdAt:now,
   };
-  state.permission.adminBond.moments=[...state.permission.adminBond.moments,moment].slice(-18);
+  state.permission.adminBond.moments=[...state.permission.adminBond.moments,moment].slice(-24);
   if(kind==='interest' && !state.permission.adminBond.firstInterestAt) state.permission.adminBond.firstInterestAt=now;
   if(kind==='desire' && !state.permission.adminBond.firstDesireAt) state.permission.adminBond.firstDesireAt=now;
   if(kind==='attachment' && !state.permission.adminBond.firstAttachmentAt) state.permission.adminBond.firstAttachmentAt=now;
@@ -573,27 +658,27 @@ async function handleRuntimeEvent(messageId){
         });
       }
 
+      const loveReadinessBeforeSignal=canAdminLove(state,normalizeBondTag(event.permission?.loveTag));
+
       if(event.permission?.signal){
         const signal=String(event.permission.signal);
         const reason=event.permission?.signalReason;
-        if(['impressed','curious','respect','amused','annoyed-but-invested'].includes(signal)){
-          const recorded=recordAdminBondMoment(state,{kind:'interest',signal,reason,messageId});
+        const tag=normalizeBondTag(event.permission?.signalTag);
+        const gate=canAcceptBondSignal(state,signal,tag);
+
+        if(gate.ok){
+          const kind=['impressed','curious','respect','amused','annoyed-but-invested'].includes(signal)
+            ? 'interest'
+            : signal;
+          const recorded=recordAdminBondMoment(state,{kind,signal,reason,tag,messageId});
           if(recorded){
-            state.permission.adminInterestSignals=Math.min(20,(Number(state.permission.adminInterestSignals)||0)+1);
-            changed=true;
-          }
-        }
-        if(signal==='desire' && Number(state.host?.charm||0)>=70){
-          const recorded=recordAdminBondMoment(state,{kind:'desire',signal,reason,messageId});
-          if(recorded){
-            state.permission.adminDesireSignals=Math.min(20,(Number(state.permission.adminDesireSignals)||0)+1);
-            changed=true;
-          }
-        }
-        if(signal==='attachment' && Number(state.permission.adminDesireSignals||0)>=2){
-          const recorded=recordAdminBondMoment(state,{kind:'attachment',signal,reason,messageId});
-          if(recorded){
-            state.permission.adminAttachmentSignals=Math.min(20,(Number(state.permission.adminAttachmentSignals)||0)+1);
+            if(kind==='interest'){
+              state.permission.adminInterestSignals=Math.min(20,(Number(state.permission.adminInterestSignals)||0)+1);
+            }else if(kind==='desire'){
+              state.permission.adminDesireSignals=Math.min(20,(Number(state.permission.adminDesireSignals)||0)+1);
+            }else if(kind==='attachment'){
+              state.permission.adminAttachmentSignals=Math.min(20,(Number(state.permission.adminAttachmentSignals)||0)+1);
+            }
             changed=true;
           }
         }
@@ -601,13 +686,13 @@ async function handleRuntimeEvent(messageId){
 
       const wasAlreadyInLove=Boolean(state.permission?.adminLove);
       if(event.permission?.love===true &&
-         Number(state.host?.charm||0)>=70 &&
-         Number(state.permission.adminAttachmentSignals||0)>=3 &&
-         !state.permission.adminLove){
+         !state.permission.adminLove &&
+         loveReadinessBeforeSignal.ok){
         const recorded=recordAdminBondMoment(state,{
           kind:'love',
           signal:'love',
           reason:event.permission?.loveReason,
+          tag:event.permission?.loveTag,
           messageId,
         });
         if(recorded){
