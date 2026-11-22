@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.7';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.7';
-import { isBoundCharacter } from './src/binding.js?v=0.10.7';
+} from './src/state.js?v=0.10.8';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.8';
+import { isBoundCharacter } from './src/binding.js?v=0.10.8';
 
 /**
- * MÉMÉ OS v0.10.7
+ * MÉMÉ OS v0.10.8
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -1167,7 +1167,7 @@ Only the first completion of each distinct erotic mission counts toward administ
 
 TASK COMPLETION / VERIFICATION:
 Currently active tasks: ${JSON.stringify(Object.values(state.tasks?.active||{}).map(t=>({id:t.id,title:t.title,category:t.category,storyDay:t.storyDay})))}.
-The host may click a task in MÉMÉ OS. The extension inserts a task line into the user's input, and the host can continue writing how she completed it after "完成过程：".
+The host may click a task in MÉMÉ OS. This only marks the task as accepted/active. The host is NOT required to describe completion in the same message and may leave it unfinished for any number of turns. Judge completion only from later visible narration and relevant story facts while the task remains active.
 Judge completion from the visible user narration and immediately relevant story facts. If an active task is clearly completed, emit one tasks entry with fields {id,status:"completed",evidence}. evidence must briefly name the concrete fact that satisfied the task.
 Do NOT emit AP/SV values. The extension owns the reward table and will add the correct resources automatically in the same assistant-response cycle.
 Do not verify intentions, promises, partial attempts, vague claims, or a task that is not currently active. If completion is unclear, leave it active.
@@ -2056,7 +2056,7 @@ function taskMarkup() {
       ${labelValue('欲望','五个基础里程碑之外，系统会随剧情继续生成新的成人任务；每个不同任务只计一次进化进度，重复采集只负责赚 SV。')}
       ${labelValue('不同任务',`${distinctEroticTaskCount(state)} 个已完成`,'重复做同一任务不重复计数')}
       ${labelValue('特殊','我什么时候想发，什么时候才有。')}
-      ${labelValue('结算','接取后把完成过程写在同一条或后续剧情里；模型验收通过的那条回复中，扩展直接发奖励并划掉任务。')}
+      ${labelValue('结算','接取只登记任务，不要求立刻完成。以后剧情里什么时候真正做到，模型验收通过时扩展才发奖励并划掉任务。')}
     </section>
   `;
 }
@@ -2502,17 +2502,17 @@ async function handleTaskAction(id){
     return;
   }
   if(state.tasks?.active?.[id]){
-    globalThis.toastr?.info?.('任务已经挂着了。把完成过程写进剧情，我会验收。');
+    globalThis.toastr?.info?.('任务已经挂着了。什么时候真正做到，什么时候再验收。');
     return;
   }
   if(pendingFor('taskAccept',id,state)){
-    globalThis.toastr?.info?.('已经在输入框里了。写完你怎么做的，再一起发。');
+    globalThis.toastr?.info?.('接取信息已经在输入框里了。发出去后任务就会挂起。');
     return;
   }
 
   const voiced=taskVoiceName(task,state);
   const dayTag=dailyLike?`DAY ${String(storyDay).padStart(3,'0')}｜`:'';
-  const text=`【MÉMÉ OS｜任务接取】${dayTag}TASK_ID:${task.id}｜「${voiced}」\n任务要求：${taskVoiceDesc(task,state)}\n完成过程：`;
+  const text=`【MÉMÉ OS｜任务接取】${dayTag}TASK_ID:${task.id}｜「${voiced}」\n任务要求：${taskVoiceDesc(task,state)}`;
 
   await queueAction(createPendingAction({
     type:'task_accept',
