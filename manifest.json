@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.9.9",
+  "version": "0.10.0",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS: idempotent per-message runtime events preventing duplicate task rewards, day advances, relationship changes, MEN updates, SHOP events and system evolution.",
-  "js": "index.js?v=0.9.9",
-  "css": "style.css?v=0.9.9",
+  "description": "MÉMÉ OS: fully rebalanced AP/SV/CHARM economy with repeatable SV collection, sane shop pricing, long-form progression and anti-farm safeguards.",
+  "js": "index.js?v=0.10.0",
+  "css": "style.css?v=0.10.0",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
