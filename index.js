@@ -752,7 +752,8 @@ async function handleRuntimeEvent(messageId){
   state.shop.dynamic=(state.shop.dynamic||[]).filter(item=>Number(item.expiresTurn||0)>=state.shop.plotTurn);
 
   const raw=String(message.mes||'');
-  const matches=[...raw.matchAll(/<!--MEME_OS_EVENT\s+([\s\S]*?)-->/g)];
+  const allMatches=[...raw.matchAll(/<!--MEME_OS_EVENT\s+([\s\S]*?)-->/g)];
+  const matches=allMatches.length ? [allMatches[allMatches.length-1]] : [];
   let changed=false;
   const touchedMenIds=new Set();
 
@@ -834,7 +835,7 @@ async function handleRuntimeEvent(messageId){
       }
 
       if(event.timeline?.dayAdvance===true){
-        state.tasks=state.tasks||{storyDay:1,active:{},completed:{},dailyCompleted:{},everCompleted:{}};
+        state.tasks=state.tasks||{storyDay:1,active:{},generated:[],lastGeneratedDesireDay:0,completed:{},dailyCompleted:{},everCompleted:{}};
         state.tasks.storyDay=Math.max(1,(Number(state.tasks.storyDay)||1)+1);
         for(const [taskId,activeTask] of Object.entries(state.tasks.active||{})){
           const task=findTask(taskId);
@@ -1022,6 +1023,9 @@ async function handleRuntimeEvent(messageId){
   }
 
   if(decayMenBuckets(state,touchedMenIds)) changed=true;
+  if(Array.isArray(state.history) && state.history.length>240){
+    state.history=state.history.slice(-240);
+  }
 
   // The whole assistant message is one idempotent runtime event.
   // Once marked, refresh/reload/repeated event dispatches and swipes on the same
