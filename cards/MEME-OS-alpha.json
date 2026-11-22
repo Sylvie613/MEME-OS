@@ -46,7 +46,8 @@
           "TASK": "任务与奖励",
           "SHOP": "欲望商城",
           "MEN": "对象档案"
-        }
+        },
+        "build_revision": "0.3.7-avatar1"
       }
     },
     "character_book": {
