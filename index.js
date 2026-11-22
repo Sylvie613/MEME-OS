@@ -1,5 +1,5 @@
 /**
- * MÉMÉ OS v0.2.3
+ * MÉMÉ OS v0.2.4
  * Native <dialog> top-layer modal for iOS Safari / SillyTavern compatibility.
  */
 const MEME_ID = 'meme-os-heart-launcher';
@@ -90,7 +90,29 @@ function panelMarkup() {
 
           <div class="meme-seal">
             <span class="meme-seal-ring"></span>
-            <span class="meme-seal-heart">♥</span>
+            <span class="meme-seal-tail" aria-hidden="true">
+    <svg viewBox="0 0 64 64" width="34" height="34">
+      <path d="M18 13
+               C34 15 42 24 39 35
+               C37 42 30 45 25 41
+               C21 38 22 32 27 30
+               C31 29 34 31 34 34
+               C34 40 28 45 24 49"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="3.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"/>
+      <path d="M24 49 L17 45 L19 54 Z"
+            fill="currentColor"/>
+      <path d="M18 13
+               C14 9 10 8 7 10
+               C9 13 12 16 18 17
+               C18 17 19 15 18 13Z"
+            fill="currentColor"
+            opacity=".92"/>
+    </svg>
+  </span>
           </div>
 
           <p class="meme-contract-label">DESIRE ENGINE</p>
