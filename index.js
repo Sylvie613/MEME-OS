@@ -12,7 +12,7 @@ import { appendToInput, removeFromInput } from './src/input.js?v=0.9.4';
 import { isBoundCharacter } from './src/binding.js?v=0.9.4';
 
 /**
- * MÉMÉ OS v0.9.4
+ * MÉMÉ OS v0.9.5
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -458,6 +458,37 @@ function decayMenBuckets(state,touchedIds=new Set()){
 }
 
 
+function normalizeBondReason(value){
+  return String(value||'').replace(/\s+/g,' ').trim().slice(0,180);
+}
+
+function recordAdminBondMoment(state,{kind,signal,reason,messageId}){
+  const cleaned=normalizeBondReason(reason);
+  if(!cleaned) return false;
+  state.permission.adminBond=state.permission.adminBond||{moments:[],firstInterestAt:null,firstDesireAt:null,firstAttachmentAt:null,loveAt:null};
+  state.permission.adminBond.moments=Array.isArray(state.permission.adminBond.moments)?state.permission.adminBond.moments:[];
+  const fingerprint=`${kind}|${signal||kind}|${cleaned.toLowerCase()}`;
+  const id=`bond_${messageId}_${hashId(fingerprint).toString(36)}`;
+  if(state.permission.adminBond.moments.some(item=>item.id===id)) return false;
+  const now=Date.now();
+  const moment={
+    id,
+    kind,
+    signal:signal||kind,
+    reason:cleaned,
+    storyDay:Number(state.tasks?.storyDay)||1,
+    plotTurn:Number(state.shop?.plotTurn)||0,
+    createdAt:now,
+  };
+  state.permission.adminBond.moments=[...state.permission.adminBond.moments,moment].slice(-18);
+  if(kind==='interest' && !state.permission.adminBond.firstInterestAt) state.permission.adminBond.firstInterestAt=now;
+  if(kind==='desire' && !state.permission.adminBond.firstDesireAt) state.permission.adminBond.firstDesireAt=now;
+  if(kind==='attachment' && !state.permission.adminBond.firstAttachmentAt) state.permission.adminBond.firstAttachmentAt=now;
+  if(kind==='love' && !state.permission.adminBond.loveAt) state.permission.adminBond.loveAt=now;
+  return true;
+}
+
+
 async function handleRuntimeEvent(messageId){
   if(!isBoundCharacter() || !hasActiveChat()) return;
   const context=globalThis.SillyTavern?.getContext?.()||{};
@@ -544,27 +575,45 @@ async function handleRuntimeEvent(messageId){
 
       if(event.permission?.signal){
         const signal=String(event.permission.signal);
+        const reason=event.permission?.signalReason;
         if(['impressed','curious','respect','amused','annoyed-but-invested'].includes(signal)){
-          state.permission.adminInterestSignals=Math.min(20,(Number(state.permission.adminInterestSignals)||0)+1);
-          changed=true;
+          const recorded=recordAdminBondMoment(state,{kind:'interest',signal,reason,messageId});
+          if(recorded){
+            state.permission.adminInterestSignals=Math.min(20,(Number(state.permission.adminInterestSignals)||0)+1);
+            changed=true;
+          }
         }
         if(signal==='desire' && Number(state.host?.charm||0)>=70){
-          state.permission.adminDesireSignals=Math.min(20,(Number(state.permission.adminDesireSignals)||0)+1);
-          state.permission.adminInterestSignals=Math.min(20,(Number(state.permission.adminInterestSignals)||0)+1);
-          changed=true;
+          const recorded=recordAdminBondMoment(state,{kind:'desire',signal,reason,messageId});
+          if(recorded){
+            state.permission.adminDesireSignals=Math.min(20,(Number(state.permission.adminDesireSignals)||0)+1);
+            changed=true;
+          }
         }
         if(signal==='attachment' && Number(state.permission.adminDesireSignals||0)>=2){
-          state.permission.adminAttachmentSignals=Math.min(20,(Number(state.permission.adminAttachmentSignals)||0)+1);
-          changed=true;
+          const recorded=recordAdminBondMoment(state,{kind:'attachment',signal,reason,messageId});
+          if(recorded){
+            state.permission.adminAttachmentSignals=Math.min(20,(Number(state.permission.adminAttachmentSignals)||0)+1);
+            changed=true;
+          }
         }
       }
 
       const wasAlreadyInLove=Boolean(state.permission?.adminLove);
       if(event.permission?.love===true &&
          Number(state.host?.charm||0)>=70 &&
-         Number(state.permission.adminAttachmentSignals||0)>=3){
-        state.permission.adminLove=true;
-        changed=true;
+         Number(state.permission.adminAttachmentSignals||0)>=3 &&
+         !state.permission.adminLove){
+        const recorded=recordAdminBondMoment(state,{
+          kind:'love',
+          signal:'love',
+          reason:event.permission?.loveReason,
+          messageId,
+        });
+        if(recorded){
+          state.permission.adminLove=true;
+          changed=true;
+        }
       }
 
       if(event.identity?.offerNaming===true &&
