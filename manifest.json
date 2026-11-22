@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS content-complete shell with full ME, TASK, SHOP, MEN, SYSTEM and RECORD content.",
-  "js": "index.js?v=0.6.0",
-  "css": "style.css?v=0.6.0",
+  "description": "MÉMÉ OS live core: persistent AP/SV, tasks, purchases, pending actions, records and administrator attitude-driven copy.",
+  "js": "index.js?v=0.7.0",
+  "css": "style.css?v=0.7.0",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
