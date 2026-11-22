@@ -7,9 +7,9 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.7.4';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.7.4';
-import { isBoundCharacter } from './src/binding.js?v=0.7.4';
+} from './src/state.js?v=0.8.0';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.8.0';
+import { isBoundCharacter } from './src/binding.js?v=0.8.0';
 
 /**
  * MÉMÉ OS v0.7.4
@@ -287,6 +287,138 @@ function hashId(value=''){
   return h;
 }
 
+
+const MEME_RUNTIME_PROMPT_ID='meme_os_runtime_bridge';
+
+function sanitizeDynamicItem(raw,state=runtimeState()){
+  if(!raw || typeof raw!=='object') return null;
+  const id=String(raw.id || `plot_${Date.now()}_${Math.random().toString(36).slice(2,6)}`).replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48);
+  const currency=raw.currency==='SV'?'SV':'AP';
+  const price=Math.max(0,Math.min(9999,Math.round(Number(raw.price)||0)));
+  const charmGain=Math.max(0,Math.min(0.5,Number(raw.charmGain)||0));
+  const ttl=Math.max(1,Math.min(8,Math.round(Number(raw.ttl)||4)));
+  const title=String(raw.title||'临时改造').slice(0,40);
+  const desc=String(raw.desc||'系统临时上架。').slice(0,140);
+  const detail=String(raw.detail||'根据当前剧情临时出现，过期后自动撤架。').slice(0,180);
+  return {
+    id,
+    icon:String(raw.icon||'✦').slice(0,4),
+    title,
+    desc,
+    detail,
+    price,
+    currency,
+    level:'PLOT',
+    req:'剧情触发',
+    category:'plot',
+    dynamic:true,
+    charmGain,
+    createdTurn:Number(state.shop?.plotTurn)||0,
+    expiresTurn:(Number(state.shop?.plotTurn)||0)+ttl,
+    source:String(raw.source||'剧情临时上架').slice(0,80),
+  };
+}
+
+function getDynamicShop(state=runtimeState()){
+  const turn=Number(state.shop?.plotTurn)||0;
+  return (state.shop?.dynamic||[]).filter(item=>Number(item.expiresTurn||0)>=turn && !state.upgrades?.[item.id]);
+}
+
+async function handleRuntimeEvent(messageId){
+  if(!isBoundCharacter() || !hasActiveChat()) return;
+  const context=globalThis.SillyTavern?.getContext?.()||{};
+  const message=Number.isInteger(messageId)?context.chat?.[messageId]:null;
+  if(!message || message.is_user) return;
+
+  const state=runtimeState();
+  state.shop=state.shop||{dynamic:[],plotTurn:0};
+  state.shop.plotTurn=(Number(state.shop.plotTurn)||0)+1;
+  state.shop.dynamic=(state.shop.dynamic||[]).filter(item=>Number(item.expiresTurn||0)>=state.shop.plotTurn);
+
+  const raw=String(message.mes||'');
+  const matches=[...raw.matchAll(/<!--MEME_OS_EVENT\s+([\s\S]*?)-->/g)];
+  let changed=false;
+
+  for(const match of matches){
+    try{
+      const event=JSON.parse(match[1].trim());
+
+      if(Array.isArray(event.shop)){
+        for(const candidate of event.shop.slice(0,2)){
+          const item=sanitizeDynamicItem(candidate,state);
+          if(!item) continue;
+          state.shop.dynamic=state.shop.dynamic.filter(old=>old.id!==item.id);
+          state.shop.dynamic.unshift(item);
+          state.shop.dynamic=state.shop.dynamic.slice(0,6);
+          changed=true;
+        }
+      }
+
+      if(event.permission?.signal){
+        const signal=String(event.permission.signal);
+        const strong=['impressed','curious','protective','desire','respect'].includes(signal);
+        if(strong){
+          state.permission.adminInterestSignals=Math.min(20,(Number(state.permission.adminInterestSignals)||0)+1);
+          changed=true;
+        }
+      }
+
+      if(event.permission?.unlockSystem===true && state.permission?.systemInviteReady){
+        state.system.pageUnlocked=true;
+        state.permission.systemUnlockedByAdmin=true;
+        changed=true;
+        state.history.push({
+          id:`meme_system_unlock_${Date.now()}`,
+          type:'system_unlock',
+          recordType:'system',
+          title:'SYSTEM 权限由管理员主动开放',
+          summary:'管理员自行决定开放 SYSTEM 私人区域。',
+          text:'SYSTEM ACCESS GRANTED BY ADMIN',
+          committedAt:Date.now(),
+        });
+      }
+    }catch(error){
+      console.warn('[MÉMÉ OS] runtime event parse failed',error);
+    }
+  }
+
+  // Hidden eligibility is recalculated here too, without auto-unlocking.
+  const milestones=state.permission?.milestones||{};
+  state.permission.systemEligible=
+    Number(state.host?.charm||0)>=1 &&
+    Number(milestones.completedTasks||0)>=2 &&
+    Number(milestones.purchasedUpgrades||0)>=1 &&
+    Number(state.permission?.adminInterestSignals||0)>=1;
+  state.permission.systemInviteReady=
+    state.permission.systemEligible &&
+    Number(state.permission?.adminInterestSignals||0)>=2;
+
+  if(changed || matches.length || state.shop.dynamic.length){
+    await saveState(state);
+    renderView(currentView(),false);
+  }
+}
+
+function installRuntimePrompt(){
+  if(!isBoundCharacter()) return;
+  const context=globalThis.SillyTavern?.getContext?.();
+  if(typeof context?.setExtensionPrompt!=='function') return;
+
+  const state=runtimeState();
+  const voice=attitude(state);
+  const eligible=Boolean(state.permission?.systemEligible);
+  const inviteReady=Boolean(state.permission?.systemInviteReady);
+  const prompt=`[MÉMÉ OS runtime bridge]
+Only when the current story creates a genuinely relevant new shop opportunity or changes the administrator's private interest, append ONE invisible HTML comment at the very end of the assistant reply.
+Format exactly: <!--MEME_OS_EVENT {"shop":[],"permission":{}} -->
+Do not emit the comment when nothing relevant changed.
+shop: maximum 2 temporary items. Each item fields: id,title,desc,detail,price,currency("AP"|"SV"),charmGain(0|0.25|0.5),ttl(1-8),icon,source.
+Temporary shop items must arise from the just-written plot, not random catalog filler. Their names/descriptions are spoken by the male administrator in his current tone: ${voice.label}. Current CHARM=${state.host.charm}.
+SYSTEM access is NEVER unlocked merely by numbers. Hidden eligibility=${eligible}; invite-ready=${inviteReady}. You may set permission.signal to one of impressed|curious|protective|desire|respect only when his actual attitude changes because of what the host did. Set permission.unlockSystem=true only if invite-ready is true AND he personally chooses, in-story, to open the private SYSTEM area at a fitting moment. Never explain these mechanics in visible prose.`;
+
+  context.setExtensionPrompt(MEME_RUNTIME_PROMPT_ID,prompt,1,2,false,0);
+}
+
 const RUDE_TASK_NAMES = {
   clean:'先把自己洗得像个人',
   mirror:'对着镜子认清现实',
@@ -477,6 +609,9 @@ async function queueAction(action){
 }
 
 function findShopItem(id){
+  const dynamic=getDynamicShop();
+  const plotItem=dynamic.find(item=>item.id===id);
+  if(plotItem) return {...plotItem,category:'plot'};
   for(const [category,items] of Object.entries(SHOP_DATA)){
     const item=items.find(x=>x.id===id);
     if(item) return {...item,category};
@@ -817,6 +952,7 @@ function shopItem(item,category) {
 }
 
 function renderShopList(category='appearance') {
+  if(category==='plot') return getDynamicShop().map(item=>shopItem(item,'plot')).join('') || '<div class="meme-men-empty"><small>NO PLOT GOODS</small><b>现在没什么值得临时上架</b><p>剧情真发生点有意思的事，我自然会塞东西进来。</p></div>';
   return (SHOP_DATA[category] || SHOP_DATA.appearance).map(item=>shopItem(item,category)).join('');
 }
 
@@ -837,6 +973,7 @@ function shopMarkup() {
       <button type="button" data-shop-filter="sensory">感官</button>
       <button type="button" data-shop-filter="desire">欲望</button>
       <button type="button" data-shop-filter="special">特殊</button>
+      ${getDynamicShop(state).length ? '<button type="button" data-shop-filter="plot">剧情 · '+getDynamicShop(state).length+'</button>' : ''}
     </div>
     <section class="meme-shop-list" data-shop-list>${renderShopList('appearance')}</section>
     <p class="meme-preview-note">价格是我定的。买不起就去做任务，别盯着商品流口水。</p>
@@ -1179,7 +1316,7 @@ async function handleShopAction(id){
   }
 
   const voiced=shopVoiceName(item,state);
-  const charmGain=Number(CHARM_GAIN[item.id]||0);
+  const charmGain=Number(item.dynamic ? item.charmGain : (CHARM_GAIN[item.id]||0));
   const apDelta=item.currency==='AP'?-item.price:0;
   const svDelta=item.currency==='SV'?-item.price:0;
   const text=`【MÉMÉ OS｜已结算｜勿重复结算】购入「${voiced}」；${item.currency} -${item.price}${charmGain?`；CHARM +${charmGain}`:''}。扩展已完成扣款与改造记录，正文只描写改造后的结果。`;
@@ -1300,12 +1437,14 @@ async function ensureCleanStart(){
     systemEligible:false,
     systemInviteReady:false,
     systemUnlockedByAdmin:false,
+    adminInterestSignals:0,
     milestones:{
       completedTasks:0,
       purchasedUpgrades:0,
       returningMen:0,
     },
   };
+  state.shop={dynamic:[],plotTurn:0};
   state.dev={...(state.dev||{}),testGrant1000:true,cleanStartV074:true};
 
   await saveState(state);
@@ -1320,9 +1459,14 @@ function bindSillyTavernEvents(){
   const events=context?.event_types || context?.eventTypes || {};
   if(!source?.on) return;
   if(events.MESSAGE_SENT) source.on(events.MESSAGE_SENT,handleMessageSent);
+  if(events.MESSAGE_RECEIVED) source.on(events.MESSAGE_RECEIVED,async(messageId)=>{
+    await handleRuntimeEvent(messageId);
+    installRuntimePrompt();
+  });
   if(events.CHAT_CHANGED) source.on(events.CHAT_CHANGED,async()=>{
     renderView('home',false);
     await ensureCleanStart();
+    installRuntimePrompt();
   });
   globalThis.__meme_os_events_bound__=true;
 }
@@ -1462,6 +1606,7 @@ function start() {
   mount();
   ensureDialog();
   bindSillyTavernEvents();
+  installRuntimePrompt();
   setTimeout(async()=>{
     await ensureCleanStart();
   },700);
