@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 11;
+const SCHEMA_VERSION = 12;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -58,6 +58,13 @@ const DEFAULT_STATE = Object.freeze({
         adminDesireSignals: 0,
         adminAttachmentSignals: 0,
         adminLove: false,
+        adminBond: {
+            moments: [],
+            firstInterestAt: null,
+            firstDesireAt: null,
+            firstAttachmentAt: null,
+            loveAt: null,
+        },
         milestones: {
             completedTasks: 0,
             purchasedUpgrades: 0,
@@ -131,6 +138,13 @@ function mergeState(raw) {
         permission: {
             ...base.permission,
             ...(raw.permission ?? {}),
+            adminBond: {
+                ...base.permission.adminBond,
+                ...(raw.permission?.adminBond ?? {}),
+                moments: Array.isArray(raw.permission?.adminBond?.moments)
+                    ? raw.permission.adminBond.moments.slice(-18)
+                    : [],
+            },
             milestones: {
                 ...base.permission.milestones,
                 ...(raw.permission?.milestones ?? {}),
