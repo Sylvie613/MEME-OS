@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -9,6 +9,29 @@ const DEFAULT_STATE = Object.freeze({
         charm: 0,
         stage: '初始改造阶段',
         progress: 0,
+        body: {
+            lips: 0,
+            face: 0,
+            eyes: 0,
+            skin: 0,
+            hair: 0,
+            posture: 0,
+            bodyShape: 0,
+            waistHip: 0,
+            legs: 0,
+            neckShoulders: 0,
+            bust: 0,
+            scent: 0,
+            breath: 0,
+            voice: 0,
+            touch: 0,
+            sensitivity: 0,
+            arousal: 0,
+            lubrication: 0,
+            orgasm: 0,
+            recovery: 0,
+            specialMark: 0,
+        },
     },
     system: {
         level: 1,
@@ -45,8 +68,11 @@ const DEFAULT_STATE = Object.freeze({
     },
     upgrades: {},
     tasks: {
+        storyDay: 1,
         active: {},
         completed: {},
+        dailyCompleted: {},
+        everCompleted: {},
     },
     men: {
         current: [],
@@ -84,7 +110,14 @@ function mergeState(raw) {
         ...base,
         ...raw,
         resources: { ...base.resources, ...(raw.resources ?? {}) },
-        host: { ...base.host, ...(raw.host ?? {}) },
+        host: {
+            ...base.host,
+            ...(raw.host ?? {}),
+            body: {
+                ...base.host.body,
+                ...(raw.host?.body ?? {}),
+            },
+        },
         system: { ...base.system, ...(raw.system ?? {}) },
         dev: { ...base.dev, ...(raw.dev ?? {}) },
         permission: {
@@ -102,8 +135,11 @@ function mergeState(raw) {
         },
         upgrades: { ...base.upgrades, ...(raw.upgrades ?? {}) },
         tasks: {
+            storyDay: Math.max(1, Number(raw.tasks?.storyDay) || 1),
             active: { ...base.tasks.active, ...(raw.tasks?.active ?? {}) },
             completed: { ...base.tasks.completed, ...(raw.tasks?.completed ?? {}) },
+            dailyCompleted: { ...base.tasks.dailyCompleted, ...(raw.tasks?.dailyCompleted ?? {}) },
+            everCompleted: { ...base.tasks.everCompleted, ...(raw.tasks?.everCompleted ?? {}), ...(raw.tasks?.completed ?? {}) },
         },
         men: {
             current: Array.isArray(raw.men?.current) ? raw.men.current : [],
@@ -121,6 +157,10 @@ function mergeState(raw) {
     merged.resources.ap = Math.max(0, Number(merged.resources.ap) || 0);
     merged.resources.sv = Math.max(0, Number(merged.resources.sv) || 0);
     merged.host.charm = Math.max(0, Number(merged.host.charm) || 0);
+    merged.tasks.storyDay = Math.max(1, Number(merged.tasks.storyDay) || 1);
+    for (const key of Object.keys(base.host.body)) {
+        merged.host.body[key] = Math.max(0, Number(merged.host.body[key]) || 0);
+    }
 
     return merged;
 }
@@ -245,6 +285,14 @@ function applyEffect(state, effect) {
         Object.assign(state.permission, effect.permission);
     }
 
+    if (effect.bodyDelta && typeof effect.bodyDelta === 'object') {
+        state.host.body = state.host.body || {};
+        for (const [key, delta] of Object.entries(effect.bodyDelta)) {
+            if (!Number.isFinite(Number(delta))) continue;
+            state.host.body[key] = Math.max(0, (Number(state.host.body[key]) || 0) + Number(delta));
+        }
+    }
+
     if (effect.purchase && typeof effect.purchase === 'object') {
         const item = effect.purchase;
         const wasOwned = Boolean(state.upgrades[item.id]);
@@ -266,21 +314,43 @@ function applyEffect(state, effect) {
             id: task.id,
             title: task.title,
             category: task.category,
+            storyDay: Number(state.tasks.storyDay) || 1,
             acceptedAt: Date.now(),
         };
     }
 
     if (effect.taskComplete && typeof effect.taskComplete === 'object') {
         const task = effect.taskComplete;
-        const wasCompleted = Boolean(state.tasks.completed[task.id]);
+        const wasEverCompleted = Boolean(state.tasks.everCompleted?.[task.id]);
         delete state.tasks.active[task.id];
-        state.tasks.completed[task.id] = {
+
+        if (task.category === 'daily') {
+            const previous = state.tasks.dailyCompleted?.[task.id] || {};
+            state.tasks.dailyCompleted[task.id] = {
+                id: task.id,
+                title: task.title,
+                category: task.category,
+                day: Number(state.tasks.storyDay) || 1,
+                count: Math.max(0, Number(previous.count) || 0) + 1,
+                completedAt: Date.now(),
+            };
+        } else {
+            state.tasks.completed[task.id] = {
+                id: task.id,
+                title: task.title,
+                category: task.category,
+                completedAt: Date.now(),
+            };
+        }
+
+        state.tasks.everCompleted[task.id] = {
             id: task.id,
             title: task.title,
             category: task.category,
-            completedAt: Date.now(),
+            firstCompletedAt: state.tasks.everCompleted?.[task.id]?.firstCompletedAt || Date.now(),
         };
-        if (!wasCompleted) state.permission.milestones.completedTasks += 1;
+
+        if (!wasEverCompleted) state.permission.milestones.completedTasks += 1;
     }
 
     if (effect.men && typeof effect.men === 'object') {
