@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 9;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -65,6 +65,11 @@ const DEFAULT_STATE = Object.freeze({
     shop: {
         dynamic: [],
         plotTurn: 0,
+    },
+    reactivity: {
+        recentChanges: [],
+        recentIssues: [],
+        recentReactions: [],
     },
     upgrades: {},
     tasks: {
@@ -132,6 +137,13 @@ function mergeState(raw) {
             ...base.shop,
             ...(raw.shop ?? {}),
             dynamic: Array.isArray(raw.shop?.dynamic) ? raw.shop.dynamic : [],
+        },
+        reactivity: {
+            ...base.reactivity,
+            ...(raw.reactivity ?? {}),
+            recentChanges: Array.isArray(raw.reactivity?.recentChanges) ? raw.reactivity.recentChanges.slice(0, 8) : [],
+            recentIssues: Array.isArray(raw.reactivity?.recentIssues) ? raw.reactivity.recentIssues.slice(0, 8) : [],
+            recentReactions: Array.isArray(raw.reactivity?.recentReactions) ? raw.reactivity.recentReactions.slice(0, 8) : [],
         },
         upgrades: { ...base.upgrades, ...(raw.upgrades ?? {}) },
         tasks: {
@@ -297,15 +309,34 @@ function applyEffect(state, effect) {
         const item = effect.purchase;
         const wasOwned = Boolean(state.upgrades[item.id]);
         const current = Number(state.upgrades[item.id]?.level) || 0;
+        const nextLevel = Math.max(current + 1, Number(item.level) || current + 1);
         state.upgrades[item.id] = {
             ...(state.upgrades[item.id] || {}),
             id: item.id,
             title: item.title,
             category: item.category,
-            level: Math.max(current + 1, Number(item.level) || current + 1),
+            level: nextLevel,
             purchasedAt: Date.now(),
         };
         if (!wasOwned) state.permission.milestones.purchasedUpgrades += 1;
+
+        const changedAxes = Object.entries(effect.bodyDelta || {})
+            .filter(([, delta]) => Number(delta) > 0)
+            .map(([axis, delta]) => ({ axis, delta: Number(delta) }));
+        state.reactivity = state.reactivity || { recentChanges: [], recentIssues: [], recentReactions: [] };
+        state.reactivity.recentChanges = [
+            {
+                id: `change_${Date.now()}_${item.id}`,
+                itemId: item.id,
+                title: item.title,
+                level: nextLevel,
+                axes: changedAxes,
+                charmDelta: Number(effect.charmDelta) || 0,
+                storyDay: Number(state.tasks?.storyDay) || 1,
+                committedAt: Date.now(),
+            },
+            ...(state.reactivity.recentChanges || []),
+        ].slice(0, 8);
     }
 
     if (effect.taskAccept && typeof effect.taskAccept === 'object') {
