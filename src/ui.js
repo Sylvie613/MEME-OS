@@ -77,9 +77,9 @@ function mountUi() {
 }
 
 function bindSillyTavernEvents() {
-    const { eventSource, event_types } = SillyTavern.getContext();
-    eventSource.on(event_types.CHAT_CHANGED, refreshUi);
-    eventSource.on(event_types.MESSAGE_SENT, handleMessageSent);
+    const { eventSource, eventTypes } = SillyTavern.getContext();
+    eventSource.on(eventTypes.CHAT_CHANGED, refreshUi);
+    eventSource.on(eventTypes.MESSAGE_SENT, handleMessageSent);
 }
 
 function togglePanel() {
@@ -129,10 +129,11 @@ async function handlePendingListClick(event) {
     refreshUi();
 }
 
-async function handleMessageSent() {
+async function handleMessageSent(messageId) {
     const { chat } = SillyTavern.getContext();
-    const latest = [...chat].reverse().find((message) => message?.is_user);
-    const sentText = latest?.mes ?? '';
+    const sentMessage = chat?.[messageId];
+    if (!sentMessage?.is_user) return;
+    const sentText = sentMessage.mes ?? '';
 
     const { committed } = await commitPendingActions(sentText);
     if (committed.length) {
