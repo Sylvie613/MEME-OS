@@ -793,10 +793,20 @@ present=true means he is visibly still part of the current scene/contact. presen
 contactDelta counts meaningful new contact/events only; use 0 for continued presence, normally 1 for a new meaningful interaction.
 Do not decide CURRENT/RECENT/RETURNING yourself. The extension derives the bucket from presence and prior archive history. Do not create affection scores.
 
+ADMIN RELATIONSHIP MEMORY:
+Hidden remembered turning points: ${JSON.stringify((state.permission?.adminBond?.moments||[]).slice(-12).map(m=>({kind:m.kind,signal:m.signal,reason:m.reason,storyDay:m.storyDay})))}.
+These moments are private continuity memory, not a visible affection meter and not facts the administrator has necessarily confessed aloud.
+A relationship signal is valid only when the current reply contains a concrete new event that genuinely changes his personal attitude. If you emit permission.signal, permission.signalReason is REQUIRED and must describe the specific cause in one concise sentence. Generic reasons such as "she is interesting", "he likes her more", "they got closer", "she is beautiful", or repeated restatements of an older event do not count.
+interest signals (impressed|curious|respect|amused|annoyed-but-invested) record personal attention only.
+desire records a new genuine sexual-attraction turning point only and requires CHARM>=70; it does NOT automatically increase personal interest.
+attachment records a new emotional-investment turning point only after repeated established desire and real personal investment.
+permission.love=true is allowed only for a clear long-term emotional turning point where he himself has genuinely crossed into love. loveReason is REQUIRED and must name the concrete reason/decision that makes this different from desire, habit, jealousy, possessiveness or attachment.
+Do not emit a new relationship signal merely because a previous feeling continues. Continuity is expressed in prose; state events are only for actual changes.
+
 Current CHARM=${state.host.charm}; desire allowed by appearance=${desireAllowed}; adminLove=${loveState}.
 
 Only when the current story creates a genuinely relevant MÉMÉ OS state update — shop, feedback, MEN, permission, identity, or timeline — append ONE invisible HTML comment at the very end of the assistant reply.
-Format exactly: <!--MEME_OS_EVENT {"shop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"permission":{"systemAccess":null},"identity":{},"timeline":{}} -->
+Format exactly: <!--MEME_OS_EVENT {"shop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"permission":{"signal":null,"signalReason":"","love":false,"loveReason":"","systemAccess":null},"identity":{},"timeline":{}} -->
 Do not emit the comment when nothing relevant changed.
 shop: maximum 2 temporary items. Each item fields: id,title,desc,detail,price,currency("AP"|"SV"),charmGain(0|0.25|0.5),ttl(1-8),icon,source,bodyAxis(optional),sourceIssueId(optional). bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
 feedback.issues: max 2, only direct story evidence; fields id,axis(optional),source,note,severity(low|medium|high).
@@ -811,7 +821,7 @@ PEEK→OPEN qualification: open-ready=${openReady}. OPEN means he deliberately a
 OPEN→PRIVATE qualification: private-ready=${privateReady}. PRIVATE is a major act of personal trust/attachment and must be his autonomous choice. Do not grant it simply because the host asks, flirts, has sex, or reaches a CHARM number.
 When he visibly chooses to advance exactly one stage, set permission.systemAccess to "peek", "open", or "private" matching that next stage.
 PRIVATE still does NOT reveal the naming-right secret. Naming remains separately sealed until the late-love event “来自他的坦白”.
-Set permission.signal only for genuine changes caused by the host: impressed|curious|respect|amused|annoyed-but-invested; desire only when CHARM>=70 and specific attraction actually occurs; attachment only after repeated desire plus personal investment. permission.love=true is reserved for a genuinely earned long-term emotional turning point, never beauty, sex, jealousy, system level or one dramatic scene.
+Set permission.signal only for a genuinely new change caused by a concrete event, and always include permission.signalReason. Allowed interest signals: impressed|curious|respect|amused|annoyed-but-invested. desire requires CHARM>=70 and a new specific attraction turning point. attachment requires repeated desire plus genuine personal investment. permission.love=true requires permission.loveReason and is reserved for a genuinely earned long-term emotional turning point, never beauty, sex, jealousy, system level or one dramatic scene.
 Never explain hidden qualification mechanics in visible prose.`;
 
   context.setExtensionPrompt(MEME_RUNTIME_PROMPT_ID,prompt,1,2,false,0);
@@ -2118,6 +2128,13 @@ async function ensureCleanStart(){
     adminDesireSignals:0,
     adminAttachmentSignals:0,
     adminLove:false,
+    adminBond:{
+      moments:[],
+      firstInterestAt:null,
+      firstDesireAt:null,
+      firstAttachmentAt:null,
+      loveAt:null,
+    },
     milestones:{
       completedTasks:0,
       purchasedUpgrades:0,
