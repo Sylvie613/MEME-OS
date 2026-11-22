@@ -620,3 +620,43 @@ html.meme-os-open body {
     border-bottom: 1px solid rgba(255,146,195,.26) !important;
   }
 }
+
+
+/* v0.2.3 native dialog top-layer modal */
+#meme-os-dialog {
+  border: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  overflow: visible !important;
+  color: inherit !important;
+}
+
+#meme-os-dialog::backdrop {
+  background: rgba(14,5,18,.68);
+  backdrop-filter: blur(8px) saturate(.86);
+  -webkit-backdrop-filter: blur(8px) saturate(.86);
+}
+
+#meme-os-dialog .meme-os-window {
+  position: relative !important;
+  width: 100% !important;
+  max-height: 78dvh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: none !important;
+  margin: 0 !important;
+}
+
+@media (max-width:600px) {
+  #meme-os-dialog {
+    width: calc(100vw - 16px) !important;
+    max-width: none !important;
+    max-height: 76dvh !important;
+  }
+  #meme-os-dialog .meme-os-window {
+    max-height: 76dvh !important;
+    border-radius: 26px !important;
+  }
+}
