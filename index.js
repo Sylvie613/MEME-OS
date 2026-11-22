@@ -12,7 +12,7 @@ import { appendToInput, removeFromInput } from './src/input.js?v=0.9.3';
 import { isBoundCharacter } from './src/binding.js?v=0.9.3';
 
 /**
- * MÉMÉ OS v0.9.3
+ * MÉMÉ OS v0.9.4
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -1149,6 +1149,42 @@ function adminDisplayName(state=runtimeState()){
   return name || 'ADMINISTRATOR';
 }
 
+const SYSTEM_ACCESS_STAGES = ['locked','peek','open','private'];
+
+function systemAccessStage(state=runtimeState()){
+  const raw=String(state.system?.accessStage||'').toLowerCase();
+  if(SYSTEM_ACCESS_STAGES.includes(raw)) return raw;
+  return state.system?.pageUnlocked ? 'open' : 'locked';
+}
+
+function systemAccessRank(state=runtimeState()){
+  return Math.max(0,SYSTEM_ACCESS_STAGES.indexOf(systemAccessStage(state)));
+}
+
+function systemAccessMeta(state=runtimeState()){
+  const stage=systemAccessStage(state);
+  return {
+    locked:{label:'LOCKED',sub:'他没允许你看'},
+    peek:{label:'PEEK',sub:'只准你看一点'},
+    open:{label:'OPEN',sub:'基本档案开放'},
+    private:{label:'PRIVATE',sub:'私人权限开放'},
+  }[stage];
+}
+
+function systemOpenReady(state=runtimeState()){
+  const m=state.permission?.milestones||{};
+  return systemAccessStage(state)==='peek' &&
+    Number(state.permission?.adminInterestSignals||0)>=4 &&
+    Number(m.completedTasks||0)>=3 &&
+    Number(m.purchasedUpgrades||0)>=2;
+}
+
+function systemPrivateReady(state=runtimeState()){
+  return systemAccessStage(state)==='open' &&
+    Number(state.permission?.adminInterestSignals||0)>=6 &&
+    (Number(state.permission?.adminAttachmentSignals||0)>=1 || Boolean(state.permission?.adminLove));
+}
+
 function totalMenCount() {
   const men = runtimeState().men || {};
   return ['current','recent','returning'].reduce((sum, key) => sum + (men[key]?.length || 0), 0);
@@ -1156,11 +1192,12 @@ function totalMenCount() {
 
 function moduleCard(key,title,sub){
   const state=runtimeState();
-  const systemLocked=key==='system' && !state.system?.pageUnlocked;
+  const access=systemAccessMeta(state);
+  const systemLocked=key==='system' && systemAccessStage(state)==='locked';
   const resolvedSub=key==='men'
     ? `${sub} · ${totalMenCount()}`
-    : systemLocked
-      ? '他没允许你看'
+    : key==='system'
+      ? access.sub
       : sub;
   return `
     <button type="button" class="meme-module ${systemLocked?'is-system-locked':''}" data-meme-module="${key}" ${systemLocked?'data-system-locked="true"':''}>
