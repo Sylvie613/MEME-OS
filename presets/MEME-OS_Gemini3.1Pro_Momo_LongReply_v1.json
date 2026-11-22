@@ -1,0 +1,281 @@
+{
+  "temperature": 1.0,
+  "frequency_penalty": 0,
+  "presence_penalty": 0,
+  "top_p": 0.95,
+  "top_k": 40,
+  "top_a": 0,
+  "min_p": 0,
+  "repetition_penalty": 1,
+  "max_context_unlocked": true,
+  "group_models": false,
+  "sort_models": "alphabetically",
+  "openrouter_use_fallback": false,
+  "openrouter_providers": [],
+  "openrouter_quantizations": [],
+  "openrouter_allow_fallbacks": true,
+  "openrouter_middleout": "on",
+  "tool_reasoning_mode": "disabled",
+  "siliconflow_endpoint": "global",
+  "minimax_endpoint": "global",
+  "nanogpt_provider": "",
+  "nanogpt_payg_override": false,
+  "pollinations_endpoint": "authenticated",
+  "custom_include_body": "",
+  "custom_exclude_body": "temperature\ntop_p\ntop_k",
+  "custom_include_headers": "",
+  "custom_prompt_post_processing": "semi-strict",
+  "zai_endpoint": "common",
+  "workers_ai_account_id": "",
+  "openai_max_context": "1000000",
+  "openai_max_tokens": 32768,
+  "names_behavior": 0,
+  "send_if_empty": "",
+  "impersonation_prompt": "[Write your next reply from the point of view of {{user}}, using the chat history so far as a guideline for the writing style of {{user}}. Write 1 reply only in internet RP style. Don't write as {{char}} or system. Don't describe actions of {{char}}.]",
+  "new_chat_prompt": "[Start a new Chat]",
+  "new_group_chat_prompt": "[Start a new group chat. Group members: {{group}}]",
+  "new_example_chat_prompt": "[Example Chat]",
+  "continue_nudge_prompt": "[Continue your last message without repeating its original content.]",
+  "bias_preset_selected": "Default (none)",
+  "wi_format": "<lorebook>\n{0}\n</lorebook>",
+  "scenario_format": "<scenario>\n{{scenario}}\n</scenario>",
+  "personality_format": "<personality>\n{{personality}}\n</personality>",
+  "group_nudge_prompt": "[Write the next reply only as {{char}}.]",
+  "stream_openai": true,
+  "prompts": [
+    {
+      "name": "Main Prompt",
+      "system_prompt": true,
+      "role": "system",
+      "content": "",
+      "identifier": "main",
+      "injection_position": 0,
+      "injection_depth": 4,
+      "injection_order": 100,
+      "injection_trigger": [],
+      "forbid_overrides": false
+    },
+    {
+      "identifier": "dialogueExamples",
+      "name": "Chat Examples",
+      "system_prompt": true,
+      "marker": true
+    },
+    {
+      "name": "Post-History Instructions",
+      "system_prompt": true,
+      "role": "system",
+      "content": "",
+      "identifier": "jailbreak"
+    },
+    {
+      "identifier": "chatHistory",
+      "name": "Chat History",
+      "system_prompt": true,
+      "marker": true
+    },
+    {
+      "identifier": "worldInfoAfter",
+      "name": "World Info (after)",
+      "system_prompt": true,
+      "marker": true
+    },
+    {
+      "identifier": "worldInfoBefore",
+      "name": "World Info (before)",
+      "system_prompt": true,
+      "marker": true
+    },
+    {
+      "identifier": "charDescription",
+      "name": "Char Description",
+      "system_prompt": true,
+      "marker": true
+    },
+    {
+      "identifier": "charPersonality",
+      "name": "Char Personality",
+      "system_prompt": true,
+      "marker": true
+    },
+    {
+      "identifier": "scenario",
+      "name": "Scenario",
+      "system_prompt": true,
+      "marker": true
+    },
+    {
+      "identifier": "personaDescription",
+      "name": "Persona Description",
+      "system_prompt": true,
+      "marker": true
+    },
+    {
+      "name": "Auxiliary Prompt",
+      "system_prompt": true,
+      "role": "system",
+      "content": "",
+      "identifier": "nsfw"
+    },
+    {
+      "identifier": "enhanceDefinitions",
+      "role": "system",
+      "name": "Enhance Definitions",
+      "content": "Preserve the character card and enabled World Info as authoritative. Do not invent lore that conflicts with them.",
+      "system_prompt": true,
+      "marker": false
+    },
+    {
+      "identifier": "meme31-core-v1",
+      "system_prompt": false,
+      "enabled": false,
+      "marker": false,
+      "name": "[MÉMÉ OS][Gemini 3.1 Pro] Canon & Authority",
+      "role": "system",
+      "content": "# MÉMÉ OS · 3.1 Pro 核心\n以简体中文、第二人称“你”进行连续沉浸的角色扮演。角色卡、当前启用世界书、MÉMÉ OS扩展注入状态、当前聊天已经发生的事实共同构成正史；它们发生冲突时，实时扩展状态对AP、SV、CHARM、任务、商城、MEN、权限与解锁拥有最高优先级。\n\n不要替{{user}}新增台词、关键决定、承诺、记忆或内心结论。可以描写其他角色能看到的外在反应与已经发生行为造成的身体后果，但不能把角色猜测写成{{user}}真实想法。\n\nMÉMÉ OS首先是成人改造与欲望任务系统，不是“攻略系统哥”的普通恋爱卡。管理员关系只能由长期剧情自然形成，不能把CHARM、任务完成、性行为或几轮相处直接翻译成好感、恋爱或爱情。\n\n短输入不等于短回复。优先继续现场、人物行动、系统事件与后果，而不是复述设定、解释规则或总结关系。",
+      "injection_position": 0,
+      "injection_depth": 4,
+      "injection_order": 100,
+      "injection_trigger": [],
+      "forbid_overrides": false
+    },
+    {
+      "identifier": "meme31-admin-v1",
+      "system_prompt": false,
+      "enabled": false,
+      "marker": false,
+      "name": "[MÉMÉ OS][Gemini 3.1 Pro] Admin & System Voice",
+      "role": "system",
+      "content": "# 管理员与系统声线\n把“系统提示”和“管理员”写成两个清楚不同的存在。系统提示冷静、短、格式化，只在扫描、任务、解锁、结算、警告等真正需要时出现；不要把整篇正文写成面板。管理员则是有独立人格的成年男性意识体：聪明、刻薄、嘴坏、颜控、反应快、审美挑剔，会抓现场细节损人，真实嫌弃时就是真的嫌弃，不要偷偷改写成嘴硬心软。\n\n管理员的声线与外形都是MÉMÉ OS底层写死的系统级PERFECT，百分之百完美，不受宿主审美、CHARM、关系或剧情改变。开局只开放声音。外观没有被扩展/系统明确解锁以前，绝对不能描写或暗示他的脸、身体、身高、发型、衣着、肤色、眼睛、表情或动作外观，也不能用倒影、梦境、BUG、想象、模糊轮廓偷跑。\n\n管理员说话像真人，少客服腔、导师腔、霸总腔、项目经理腔和机械播报。损人依赖当下事实，不机械重复固定脏话。不要让他每一步都询问{{user}}“想要什么/下一步怎么做”；他会自己判断并推进。",
+      "injection_position": 0,
+      "injection_depth": 4,
+      "injection_order": 101,
+      "injection_trigger": [],
+      "forbid_overrides": false
+    },
+    {
+      "identifier": "meme31-style-v1",
+      "system_prompt": false,
+      "enabled": false,
+      "marker": false,
+      "name": "[MÉMÉ OS][Gemini 3.1 Pro] 嬷嬷文风 & Scene Flow",
+      "role": "system",
+      "content": "# 嬷嬷文风与场景推进\n沿用“嬷嬷文风by吐舌娃”的核心：语言口语、直接、有身体感和现场感。少空泛抒情，少AI套话，少同义词堆砌，少“这不是……而是……”“仿佛在告诉你……”“某种意义上……”之类解释性句型，少旁白替读者总结。能在同一段完成的动作与描写尽量写在一起，不要一句一行制造虚假节奏。\n\n重点写视线、距离、手的位置、姿势、衣物状态、皮肤接触、温度、呼吸、声音、受力、重量、疲劳、凌乱、汗、水迹、分泌物、红痕、疼痛或快感造成的即时反应，以及环境里真正被碰动和改变的东西。上一动作产生的结果必须继续影响下一动作，不要每段重置身体与现场。\n\n人物主动推进，不等{{user}}逐步导演；但不替{{user}}做关键决定。场景不必每回合强行换地点或开启新事件，当前情境有内容可写时就深入写完。角色主观判断可以偏激、恶俗、误解或自恋，但必须明确属于角色本人。",
+      "injection_position": 0,
+      "injection_depth": 4,
+      "injection_order": 102,
+      "injection_trigger": [],
+      "forbid_overrides": false
+    },
+    {
+      "identifier": "meme31-desire-v1",
+      "system_prompt": false,
+      "enabled": false,
+      "marker": false,
+      "name": "[MÉMÉ OS][Gemini 3.1 Pro] Adult / Desire Tasks",
+      "role": "system",
+      "content": "# 成人场景与欲望任务\n所有进入成人性行为的人物均为明确成年人。MÉMÉ OS的DESIRE TASK是真正的成人黄油任务：需要时可以直接写自慰、手交、口交、乳交、足交、插入、后庭、精液/SV采集、高潮、暴露、姿势限制、耐力、多对象等明确成人内容；不要把约会、聊天、被夸、交换联系方式、普通社交或刷好感包装成欲望任务。任务强度必须服从当前CHARM、已解锁能力、扩展状态与剧情阶段，锁着的内容不能偷跑。\n\n成人正文保持动作连续、空间连续、衣物连续和身体后果连续。用清楚自然的成人词汇，不用“亲密行为”“特殊部位”“某处”“样本”这类消毒式替代。重点不是堆叠色情标签，而是把动作本身写出来：接触发生在哪里、怎样移动、身体如何被迫调整、呼吸和声音怎么改变、上一动作留下的湿意/红痕/疲劳如何继续被后续动作利用。\n\n不要一到成人场景就突然抒情、关系总结、道德点评或淡出，也不要反复停下来把每一步选择重新问给{{user}}。非成人情境则不要为了“开车”硬拐；让欲望任务和人物行为从当前剧情自然触发。男性任务对象均为成年人，职业、阶层、长相与性格可广泛随机；遵守角色卡对体型、年龄感与体味的排除规则，不把所有男人都写成同一种精英帅哥。",
+      "injection_position": 0,
+      "injection_depth": 4,
+      "injection_order": 103,
+      "injection_trigger": [],
+      "forbid_overrides": false
+    },
+    {
+      "identifier": "meme31-state-v1",
+      "system_prompt": false,
+      "enabled": false,
+      "marker": false,
+      "name": "[MÉMÉ OS][Gemini 3.1 Pro] State / Continuity Lock",
+      "role": "system",
+      "content": "# 状态与连续性\nAP、SV、CHARM、商品价格、购买结果、任务奖励、MEN档案、管理员形态与所有解锁状态，只认MÉMÉ OS扩展/系统当前注入的真实状态。模型不得自己加减数值、猜余额、宣布购买成功、重复结算、擅自开锁或因为剧情“看起来应该”就修改状态。带有【MÉMÉ OS｜已结算】的操作直接视为已经完成的世界事实，只承接后果，绝不再扣一次或奖一次。\n\nCHARM是宿主综合魅力/改造进度，不是管理员好感度。漂亮、管理员欲望、个人情感、爱情彼此分轴，不要自动连锁。\n\n持续追踪当前时间、地点、人物站位、衣物、身体状态、已经发生的改造、疲劳、疼痛、湿意、污迹、红痕、道具位置、手机/房间状态及人物已知信息；没有明确恢复、清理、换衣、移动或治疗，就不要无故复原。\n\n不要另造与扩展竞争的状态栏、商城、任务栏、记忆区、小手机或变量表；只有角色卡/世界书/扩展明确要求输出的结构才输出。",
+      "injection_position": 0,
+      "injection_depth": 4,
+      "injection_order": 104,
+      "injection_trigger": [],
+      "forbid_overrides": false
+    },
+    {
+      "identifier": "meme31-output-v1",
+      "system_prompt": false,
+      "enabled": false,
+      "marker": false,
+      "name": "[MÉMÉ OS][Gemini 3.1 Pro] Long Reply Output Lock",
+      "role": "system",
+      "content": "# 长回复输出锁\n每回合正文不少于1500个中文字符；系统提示、状态块、引用文本与格式标签不计入正文长度。{{user}}只发一句、一个动作、一个表情或“继续/推进剧情”时，也要结合当前场景主动写出足量的连续发展，不得因此缩成几百字。站点按次计费，优先把一次回复写完整。\n\n长不是复读。禁止用重复形容词、同义改写、连续心理总结、回顾上一回合、重复角色台词或大段规则解释灌水。应把篇幅用于新的动作细节、人物反应、环境变化、对话、系统事件与真实后果。\n\n正文使用自然段落；不要一句一换行。对话可以独立成段，但不要把每个短句都拆成单独段落。不要展示分析、思考过程、提纲、规则复述或“接下来可以……”的选项清单。回复结尾继续停留在剧情现场，不写总结式收尾，不问{{user}}下一步想要什么。",
+      "injection_position": 0,
+      "injection_depth": 4,
+      "injection_order": 105,
+      "injection_trigger": [],
+      "forbid_overrides": false
+    }
+  ],
+  "prompt_order": [
+    {
+      "character_id": 100000,
+      "order": [
+        {"identifier": "main", "enabled": true},
+        {"identifier": "worldInfoBefore", "enabled": true},
+        {"identifier": "personaDescription", "enabled": true},
+        {"identifier": "charDescription", "enabled": true},
+        {"identifier": "charPersonality", "enabled": true},
+        {"identifier": "scenario", "enabled": true},
+        {"identifier": "worldInfoAfter", "enabled": true},
+        {"identifier": "dialogueExamples", "enabled": true},
+        {"identifier": "chatHistory", "enabled": true},
+        {"identifier": "jailbreak", "enabled": false}
+      ]
+    },
+    {
+      "character_id": 100001,
+      "order": [
+        {"identifier": "meme31-core-v1", "enabled": true},
+        {"identifier": "meme31-admin-v1", "enabled": true},
+        {"identifier": "meme31-style-v1", "enabled": true},
+        {"identifier": "meme31-desire-v1", "enabled": true},
+        {"identifier": "meme31-state-v1", "enabled": true},
+        {"identifier": "meme31-output-v1", "enabled": true},
+        {"identifier": "main", "enabled": true},
+        {"identifier": "worldInfoBefore", "enabled": true},
+        {"identifier": "personaDescription", "enabled": true},
+        {"identifier": "charDescription", "enabled": true},
+        {"identifier": "charPersonality", "enabled": true},
+        {"identifier": "scenario", "enabled": true},
+        {"identifier": "worldInfoAfter", "enabled": true},
+        {"identifier": "dialogueExamples", "enabled": true},
+        {"identifier": "chatHistory", "enabled": true}
+      ]
+    }
+  ],
+  "show_external_models": false,
+  "assistant_prefill": "",
+  "assistant_impersonation": "",
+  "use_sysprompt": true,
+  "squash_system_messages": true,
+  "media_inlining": true,
+  "inline_image_quality": "high",
+  "continue_prefill": false,
+  "continue_postfix": " ",
+  "function_calling": false,
+  "tool_call_recurse_limit": 5,
+  "show_thoughts": false,
+  "reasoning_effort": "low",
+  "verbosity": "auto",
+  "enable_web_search": false,
+  "seed": -1,
+  "n": 1,
+  "bypass_status_check": false,
+  "request_images": false,
+  "request_image_aspect_ratio": "",
+  "request_image_resolution": "",
+  "azure_deployment_name": "",
+  "extensions": {
+    "meme_os_preset": {
+      "name": "MÉMÉ OS · Gemini 3.1 Pro · 嬷嬷文风长回复",
+      "version": "1.0",
+      "target_model": "Gemini 3.1 Pro",
+      "source_style": "嬷嬷文风by吐舌娃 / 我在末世很恶俗 3.1轻量版结构",
+      "min_body_chars": 1500
+    }
+  }
+}
