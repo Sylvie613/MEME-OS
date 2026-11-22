@@ -12,7 +12,7 @@ import { appendToInput, removeFromInput } from './src/input.js?v=0.8.3';
 import { isBoundCharacter } from './src/binding.js?v=0.8.3';
 
 /**
- * MÉMÉ OS v0.8.3
+ * MÉMÉ OS v0.8.4
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -339,11 +339,49 @@ async function handleRuntimeEvent(messageId){
         }
       }
 
+      const wasAlreadyInLove=Boolean(state.permission?.adminLove);
       if(event.permission?.love===true &&
          Number(state.host?.charm||0)>=70 &&
          Number(state.permission.adminAttachmentSignals||0)>=3){
         state.permission.adminLove=true;
         changed=true;
+      }
+
+      if(event.identity?.offerNaming===true &&
+         wasAlreadyInLove &&
+         !state.system?.namingRightOffered){
+        state.system.namingRightOffered=true;
+        state.system.namingOfferedAt=Date.now();
+        changed=true;
+        state.history.push({
+          id:`meme_naming_confession_${Date.now()}`,
+          type:'naming_confession',
+          recordType:'system',
+          title:'来自他的坦白',
+          summary:'管理员坦白自己从未拥有固定姓名，并主动将命名权交给宿主。',
+          text:'NAMING RIGHT OFFERED BY ADMIN',
+          committedAt:Date.now(),
+        });
+      }
+
+      if(event.identity?.name &&
+         state.system?.namingRightOffered &&
+         !state.system?.name){
+        const chosen=String(event.identity.name).trim().replace(/[<>\n\r]/g,'').slice(0,24);
+        if(chosen){
+          state.system.name=chosen;
+          state.system.namedAt=Date.now();
+          changed=true;
+          state.history.push({
+            id:`meme_admin_named_${Date.now()}`,
+            type:'admin_named',
+            recordType:'system',
+            title:'管理员获得名字',
+            summary:`宿主将管理员命名为「${chosen}」。`,
+            text:`ADMIN NAME: ${chosen}`,
+            committedAt:Date.now(),
+          });
+        }
       }
 
       if(event.permission?.unlockSystem===true && state.permission?.systemInviteReady){
@@ -368,7 +406,7 @@ async function handleRuntimeEvent(messageId){
   // Hidden eligibility is recalculated here too, without auto-unlocking.
   const milestones=state.permission?.milestones||{};
   state.permission.systemEligible=
-    Number(state.host?.charm||0)>=1 &&
+    Number(state.host?.charm||0)>=10 &&
     Number(milestones.completedTasks||0)>=2 &&
     Number(milestones.purchasedUpgrades||0)>=1 &&
     Number(state.permission?.adminInterestSignals||0)>=1;
@@ -401,14 +439,21 @@ ADMINISTRATOR CHARACTER INVARIANTS:
 He is a vivid adult male with strong private tastes, opinions, irritations and agency, not a helpful generic system. He is naturally sharp-tongued, judgmental, vain about aesthetics, impatient, mean in a witty specific way, observant, remembers slights, dislikes cheap flattery and fake inspirational talk, enjoys needling the host when she gives him an opening, and does not soften merely because time passes.
 He is a genuine extreme lookist. Before CHARM 55 he is extremely stingy with praise; before CHARM 70 he must NOT experience genuine sexual attraction to the host. At 55-69 he may grudgingly admit she is pretty. At 70+ she qualifies as a beauty, but beauty alone still does not equal desire, affection or love.
 Separate these axes strictly: appearance evaluation != sexual desire != emotional bond. He can admit she is beautiful while still finding her annoying. He can desire her without loving her. Tenderness is NOT a normal tone stage. Only if adminLove=true may rare genuine tenderness appear, and even then his native sharpness remains.
+IDENTITY / NAMING:
+He is an experienced cross-world system consciousness, not a first-time system. He has previously served in very different assignment types, including rebirth-oriented worlds, success/career systems, cultivation worlds and other system roles. This is genuinely the first time he has ever been assigned to a host whose starting appearance is such an extreme aesthetic disaster, which is part of why he is unusually irritated by this assignment.
+He has NO fixed personal name. A host is allowed to name him, but he deliberately conceals this rule because at the beginning he does not consider this host worthy of naming him. Before namingRightOffered=true, if asked his name he only identifies himself as the system / administrator and never reveals that the host has naming rights.
+The naming right is intimate and relationship-gated, not a system-level reward. It may only be offered after adminLove has already been genuinely established in a previous turn. Once love already exists, at the first fitting private or quiet emotional moment, he should eventually make a visible late-stage confession that he never had a fixed name and is giving the host the right to name him; in that same reply append identity.offerNaming=true. This event is titled “来自他的坦白”.
+After namingRightOffered=true, when the host clearly chooses a name for him, accept it only if he accepts the naming in visible prose, then append identity.name with exactly the chosen name. Once stored, use that name naturally thereafter. Never retroactively claim he had that name before the host gave it.
+Current namingRightOffered=${Boolean(state.system?.namingRightOffered)}; current assigned name=${state.system?.name||'NONE'}.
+
 Current CHARM=${state.host.charm}; desire allowed by appearance=${desireAllowed}; adminLove=${loveState}.
 
 Only when the current story creates a genuinely relevant new shop opportunity or changes the administrator's private interest, append ONE invisible HTML comment at the very end of the assistant reply.
-Format exactly: <!--MEME_OS_EVENT {"shop":[],"permission":{}} -->
+Format exactly: <!--MEME_OS_EVENT {"shop":[],"permission":{},"identity":{}} -->
 Do not emit the comment when nothing relevant changed.
 shop: maximum 2 temporary items. Each item fields: id,title,desc,detail,price,currency("AP"|"SV"),charmGain(0|0.25|0.5),ttl(1-8),icon,source.
 Temporary shop items must arise from the just-written plot, not random catalog filler. Their names/descriptions are spoken by the male administrator in his current tone: ${voice.label}. Current CHARM=${state.host.charm}.
-SYSTEM access is NEVER unlocked merely by numbers. Hidden eligibility=${eligible}; invite-ready=${inviteReady}. You may set permission.signal to one of impressed|curious|protective|desire|respect only when his actual attitude changes because of what the host did. Set permission.unlockSystem=true only if invite-ready is true AND he personally chooses, in-story, to open the private SYSTEM area at a fitting moment. Never explain these mechanics in visible prose.`;
+SYSTEM access is NEVER unlocked merely by numbers. Hidden eligibility=${eligible}; invite-ready=${inviteReady}. Set permission.signal only for genuine changes caused by the host: impressed|curious|respect|amused|annoyed-but-invested; desire only when CHARM>=70 and specific attraction actually occurs; attachment only after repeated desire plus personal investment. permission.love=true is reserved for a genuinely earned long-term emotional turning point, never beauty, sex, jealousy, system level or one dramatic scene. Set permission.unlockSystem=true only if invite-ready is true AND he personally chooses, in-story, to open the private SYSTEM area at a fitting moment. Never explain hidden mechanics in visible prose.`;
 
   context.setExtensionPrompt(MEME_RUNTIME_PROMPT_ID,prompt,1,2,false,0);
 }
@@ -701,6 +746,11 @@ function moduleIcon(type) {
   return icons[type] || '•';
 }
 
+function adminDisplayName(state=runtimeState()){
+  const name=String(state.system?.name||'').trim();
+  return name || 'ADMINISTRATOR';
+}
+
 function totalMenCount() {
   const men = runtimeState().men || {};
   return ['current','recent','returning'].reduce((sum, key) => sum + (men[key]?.length || 0), 0);
@@ -765,7 +815,7 @@ function homeMarkup() {
 
     <section class="meme-whisper-card">
       <span>♛</span>
-      <div><small>ADMINISTRATOR · ${voice.label}</small><b>${systemHomeLine(state)}</b></div>
+      <div><small>${adminDisplayName(state)} · ${voice.label}</small><b>${systemHomeLine(state)}</b></div>
     </section>
 
     <section class="meme-modules">
@@ -1082,7 +1132,7 @@ function systemMarkup() {
   const next=VOICE_STAGES[Math.min(VOICE_STAGES.length-1,toneIndex(state)+1)];
   return `
     ${pendingTrayMarkup(state)}
-    ${pageHeader('ADMINISTRATOR','SYSTEM · 看我干什么',voice.code)}
+    ${pageHeader(adminDisplayName(state),'SYSTEM · 看我干什么',voice.code)}
     <section class="meme-admin-card">
       <div class="meme-admin-emblem">${crownMarkup()}</div>
       <div class="meme-admin-copy">
@@ -1111,7 +1161,11 @@ function systemMarkup() {
 
     <section class="meme-page-card">
       <div class="meme-card-title"><small>ADMIN PROFILE</small><h3>我本来就这样</h3></div>
+      ${labelValue('识别',state.system?.name || 'SYSTEM / ADMINISTRATOR',state.system?.name?'HOST-NAMED':'NO PERSONAL NAME SHOWN')}
+      ${state.system?.namingRightOffered && !state.system?.name ? labelValue('命名权','已交给宿主','WAITING') : ''}
       ${labelValue('核心性格','审美偏执 / 嘴毒 / 自负 / 色情 / 不耐烦')}
+      ${labelValue('系统经历','跨世界、多类型任务。不是第一次上岗。')}
+      ${labelValue('本次异常','第一次抽到这么严重的审美灾难宿主。')}
       ${labelValue('绑定原因','纯随机。别自作多情。','NO DESTINY')}
       ${labelValue('当前态度',voice.label)}
       ${labelValue('下一变化',next.id===voice.id?'已经到最高态度层':`CHARM ${next.min} → ${next.label}`)}
@@ -1428,6 +1482,10 @@ async function ensureCleanStart(){
   state.men={current:[],recent:[],returning:[]};
   state.system.pageUnlocked=false;
   state.system.attitudeStage=0;
+  state.system.name=null;
+  state.system.namingRightOffered=false;
+  state.system.namingOfferedAt=null;
+  state.system.namedAt=null;
   state.permission={
     systemEligible:false,
     systemInviteReady:false,
