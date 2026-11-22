@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 20;
+const SCHEMA_VERSION = 21;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -87,6 +87,7 @@ const DEFAULT_STATE = Object.freeze({
         recentReactions: [],
     },
     runtime: {
+        chatKey: null,
         processedAssistantMessages: [],
     },
     upgrades: {},
@@ -186,6 +187,7 @@ function mergeState(raw) {
         runtime: {
             ...base.runtime,
             ...(raw.runtime ?? {}),
+            chatKey: raw.runtime?.chatKey ? String(raw.runtime.chatKey) : null,
             processedAssistantMessages: Array.isArray(raw.runtime?.processedAssistantMessages)
                 ? raw.runtime.processedAssistantMessages
                     .map(value => Number(value))
@@ -249,6 +251,22 @@ function getContext() {
     return globalThis.SillyTavern?.getContext?.() || null;
 }
 
+function currentChatKey(context = getContext()) {
+    const raw =
+        context?.chatId ??
+        context?.chatMetadata?.chat_id ??
+        context?.chatMetadata?.chatId ??
+        '';
+    const key = String(raw || '').trim();
+    return key || null;
+}
+
+function freshStateForChat(context = getContext()) {
+    const state = cloneDefaultState();
+    state.runtime.chatKey = currentChatKey(context);
+    return state;
+}
+
 export function hasActiveChat() {
     const context = getContext();
     return Boolean(context?.chatMetadata && Array.isArray(context?.chat));
@@ -256,18 +274,43 @@ export function hasActiveChat() {
 
 export function getState() {
     const context = getContext();
-    if (!context?.chatMetadata) return cloneDefaultState();
+    if (!context?.chatMetadata) return freshStateForChat(context);
 
-    const merged = mergeState(context.chatMetadata[META_KEY]);
+    const chatKey = currentChatKey(context);
+    const raw = context.chatMetadata[META_KEY];
+
+    // New/duplicated chats can inherit metadata. A persisted state belongs only
+    // to the exact chatId that first owned it; a mismatch means a brand-new run.
+    if (chatKey && raw?.runtime?.chatKey && String(raw.runtime.chatKey) !== chatKey) {
+        const fresh = freshStateForChat(context);
+        context.chatMetadata[META_KEY] = fresh;
+        return fresh;
+    }
+
+    const merged = mergeState(raw);
+    if (chatKey && !merged.runtime.chatKey) merged.runtime.chatKey = chatKey;
     context.chatMetadata[META_KEY] = merged;
     return merged;
+}
+
+export async function resetStateForCurrentChat() {
+    const context = getContext();
+    if (!context?.chatMetadata) return freshStateForChat(context);
+
+    const fresh = freshStateForChat(context);
+    context.chatMetadata[META_KEY] = fresh;
+    if (typeof context.saveMetadata === 'function') await context.saveMetadata();
+    return fresh;
 }
 
 export async function saveState(state) {
     const context = getContext();
     if (!context?.chatMetadata) return;
 
-    context.chatMetadata[META_KEY] = mergeState(state);
+    const merged = mergeState(state);
+    const chatKey = currentChatKey(context);
+    if (chatKey) merged.runtime.chatKey = chatKey;
+    context.chatMetadata[META_KEY] = merged;
     if (typeof context.saveMetadata === 'function') await context.saveMetadata();
 }
 
