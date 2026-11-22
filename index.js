@@ -1603,21 +1603,40 @@ function menMarkup() {
   `;
 }
 
+function systemAccessLadder(state=runtimeState()){
+  const rank=systemAccessRank(state);
+  const rows=[
+    ['00','LOCKED','完全封闭 · 你连门都进不来'],
+    ['01','PEEK','只给你看系统状态和表层资料'],
+    ['02','OPEN','基本档案、进化与公开资料开放'],
+    ['03','PRIVATE','私人偏好与更深资料开放'],
+  ];
+  return `
+    <div class="meme-system-levels">
+      ${rows.map((row,index)=>`<article class="${rank>=index?'is-on':''}"><span>${row[0]}</span><div><b>${row[1]}</b><small>${row[2]}</small></div></article>`).join('')}
+    </div>
+  `;
+}
+
 function lockedSystemMarkup(){
   const state=runtimeState();
   return `
-    ${pageHeader('ACCESS DENIED','SYSTEM · 他不让你看','LOCKED')}
+    ${pageHeader('ACCESS DENIED','SYSTEM · LOCKED','LOCKED')}
     <section class="meme-system-locked-card">
       <div class="meme-admin-emblem">${crownMarkup()}</div>
       <small>PRIVATE ACCESS</small>
       <h3>谁准你翻我的档案了？</h3>
-      <p>“这区什么时候开，我说了算。不是你刷够某个数字就能进。先证明你不是个只会点按钮的废物。”</p>
+      <p>“门关着就是不想让你进。刷数字只能让你有资格站门口，开不开还是我说了算。”</p>
       <div class="meme-system-lock-hints">
         <span>持续完成任务</span>
         <span>真的发生改造</span>
         <span>让我开始对你有兴趣</span>
       </div>
-      <span>满足资格后，仍需管理员主动授权</span>
+      <span>满足资格后，也只可能先得到 PEEK。</span>
+    </section>
+    <section class="meme-page-card">
+      <div class="meme-card-title"><small>ACCESS LADDER</small><h3>别想着一步翻到底。</h3></div>
+      ${systemAccessLadder(state)}
     </section>
   `;
 }
@@ -1625,55 +1644,42 @@ function lockedSystemMarkup(){
 function systemMarkup() {
   const state=runtimeState();
   const voice=attitude(state);
+  const stage=systemAccessStage(state);
+  const rank=systemAccessRank(state);
+  const access=systemAccessMeta(state);
   const next=VOICE_STAGES[Math.min(VOICE_STAGES.length-1,toneIndex(state)+1)];
-  return `
-    ${pendingTrayMarkup(state)}
-    ${pageHeader(adminDisplayName(state),'SYSTEM · 看我干什么',voice.code)}
-    <section class="meme-admin-card">
-      <div class="meme-admin-emblem">${crownMarkup()}</div>
-      <div class="meme-admin-copy">
-        <small>CURRENT ATTITUDE</small>
-        <h3>${voice.label}</h3>
-        <p>成年男性系统意识体。态度跟着宿主实际改造结果变，不会因为“你是宿主”就自动喜欢你。</p>
-      </div>
-    </section>
+  const intro={
+    peek:'只准你看一眼。能看到什么就看什么，手别往里面伸。',
+    open:'基本档案给你开了。别把“允许查看”脑补成我在跟你交心。',
+    private:'私人区给你进，不代表我从此什么都得向你汇报。少得寸进尺。',
+  }[stage] || '';
 
+  const snapshot=`
+    <section class="meme-page-card">
+      <div class="meme-card-title"><small>SYSTEM SNAPSHOT</small><h3>${rank===1?'只许看这些':'基础资料'}</h3></div>
+      ${labelValue('识别',state.system?.name || 'SYSTEM / ADMINISTRATOR',state.system?.name?'HOST-NAMED':'SYSTEM ID')}
+      ${labelValue('当前形态',state.system?.form || '意识体',`SYSTEM LV.${state.system?.level||1}`)}
+      ${labelValue('运行状态',state.system?.status || 'ONLINE','ACTIVE')}
+      ${labelValue('系统经历','跨世界、多类型任务','不是第一次上岗')}
+      ${labelValue('本次绑定','纯随机','NO DESTINY')}
+      ${state.system?.namingRightOffered && !state.system?.name ? labelValue('命名权','已由本人主动交给宿主','WAITING') : ''}
+    </section>
+  `;
+
+  const openSections=rank>=2 ? `
     <section class="meme-system-meters">
       <article><small>综合魅力</small><b>${state.host.charm}</b><span><i style="width:${Math.min(100,state.host.charm)}%"></i></span></article>
       <article><small>当前态度</small><b>${voice.code}</b><span><i style="width:${(toneIndex(state)+1)*20}%"></i></span></article>
-      <article><small>系统权限</small><b>${state.system.level} / 4</b><span><i style="width:${state.system.level*25}%"></i></span></article>
+      <article><small>系统等级</small><b>${state.system.level} / 4</b><span><i style="width:${state.system.level*25}%"></i></span></article>
     </section>
 
     <section class="meme-page-card">
-      <div class="meme-card-title"><small>VOICE PROTOCOL</small><h3>我的嘴不会一直一个样</h3></div>
-      ${VOICE_STAGES.map(stage=>`
-        <div class="meme-voice-rule ${stage.id===voice.id?'is-current':''}">
-          <span>${stage.code}</span>
-          <div><b>${stage.min}–${stage.max===999?'100':stage.max} · ${stage.label}</b><p>${stage.rule}</p></div>
-        </div>
-      `).join('')}
-      <p class="meme-men-rule-note">规则：除了 AP / SV / CHARM / TASK / SHOP 这类结构标签，所有新生成的名称、说明、任务、事件、推荐、警告和管理员留言都必须像是他本人亲手写的。基调固定为刻薄＋恶俗：能直说就别装文明，碰到性、SV、身体反应时直接说精液、口交、射精、高潮、发情、湿、想睡/想操；普通内容也要嘴脏、下流、缺德，不准突然变成通用游戏文案、心理咨询或客服腔。</p>
-    </section>
-
-    <section class="meme-page-card">
-      <div class="meme-card-title"><small>ADMIN PROFILE</small><h3>我本来就这样</h3></div>
-      ${labelValue('识别',state.system?.name || 'SYSTEM / ADMINISTRATOR',state.system?.name?'HOST-NAMED':'NO PERSONAL NAME SHOWN')}
-      ${state.system?.namingRightOffered && !state.system?.name ? labelValue('命名权','已交给宿主','WAITING') : ''}
-      ${labelValue('核心性格','审美偏执 / 嘴毒 / 自负 / 色情 / 不耐烦')}
-      ${labelValue('系统经历','跨世界、多类型任务。不是第一次上岗。')}
-      ${labelValue('本次异常','第一次抽到这么严重的审美灾难宿主。')}
-      ${labelValue('绑定原因','纯随机。别自作多情。','NO DESTINY')}
+      <div class="meme-card-title"><small>ADMIN PROFILE</small><h3>基本档案，够你看了。</h3></div>
+      ${labelValue('核心性格','审美偏执 / 嘴毒 / 恶俗 / 自负 / 色情 / 不耐烦')}
+      ${labelValue('系统经历','重生 / 事业 / 修仙 / 其他跨世界任务')}
+      ${labelValue('本次异常','第一次抽到这么严重的审美灾难宿主')}
       ${labelValue('当前态度',voice.label)}
-      ${labelValue('下一变化',next.id===voice.id?'已经到最高态度层':`CHARM ${next.min} → ${next.label}`)}
-      ${labelValue('目前建议',toneIndex(state)===0?'先去洗头':'继续改，别停')}
-    </section>
-
-    <section class="meme-page-card">
-      <div class="meme-card-title"><small>PRIVATE PREFERENCE</small><h3>别把我的癖好往你身上套</h3></div>
-      ${labelValue('审美对象','漂亮的成年女性')}
-      ${labelValue('特殊癖好','对睡眠状态下的漂亮成年女性有明显性兴趣')}
-      ${labelValue('宿主适用',toneIndex(state)===0?'目前完全不适用':'随魅力上升重新判定')}
-      <p class="meme-men-rule-note">这是我原本就有的偏好，不是因为绑定你才长出来的。你够不够格，是另一回事。</p>
+      ${labelValue('下一变化',next.id===voice.id?'已经到最高外貌评价层':`CHARM ${next.min} → ${next.label}`)}
     </section>
 
     <section class="meme-page-card">
@@ -1685,6 +1691,63 @@ function systemMarkup() {
         <article class="${state.system.level>=4?'is-on':''}"><span>04</span><div><b>完全具现</b><small>稳定成年实体 · 自主行动</small></div></article>
       </div>
     </section>
+
+    <section class="meme-page-card">
+      <div class="meme-card-title"><small>VOICE PROTOCOL</small><h3>我的嘴不会一直一个样</h3></div>
+      ${VOICE_STAGES.map(item=>`
+        <div class="meme-voice-rule ${item.id===voice.id?'is-current':''}">
+          <span>${item.code}</span>
+          <div><b>${item.min}–${item.max===999?'100':item.max} · ${item.label}</b><p>${item.rule}</p></div>
+        </div>
+      `).join('')}
+    </section>
+  ` : '';
+
+  const privateSections=rank>=3 ? `
+    <section class="meme-page-card">
+      <div class="meme-card-title"><small>PRIVATE PREFERENCE</small><h3>既然放你进来了，就别装纯。</h3></div>
+      ${labelValue('审美对象','漂亮的成年女性')}
+      ${labelValue('特殊癖好','对熟睡状态下的漂亮成年女性有明显性兴趣')}
+      ${labelValue('审美原则','漂亮会让我多看，但不代表喜欢，更不代表爱')}
+      ${labelValue('本次宿主',Number(state.host?.charm||0)<70?'仍未跨过我的真实欲望门槛':Number(state.permission?.adminDesireSignals||0)>0?'已经产生过针对性欲望':'达到美女门槛，但我想不想碰是另一回事')}
+      <p class="meme-men-rule-note">PRIVATE 不是“全部秘密公开”。我愿意给你看的才会出现在这里，没说的别替我补。</p>
+    </section>
+
+    <section class="meme-page-card">
+      <div class="meme-card-title"><small>OLD ASSIGNMENTS</small><h3>以前带过的可没你这么离谱。</h3></div>
+      ${labelValue('重生类','处理人生重启、身份与目标重构')}
+      ${labelValue('事业类','处理成功、资源、竞争与社会跃迁')}
+      ${labelValue('修仙类','处理修为、资源、境界与世界规则')}
+      ${labelValue('本次评价','第一次遇到开局审美灾难严重到让我不想交命名权的宿主')}
+      <p class="meme-men-rule-note">这里仍不会自动显示命名机制。只有“来自他的坦白”发生以后，命名权才会成为已公开事实。</p>
+    </section>
+  ` : `
+    <section class="meme-page-card">
+      <div class="meme-card-title"><small>PRIVATE DATA</small><h3>这里不是你现在能翻的。</h3></div>
+      ${labelValue('状态','SEALED',stage==='peek'?'先拿着这点 PEEK 权限别得寸进尺。':'我开的是基本档案，不是把底裤都给你看。')}
+    </section>
+  `;
+
+  return `
+    ${pendingTrayMarkup(state)}
+    ${pageHeader(adminDisplayName(state),`SYSTEM · ${access.label}`,voice.code)}
+    <section class="meme-admin-card">
+      <div class="meme-admin-emblem">${crownMarkup()}</div>
+      <div class="meme-admin-copy">
+        <small>ACCESS · ${access.label}</small>
+        <h3>${voice.label}</h3>
+        <p>${intro}</p>
+      </div>
+    </section>
+
+    <section class="meme-page-card">
+      <div class="meme-card-title"><small>ACCESS LADDER</small><h3>权限是我一层一层给的。</h3></div>
+      ${systemAccessLadder(state)}
+    </section>
+
+    ${snapshot}
+    ${openSections}
+    ${privateSections}
 
     <section class="meme-admin-quote">
       <small>LIVE COMMENT · ${voice.code}</small>
@@ -1748,7 +1811,7 @@ function renderView(view='home', animate=true) {
     task: taskMarkup,
     shop: shopMarkup,
     men: menMarkup,
-    system: () => runtimeState().system?.pageUnlocked ? systemMarkup() : lockedSystemMarkup(),
+    system: () => systemAccessStage(runtimeState())==='locked' ? lockedSystemMarkup() : systemMarkup(),
     record: recordMarkup,
   };
 
@@ -1991,6 +2054,8 @@ async function ensureCleanStart(){
   state.history=[];
   state.men={current:[],recent:[],returning:[],archive:{}};
   state.system.pageUnlocked=false;
+  state.system.accessStage='locked';
+  state.system.accessChangedAt=null;
   state.system.attitudeStage=0;
   state.system.name=null;
   state.system.namingRightOffered=false;
@@ -2061,7 +2126,7 @@ function ensureDialog() {
     const card=event.target.closest('[data-meme-module]');
     if(card){
       const view=card.dataset.memeModule||'home';
-      if(view==='system' && !runtimeState().system?.pageUnlocked){
+      if(view==='system' && systemAccessStage(runtimeState())==='locked'){
         globalThis.toastr?.warning?.('“谁准你看的？我没开就是没开。”');
         return;
       }
