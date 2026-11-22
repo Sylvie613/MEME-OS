@@ -1145,25 +1145,29 @@ function taskMarkup() {
 
 function shopItem(item,category) {
   const state=runtimeState();
+  const view=staticShopView(item,state);
   const req=shopRequirement(item,state);
-  const owned=Boolean(state.upgrades?.[item.id]);
   const pending=pendingFor('purchase',item.id,state);
   const spendable=getSpendableResources(state);
-  const enough=item.currency==='AP' ? spendable.ap>=item.price : item.currency==='SV' ? spendable.sv>=item.price : false;
-  let button=owned?'买过了':pending?'待发送':!req.ok?'锁着':!enough?'穷':'买';
+  const enough=item.currency==='AP' ? spendable.ap>=view.price : item.currency==='SV' ? spendable.sv>=view.price : false;
+  const soldOut=view.soldOut;
+  let button=soldOut?'改满了':pending?'待发送':!req.ok?'锁着':!enough?'穷':'买';
+  const levelMeta=item.dynamic
+    ? 'PLOT · 临时货'
+    : `${view.phase.code} · ${view.currentLevel}/${view.maxLevel} → ${ROMAN_LEVELS[Math.max(0,view.nextLevel-1)]}`;
 
   return `
-    <article class="meme-shop-card ${(!req.ok||owned)?'is-locked':''}" data-shop-id="${item.id}" data-shop-category="${category}">
+    <article class="meme-shop-card ${(!req.ok||soldOut)?'is-locked':''}" data-shop-id="${item.id}" data-shop-category="${category}">
       <span class="meme-shop-icon" data-shop-detail>${item.icon}</span>
       <div class="meme-shop-copy" data-shop-detail>
-        <b>${shopVoiceName(item,state)}</b>
-        <p>${shopVoiceDesc(item,state)}</p>
-        <small>${item.level} · ${req.ok?item.req:req.reason}</small>
+        <b>${soldOut ? (state.upgrades?.[item.id]?.title || item.title) : shopVoiceName(item,state)}</b>
+        <p>${soldOut ? '这项已经被你改到当前版本上限。再点也榨不出第五层。' : shopVoiceDesc(item,state)}</p>
+        <small>${levelMeta} · ${req.ok ? (view.nextLevel===1 ? item.req : view.phase.label) : req.reason}</small>
         <div class="meme-shop-detail">${item.detail}</div>
       </div>
       <div class="meme-shop-buy">
-        <strong>${item.currency==='LOCK'?'—':item.price}</strong><em>${item.currency}</em>
-        <button type="button" data-shop-action="${item.id}" ${(owned||pending||!req.ok||!enough)?'disabled':''}>${button}</button>
+        <strong>${item.currency==='LOCK'?'—':view.price}</strong><em>${item.currency}</em>
+        <button type="button" data-shop-action="${item.id}" ${(soldOut||pending||!req.ok||!enough)?'disabled':''}>${button}</button>
       </div>
     </article>
   `;
@@ -1177,9 +1181,17 @@ function renderShopList(category='appearance') {
 function shopMarkup() {
   const state=runtimeState();
   const spendable=getSpendableResources(state);
+  const phase=currentShopPhase(state);
+  const levels=totalUpgradeLevels(state);
+  const nextPhase=SHOP_PHASES.find(item=>item.minLevels>levels) || null;
   return `
     ${pendingTrayMarkup(state)}
-    ${pageHeader('DESIRE MARKET','SHOP · 把这副身子修得能看',attitude(state).code)}
+    ${pageHeader('DESIRE MARKET','SHOP · 把这副身子修得能看',phase.code)}
+    <section class="meme-page-card">
+      <div class="meme-card-title"><small>CURRENT SHELF</small><h3>${phase.label}</h3></div>
+      ${labelValue('累计改造',`${levels} 级`,nextPhase?`再改 ${Math.max(0,nextPhase.minLevels-levels)} 级开 ${nextPhase.label}`:'固定商城已到最高货架')}
+      ${labelValue('货架规则','同一项目可以继续升Ⅱ / Ⅲ / Ⅳ级。','越往后越贵，也越不是“擦屁股级修复”。')}
+    </section>
     <div class="meme-shop-balance">
       <span><small>AP 可用</small><b>${String(spendable.ap).padStart(3,'0')}</b></span>
       <i></i>
@@ -1520,24 +1532,25 @@ async function handleShopAction(id){
   const item=findShopItem(id);
   if(!item) return;
   const state=runtimeState();
+  const view=staticShopView(item,state);
   const req=shopRequirement(item,state);
+  if(view.soldOut){
+    globalThis.toastr?.info?.('这项已经改满了。再戳也不会长出第五级。');
+    return;
+  }
   if(!req.ok){
     globalThis.toastr?.warning?.(`锁着呢。先做到：${req.reason}。`);
     return;
   }
-  if(state.upgrades?.[id]){
-    globalThis.toastr?.info?.('买过了。别重复点。');
-    return;
-  }
   if(pendingFor('purchase',id,state)){
-    globalThis.toastr?.info?.('已经在输入框里等你发送。');
+    globalThis.toastr?.info?.('这一层已经在输入框里等你发送。');
     return;
   }
 
   const spendable=getSpendableResources(state);
   const balance=item.currency==='AP'?spendable.ap:spendable.sv;
-  if(balance<item.price){
-    globalThis.toastr?.warning?.(`穷。还差 ${item.price-balance} ${item.currency}。`);
+  if(balance<view.price){
+    globalThis.toastr?.warning?.(`穷。还差 ${view.price-balance} ${item.currency}。`);
     return;
   }
 
@@ -1546,26 +1559,26 @@ async function handleShopAction(id){
   const bodyDelta=item.dynamic
     ? (item.bodyAxis ? {[item.bodyAxis]:1} : {})
     : (BODY_EFFECTS[item.id] || {});
-  const apDelta=item.currency==='AP'?-item.price:0;
-  const svDelta=item.currency==='SV'?-item.price:0;
-  const text=`【MÉMÉ OS｜已结算｜勿重复结算】购入「${voiced}」；${item.currency} -${item.price}${charmGain?`；CHARM +${charmGain}`:''}。扩展已完成扣款与改造记录，正文只描写改造后的结果。`;
+  const apDelta=item.currency==='AP'?-view.price:0;
+  const svDelta=item.currency==='SV'?-view.price:0;
+  const levelText=item.dynamic?'剧情临时改造':`LV.${view.nextLevel}`;
+  const text=`【MÉMÉ OS｜已结算｜勿重复结算】购入「${voiced}」· ${levelText}；${item.currency} -${view.price}${charmGain?`；CHARM +${charmGain}`:''}。扩展已完成扣款、等级与身体轴结算，正文只描写改造后的结果。`;
 
   await queueAction(createPendingAction({
     type:'purchase',
     recordType:'change',
     title:`购入：${voiced}`,
-    summary:`购入「${voiced}」；${item.currency} -${item.price}${charmGain?`；CHARM +${charmGain}`:''}。`,
+    summary:`购入「${voiced}」· ${levelText}；${item.currency} -${view.price}${charmGain?`；CHARM +${charmGain}`:''}。`,
     text,
     effect:{
       apDelta,
       svDelta,
       charmDelta:charmGain,
       bodyDelta,
-      purchase:{id:item.id,title:voiced,category:item.category,level:1},
+      purchase:{id:item.id,title:voiced,category:item.category,level:view.nextLevel},
     },
   }));
 }
-
 async function handleRemovePending(actionId){
   const state=runtimeState();
   const action=state.pending?.find(item=>item.id===actionId);
