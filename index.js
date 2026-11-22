@@ -538,12 +538,17 @@ function settleTaskFromModel(state,rawTask,messageId){
   state.permission.milestones.taskSettlements=Math.max(0,Number(state.permission.milestones.taskSettlements)||0)+1;
   if(!wasEverCompleted) state.permission.milestones.completedTasks+=1;
 
+  const rewardText=[
+    reward.ap>0 ? `AP +${reward.ap}` : '',
+    reward.sv>0 ? `SV +${reward.sv}` : '',
+  ].filter(Boolean).join(' / ') || '无资源奖励';
+
   state.history.push({
     id:historyId,
     type:'task_complete',
     recordType:'task',
     title:`${wasEverCompleted && repeatable?'重复结算':'完成'}：${title}`,
-    summary:`任务「${title}」验收通过；AP +${reward.ap}${reward.sv?` / SV +${reward.sv}`:''}。证据：${evidence}`,
+    summary:`任务「${title}」验收通过；${rewardText}。证据：${evidence}`,
     text:`TASK VERIFIED AND SETTLED: ${id}`,
     committedAt:Date.now(),
   });
@@ -1033,7 +1038,7 @@ For sample, oral and drain: after their first-ever completion they become repeat
 STORY DAY:
 Current in-world story day=${Number(state.tasks?.storyDay)||1}. Daily tasks may reward once per story day. Set timeline.dayAdvance=true only when the visible narrative clearly crosses into a new in-world day (for example after sleeping overnight, an explicit next morning/day, or an explicit date jump). Never advance the day merely because several turns passed.
 
-Current SHOP phase=${currentShopPhase(state).label} (${currentShopPhase(state).code}); total permanent upgrade levels=${totalUpgradeLevels(state)}.
+Current SHOP phase=${currentShopPhase(state).label} (${currentShopPhase(state).code}); appearance/presentation shop progress levels=${shopProgressLevels(state)}. Adult-response upgrades do not advance beauty-shelf phases.
 Dynamic plot goods must respect the current SHOP phase. They may solve a concrete problem exposed by the just-written plot, but each purchase is only one incremental body-axis step and may not claim a sudden makeover, perfect body, instant beauty, or any effect far beyond the host's current progression.
 
 PLOT → SHOP → BODY → REACTION LOOP:
@@ -1238,12 +1243,21 @@ function bodyStatus(keys,baseline,levels,state=runtimeState()){
   return options[Math.min(options.length-1,total-1)] || options[options.length-1];
 }
 
+const SHOP_PHASE_EXCLUDED = new Set(['sensitive1','arousal1','lubrication1','orgasm1','recovery1']);
+
 function totalUpgradeLevels(state=runtimeState()){
   return Object.values(state.upgrades||{}).reduce((sum,item)=>sum+Math.max(0,Number(item?.level)||0),0);
 }
 
+function shopProgressLevels(state=runtimeState()){
+  return Object.values(state.upgrades||{}).reduce((sum,item)=>{
+    if(SHOP_PHASE_EXCLUDED.has(String(item?.id||''))) return sum;
+    return sum+Math.max(0,Number(item?.level)||0);
+  },0);
+}
+
 function currentShopPhase(state=runtimeState()){
-  const total=totalUpgradeLevels(state);
+  const total=shopProgressLevels(state);
   return [...SHOP_PHASES].reverse().find(phase=>total>=phase.minLevels) || SHOP_PHASES[0];
 }
 
@@ -1395,7 +1409,7 @@ function shopRequirement(item,state=runtimeState()){
   if(view.soldOut) return {ok:false,reason:'已经改到当前上限'};
   if(item.currency==='LOCK') return {ok:false,reason:item.req||'SYSTEM LOCK'};
   if(!view.phaseUnlocked){
-    return {ok:false,reason:`${view.phase.label} · 累计改造 ${view.phase.minLevels} 级`};
+    return {ok:false,reason:`${view.phase.label} · 外观/感官改造累计 ${view.phase.minLevels} 级`};
   }
   const min=Number(item.req?.match(/CHARM (\d+)/)?.[1]||0);
   if(view.nextLevel===1 && min && charm<min) return {ok:false,reason:`CHARM ${min}`};
@@ -1906,14 +1920,14 @@ function shopMarkup() {
   const state=runtimeState();
   const spendable=getSpendableResources(state);
   const phase=currentShopPhase(state);
-  const levels=totalUpgradeLevels(state);
+  const levels=shopProgressLevels(state);
   const nextPhase=SHOP_PHASES.find(item=>item.minLevels>levels) || null;
   return `
     ${pendingTrayMarkup(state)}
     ${pageHeader('DESIRE MARKET','SHOP · 把这副身子修得能看',phase.code)}
     <section class="meme-page-card">
       <div class="meme-card-title"><small>CURRENT SHELF</small><h3>${phase.label}</h3></div>
-      ${labelValue('累计改造',`${levels} 级`,nextPhase?`再改 ${Math.max(0,nextPhase.minLevels-levels)} 级开 ${nextPhase.label}`:'固定商城已到最高货架')}
+      ${labelValue('外观进度',`${levels} 级`,nextPhase?`再完成 ${Math.max(0,nextPhase.minLevels-levels)} 级外观/感官改造开 ${nextPhase.label}`:'固定商城已到最高货架')}
       ${labelValue('货架规则','同一项目可以继续升Ⅱ / Ⅲ / Ⅳ级。','越往后越贵，也越不是“擦屁股级修复”。')}
     </section>
     <div class="meme-shop-balance">
