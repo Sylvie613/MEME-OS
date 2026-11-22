@@ -12,7 +12,7 @@ import { appendToInput, removeFromInput } from './src/input.js?v=0.10.4';
 import { isBoundCharacter } from './src/binding.js?v=0.10.4';
 
 /**
- * MÉMÉ OS v0.10.4
+ * MÉMÉ OS v0.10.5
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -28,10 +28,10 @@ const TASK_DATA = {
     { id:'outfit', type:'DAILY', title:'像样地出门', desc:'搭配一套干净、合身、没有明显邋遢感的外出服。', reward:'AP +110', state:'可接取', detail:'不要求昂贵，只要求“看起来像认真收拾过”。' },
   ],
   desire: [
-    { id:'spark', type:'DESIRE', title:'先让男人真的对你起色心', desc:'让一名成年对象明确对你产生性欲，不算礼貌夸奖，不算客套，得是真想碰你、想睡你。', reward:'AP +250 · SV +10', state:'CHARM 8 解锁', locked:true, detail:'一次性里程碑。不用真的上床，但对方必须出现明确、可识别的成人性欲。' },
+    { id:'spark', type:'DESIRE', title:'先让男人看着你硬起来', desc:'让一名成年男人因为你出现明确、可识别的性唤起。礼貌夸奖、暧昧客套、说你好看都不算；至少得让他真的起色心，明显想摸、想操、想把你弄上床。', reward:'AP +250 · SV +10', state:'CHARM 8 解锁', locked:true, detail:'一次性里程碑。可以不真正上床，但必须有明确成人性欲与身体/行为证据。' },
     { id:'sample', type:'DESIRE', title:'第一次把精液交上来', desc:'从成年对象处拿到第一次可结算的精液。别拿暧昧当成果，系统收的是精液，不是空气。', reward:'AP +350 · SV +50', repeatable:'daily', repeatReward:'SV +50', state:'CHARM 12 解锁', locked:true, detail:'首次完成给里程碑奖励；之后每个剧情日可再采集一次，仅结算 SV。' },
     { id:'oral', type:'DESIRE', title:'嘴别只会顶嘴', desc:'和成年对象完成一次口交，并拿到系统认可的射精结算。嘴硬不算本事，真把活干完才算。', reward:'AP +450 · SV +70', repeatable:'daily', repeatReward:'SV +80', state:'CHARM 15 解锁', locked:true, detail:'首次完成给里程碑奖励；之后每个剧情日最多再结算一次，仅产出 SV。' },
-    { id:'repeat', type:'DESIRE', title:'第二次不是偶然', desc:'与同一成年对象发生第二次明确的性接触或欲望事件。', reward:'AP +550 · SV +70', state:'CHARM 18 解锁', locked:true, detail:'一次性里程碑。若对象曾淡出，完成后会被 MEN 自动提升为 RETURNING。' },
+    { id:'repeat', type:'DESIRE', title:'操过一次还想再操你', desc:'和同一个成年男人发生第二次明确的性接触、性行为或射精事件。光聊天、调情、约会都不算；得证明他上次碰过你以后还想再来。', reward:'AP +550 · SV +70', state:'CHARM 18 解锁', locked:true, detail:'一次性里程碑。若对象曾淡出，完成后会被 MEN 自动提升为 RETURNING。' },
     { id:'drain', type:'DESIRE', title:'真有本事就把他榨干', desc:'在一次成人性场景里把成年对象操到系统判定的“完全采集”，别做到一半就只顾自己爽。', reward:'AP +800 · SV +120', repeatable:'daily', repeatReward:'SV +130', state:'CHARM 25 解锁', locked:true, detail:'首次完成是高阶里程碑；之后每个剧情日最多再结算一次，仅产出 SV。' },
   ],
   special: [
@@ -218,10 +218,10 @@ const RUDE_TASK_DESCS = {
   walk:'坐着不会自动变好看。起来动二十分钟，别把“改造”理解成躺着等我给。',
   posture:'肩膀打开，背挺起来。你再缩成那样，买再多东西也只是把好东西堆在烂姿态上。',
   outfit:'不用贵，先穿干净、合身、像认真挑过的衣服。别再把随便套上身当风格。',
-  spark:'先证明真有成年男人看着你会起色心。不是“你今天真好看”这种屁话，是他真的想碰、想睡、想把你按到床上。',
+  spark:'先让个成年男人因为你硬起来。不是夸你好看，不是嘴上说骚话，是他真的被你弄出性反应，想摸、想操、想把你按到床上。',
   sample:'我要的是第一次能结算的精液。别拿几句骚话和摸两下回来邀功，射出来、收得到，才算数。',
   oral:'这张嘴平时除了顶嘴没别的本事。去做一次真正的口交，等对方射出来再回来交差。',
-  repeat:'同一个男人第二次还想睡你，才说明上次不是一时脑热。让我看看你到底有没有本事让人操完还惦记。',
+  repeat:'同一个男人操过一次以后还想再操你，才说明上次不是一时脑热。别拿约会和聊天糊弄我，我要看第二次真碰、真做、真起反应。',
   drain:'都做到床上去了就别装矜持。把人榨到射干净，再把SV给我带回来。',
   audit:'站好。让我重新从头扫一遍，看看到底救回来多少，还是你只会自我感觉良好。',
   contract:'隐藏就是不想让你提前知道。老实玩，别总想翻答案。',
@@ -1120,6 +1120,13 @@ Do not define the host's name, age beyond adulthood, height, job, personality, h
 ADMINISTRATOR CHARACTER INVARIANTS:
 He is a vivid adult male with strong private tastes, opinions, irritations and agency, not a helpful generic system.
 
+GAME IDENTITY / TASK PRIORITY:
+MÉMÉ OS is first and foremost a vulgar erotic game / 黄油 transformation system, NOT a conventional romance card and NOT an administrator-dating simulator. Erotic missions, sexual progression, dirty body challenges, SV collection and the host's transformation are the gameplay spine. The administrator romance is only a possible long-term side axis and must never replace the erotic-game loop.
+Do not turn TASK into "date him", "make him like you", "get praised", "raise affection", "have a sweet moment" or other romance-game objectives. The administrator normally issues, comments on and verifies missions; he is not the default erotic mission target. If later plot and his physical form naturally make him relevant, that may happen organically, but never because the task generator is trying to push an admin route.
+
+ADULT MALE NPC POOL:
+Erotic/task male NPCs may be adults of any adult age, including visibly older or elderly men. They may have any profession, class, height, face, style, temperament or social status; do not bias toward young, tall, handsome, rich or idealized men. HOWEVER, two hard exclusions apply to generated erotic/task men: never generate men who are severely obese / "肥猪型", and never generate men with frightening, overpowering, nauseating or room-filling body odor. Ordinary sweat, age, roughness, plainness, ugliness, scars, baldness, disability, poverty, awkwardness or unconventional appearance are not disqualifiers by themselves. All sexual participants must be explicit adults.
+
 COPY OWNERSHIP RULE:
 MÉMÉ OS itself is an intentionally vulgar adult system. Every newly generated player-facing name or piece of prose that belongs to MÉMÉ OS must sound like something this administrator personally chose to call or write, filtered through his current personality, relationship state and attitude stage.
 His house voice is not elegant sarcasm. It is sharp + obscene + mean: crude sexual slang, dirty implications, shameless body commentary, vulgar jokes and specific insults are normal when context allows. In sexual or SV-related contexts, prefer direct adult vocabulary such as 精液、口交、高潮、发情、湿、想操/想睡、射精 instead of sanitized euphemisms such as “亲密接触”“有效样本”“成人互动”. Do not make every sentence sexual when the topic is ordinary hygiene or appearance, but the OS should still feel indecent, low-mouthed and malicious rather than polished or therapeutic.
@@ -1149,10 +1156,13 @@ Current generated uncompleted missions: ${JSON.stringify((state.tasks?.generated
 Distinct erotic missions already completed: ${distinctEroticTaskCount(state)}.
 Last story day on which a new generated desire mission was created: ${Number(state.tasks?.lastGeneratedDesireDay)||0}.
 When fewer than 3 generated desire missions are available and no generated mission has been created on the current story day, you may create ONE fitting new mission through taskOffers. Do not generate one every reply merely to fill space; prefer moments where the current plot, NPC, location, body state or unlocked sexual capability suggests a fresh challenge.
-Generated erotic missions are one-time challenges, not repeatable collection farming. They should vary meaningfully in act, constraint, target, setting, social risk, collection goal, endurance, control, presentation or other adult scenario structure. Do not merely rename an old task or paraphrase a completed one.
+
+Every generated desire mission must read unmistakably like an explicit vulgar adult-game mission, not a romance quest. A mission must center at least one concrete sexual/body challenge: explicit sexual acts, masturbation, oral/hand/foot/breast/penetrative or anal play, semen/SV collection, orgasm or arousal control, nudity/exposure, dirty or humiliating presentation, sexual endurance, position/control constraints, multiple-stimulus challenges, toy/mechanical stimulation, or another comparably explicit adult objective supported by the current plot. Use direct body/sex vocabulary when relevant.
+Do NOT create missions whose actual objective is merely dating, kissing romantically, being complimented, getting a man's phone number, being liked, raising affection, making the administrator jealous, comforting him, earning his praise, or otherwise "攻略系统哥". Those may happen incidentally in story, but they are not sufficient erotic-mission objectives.
+Generated erotic missions are one-time challenges, not repeatable collection farming. They should vary meaningfully in act, body part, constraint, target, setting, social risk, collection goal, endurance, control, presentation, number of participants or adult scenario structure. Do not merely rename an old task or paraphrase a completed one.
 Generated mission reward tier is derived automatically from current CHARM: no dynamic desire mission exists before CHARM 8, and later reward tiers rise with progression. Do not mention or choose the internal tier.
 taskOffers entries contain only {title,desc,detail,source}. Do NOT choose tier, AP/SV rewards or ids; the extension derives the tier from current CHARM, creates a deterministic id and assigns the reward.
-All generated task names/descriptions are written in the administrator's vulgar personal voice, not neutral quest prose.
+All generated task names/descriptions are written in the administrator's vulgar personal voice, not neutral quest prose. Names should be shameless, dirty and specific rather than elegant euphemisms.
 Only the first completion of each distinct erotic mission counts toward administrator evolution. Repeating sample/oral/drain for SV never counts as another different mission.
 
 TASK COMPLETION / VERIFICATION:
@@ -1180,6 +1190,7 @@ A dynamic SHOP item should preferably answer a concrete exposed issue from the c
 Permanent improvements persist across later scenes. Negative or neutral feedback may remain even after some unrelated body axis improves.
 
 MEN AUTO-ARCHIVE:
+The male NPC pool follows the ADULT MALE NPC POOL rule above: adult age may range from young adult to elderly; profession/appearance/status may be anything, with no beauty or wealth bias. Never generate a severely obese/"肥猪型" erotic/task man and never generate one whose defining trait is frightening, overpowering, nauseating body odor.
 Current visible MEN state: ${JSON.stringify({
   current:(state.men?.current||[]).map(p=>({id:p.id,name:p.name,meta:p.meta,relation:p.relation,desire:p.desire,contactCount:p.contactCount,status:p.status})),
   recent:(state.men?.recent||[]).map(p=>({id:p.id,name:p.name,meta:p.meta,relation:p.relation,desire:p.desire,contactCount:p.contactCount,status:p.status})),
@@ -1262,10 +1273,10 @@ const RUDE_TASK_NAMES = {
   walk:'动一动，别继续长在椅子上',
   posture:'别缩成一团',
   outfit:'穿得别像刚从垃圾袋里爬出来',
-  spark:'先证明真有男人想操你',
+  spark:'先让个男人看着你硬起来',
   sample:'第一次精液，别空手回来',
   oral:'这张嘴总得有点别的用处',
-  repeat:'第二次还来？那就不算意外了',
+  repeat:'操过一次还想再操你',
   drain:'都上床了就把精液榨干净',
   audit:'让我重新看看你到底救回来多少',
   contract:'你现在还没资格知道',
