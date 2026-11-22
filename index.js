@@ -12,7 +12,7 @@ import { appendToInput, removeFromInput } from './src/input.js?v=0.10.3';
 import { isBoundCharacter } from './src/binding.js?v=0.10.3';
 
 /**
- * MÉMÉ OS v0.10.3
+ * MÉMÉ OS v0.10.4
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -713,23 +713,52 @@ function recordAdminBondMoment(state,{kind,signal,reason,tag,messageId}){
 }
 
 
-function runtimeMessageAlreadyProcessed(state,messageId){
-  if(!Number.isInteger(messageId)) return false;
+function messageDateKey(message){
+  const raw=message?.send_date;
+  if(raw===undefined || raw===null || raw==='') return '';
+  if(typeof raw==='string' || typeof raw==='number') return String(raw);
+  try{return JSON.stringify(raw);}catch{return String(raw);}
+}
+
+function assistantTurnKey(context,messageId,message){
+  const chat=Array.isArray(context?.chat)?context.chat:[];
+  if(Number.isInteger(messageId)){
+    for(let i=messageId-1;i>=0;i--){
+      const prior=chat[i];
+      if(!prior?.is_user) continue;
+      const date=messageDateKey(prior);
+      if(date) return `turn_u_${hashId(date).toString(36)}`;
+      const text=String(prior.mes||'');
+      return `turn_u_${hashId(`${i}|${text}`).toString(36)}`;
+    }
+  }
+
+  const firstSwipe=Array.isArray(message?.swipes) && message.swipes.length
+    ? String(message.swipes[0]||'')
+    : String(message?.mes||'');
+  const firstInfo=Array.isArray(message?.swipe_info) && message.swipe_info.length
+    ? message.swipe_info[0]
+    : null;
+  const rootDate=messageDateKey(firstInfo)||messageDateKey(message);
+  return `turn_a_${hashId(`${rootDate}|${firstSwipe}|${String(message?.name||'')}`).toString(36)}`;
+}
+
+function runtimeMessageAlreadyProcessed(state,messageId,messageKey){
   const list=Array.isArray(state.runtime?.processedAssistantMessages)
     ? state.runtime.processedAssistantMessages
     : [];
-  return list.includes(messageId);
+  return list.includes(messageKey) || (Number.isInteger(messageId) && list.includes(messageId));
 }
 
-function markRuntimeMessageProcessed(state,messageId){
-  if(!Number.isInteger(messageId)) return;
+function markRuntimeMessageProcessed(state,messageKey){
+  if(!messageKey) return;
   state.runtime=state.runtime||{processedAssistantMessages:[]};
   const list=Array.isArray(state.runtime.processedAssistantMessages)
     ? state.runtime.processedAssistantMessages
     : [];
   state.runtime.processedAssistantMessages=[
-    ...list.filter(id=>id!==messageId),
-    messageId,
+    ...list.filter(id=>id!==messageKey),
+    messageKey,
   ].slice(-4000);
 }
 
@@ -742,8 +771,9 @@ async function handleRuntimeEvent(messageId){
   if(!message || message.is_user) return;
 
   const state=runtimeState();
-  if(runtimeMessageAlreadyProcessed(state,messageId)){
-    console.info(`[MÉMÉ OS] runtime event skipped: assistant message ${messageId} already processed`);
+  const messageKey=assistantTurnKey(context,messageId,message);
+  if(runtimeMessageAlreadyProcessed(state,messageId,messageKey)){
+    console.info(`[MÉMÉ OS] runtime event skipped: assistant turn ${messageKey} already processed`);
     return;
   }
 
@@ -1030,7 +1060,7 @@ async function handleRuntimeEvent(messageId){
   // The whole assistant message is one idempotent runtime event.
   // Once marked, refresh/reload/repeated event dispatches and swipes on the same
   // message slot cannot settle it a second time.
-  markRuntimeMessageProcessed(state,messageId);
+  markRuntimeMessageProcessed(state,messageKey);
   changed=true;
 
   // Hidden eligibility is recalculated here too, without auto-unlocking.
