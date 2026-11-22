@@ -4,7 +4,7 @@ const SCHEMA_VERSION = 1;
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
     resources: { ap: 0, sv: 0 },
-    host: { level: 1, charm: 0, stage: '未初始化' },
+    host: { level: 1, charm: 3, stage: '明显难看 · 未改造' },
     system: { level: 1, form: '意识体', status: 'ONLINE' },
     pending: [],
     history: [],
