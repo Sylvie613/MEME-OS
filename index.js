@@ -12,7 +12,7 @@ import { appendToInput, removeFromInput } from './src/input.js?v=0.10.0';
 import { isBoundCharacter } from './src/binding.js?v=0.10.0';
 
 /**
- * MÉMÉ OS v0.10.0
+ * MÉMÉ OS v0.10.1
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -54,6 +54,18 @@ const TASK_DATA = {
     { id:'override', type:'RARE', title:'越级奖励', desc:'在极少数高风险或高价值剧情节点触发一次越级改造机会。', reward:'RANDOM', state:'稀有事件', locked:true, detail:'由剧情事件触发，不作为普通可刷任务。' },
   ],
 };
+
+const DYNAMIC_DESIRE_TIERS = {
+  1:{minCharm:8, ap:120, sv:20, label:'TIER I'},
+  2:{minCharm:18, ap:180, sv:35, label:'TIER II'},
+  3:{minCharm:35, ap:260, sv:50, label:'TIER III'},
+  4:{minCharm:55, ap:360, sv:70, label:'TIER IV'},
+};
+
+function dynamicDesireRewardLabel(tier=1){
+  const meta=DYNAMIC_DESIRE_TIERS[Math.max(1,Math.min(4,Number(tier)||1))] || DYNAMIC_DESIRE_TIERS[1];
+  return `AP +${meta.ap} · SV +${meta.sv}`;
+}
 
 const SHOP_DATA = {
   appearance: [
@@ -261,6 +273,45 @@ const PLOT_PRICE_BANDS = {
 };
 
 const MEME_RUNTIME_PROMPT_ID='meme_os_runtime_bridge';
+
+function sanitizeGeneratedDesireTask(raw,state=runtimeState()){
+  if(!raw || typeof raw!=='object') return null;
+  const title=String(raw.title||'').replace(/\s+/g,' ').trim().slice(0,48);
+  const desc=String(raw.desc||'').replace(/\s+/g,' ').trim().slice(0,180);
+  const detail=String(raw.detail||'').replace(/\s+/g,' ').trim().slice(0,180);
+  if(!title || !desc) return null;
+
+  const tier=Math.max(1,Math.min(4,Math.round(Number(raw.tier)||1)));
+  const tierMeta=DYNAMIC_DESIRE_TIERS[tier] || DYNAMIC_DESIRE_TIERS[1];
+  if(Number(state.host?.charm||0)<tierMeta.minCharm) return null;
+
+  const fingerprint=`${title.toLowerCase()}|${desc.toLowerCase()}`;
+  const id=`desire_${hashId(fingerprint).toString(36)}`;
+  if(state.tasks?.completed?.[id] || state.tasks?.everCompleted?.[id]) return null;
+  if((state.tasks?.generated||[]).some(task=>task.id===id)) return null;
+  if(state.tasks?.active?.[id]) return null;
+
+  return {
+    id,
+    type:'DESIRE',
+    category:'desire',
+    dynamicTask:true,
+    tier,
+    title,
+    desc,
+    detail:detail || '剧情生成的一次性成人任务。完成后计入“不同色情任务”进度。',
+    reward:dynamicDesireRewardLabel(tier),
+    state:'剧情任务',
+    locked:false,
+    createdDay:Number(state.tasks?.storyDay)||1,
+    createdTurn:Number(state.shop?.plotTurn)||0,
+    source:String(raw.source||'当前剧情').replace(/\s+/g,' ').trim().slice(0,80),
+  };
+}
+
+function distinctEroticTaskCount(state=runtimeState()){
+  return Object.values(state.tasks?.completed||{}).filter(task=>task?.category==='desire').length;
+}
 
 function sanitizeDynamicItem(raw,state=runtimeState()){
   if(!raw || typeof raw!=='object') return null;
@@ -535,6 +586,10 @@ function settleTaskFromModel(state,rawTask,messageId){
     firstCompletedAt:state.tasks.everCompleted?.[id]?.firstCompletedAt||Date.now(),
   };
 
+  if(task.dynamicTask){
+    state.tasks.generated=(state.tasks.generated||[]).filter(task=>task.id!==id);
+  }
+
   state.permission.milestones.taskSettlements=Math.max(0,Number(state.permission.milestones.taskSettlements)||0)+1;
   if(!wasEverCompleted) state.permission.milestones.completedTasks+=1;
 
@@ -716,6 +771,17 @@ async function handleRuntimeEvent(messageId){
       const event=JSON.parse(match[1].trim());
 
       state.reactivity=state.reactivity||{recentChanges:[],recentIssues:[],recentReactions:[]};
+
+      if(Array.isArray(event.taskOffers)){
+        state.tasks=state.tasks||{storyDay:1,active:{},generated:[],completed:{},dailyCompleted:{},everCompleted:{}};
+        state.tasks.generated=Array.isArray(state.tasks.generated)?state.tasks.generated:[];
+        for(const rawOffer of event.taskOffers.slice(0,2)){
+          const task=sanitizeGeneratedDesireTask(rawOffer,state);
+          if(!task) continue;
+          state.tasks.generated=[task,...state.tasks.generated].slice(0,8);
+          changed=true;
+        }
+      }
 
       if(Array.isArray(event.tasks)){
         for(const rawTask of event.tasks.slice(0,4)){
@@ -1342,6 +1408,7 @@ function shopVoiceDesc(item,state=runtimeState()){
 }
 
 function taskVoiceName(task,state=runtimeState()){
+  if(task.dynamicTask) return task.title;
   const i=toneIndex(state);
   if(i===0) return RUDE_TASK_NAMES[task.id] || task.title;
   if(i===1) return task.title + ' · 别偷懒';
@@ -1351,6 +1418,7 @@ function taskVoiceName(task,state=runtimeState()){
 }
 
 function taskVoiceDesc(task,state=runtimeState()){
+  if(task.dynamicTask) return task.desc;
   const i=toneIndex(state);
   if(i===0) return RUDE_TASK_DESCS[task.id] || task.desc;
   const pools={
@@ -1396,6 +1464,10 @@ function taskRewardLabel(task,state=runtimeState()){
 
 function taskUnlock(task,state=runtimeState()){
   const charm=Number(state.host?.charm)||0;
+  if(task.dynamicTask){
+    const tierMeta=DYNAMIC_DESIRE_TIERS[Math.max(1,Math.min(4,Number(task.tier)||1))] || DYNAMIC_DESIRE_TIERS[1];
+    if(charm<tierMeta.minCharm) return {ok:false,reason:`CHARM ${tierMeta.minCharm}`};
+  }
   const map={spark:8,sample:12,oral:15,repeat:18,drain:25};
   if(map[task.id] && charm<map[task.id]) return {ok:false,reason:`CHARM ${map[task.id]}`};
   if(task.id==='contract') return {ok:false,reason:'条件未知'};
@@ -1462,7 +1534,9 @@ function findShopItem(id){
   return null;
 }
 
-function findTask(id){
+function findTask(id,state=runtimeState()){
+  const generated=(state.tasks?.generated||[]).find(task=>task.id===id);
+  if(generated) return {...generated,category:'desire',dynamicTask:true};
   for(const [category,tasks] of Object.entries(TASK_DATA)){
     const task=tasks.find(x=>x.id===id);
     if(task) return {...task,category};
@@ -1602,26 +1676,26 @@ function systemEvolutionReadiness(state=runtimeState(),targetLevel=(Number(state
   const target=Math.max(1,Math.min(4,Number(targetLevel)||current));
   if(target!==current+1) return {ok:false,reason:'只能逐级进化',target};
   const day=Math.max(1,Number(state.tasks?.storyDay)||1);
-  const settlements=Math.max(0,Number(state.permission?.milestones?.taskSettlements)||0);
+  const eroticTasks=distinctEroticTaskCount(state);
   const upgrades=totalUpgradeLevels(state);
 
   if(target===2){
     return {
-      ok:day>=2 && settlements>=4 && upgrades>=4,
+      ok:day>=2 && eroticTasks>=3 && upgrades>=4,
       reason:'需要更稳定的周目运行与基础改造进度',
       target,
     };
   }
   if(target===3){
     return {
-      ok:day>=5 && settlements>=12 && upgrades>=16,
+      ok:day>=5 && eroticTasks>=8 && upgrades>=16,
       reason:'需要中期任务与改造进度支撑实体化',
       target,
     };
   }
   if(target===4){
     return {
-      ok:day>=9 && settlements>=28 && upgrades>=34,
+      ok:day>=9 && eroticTasks>=18 && upgrades>=34,
       reason:'需要长线周目进度支撑稳定具现',
       target,
     };
@@ -1857,7 +1931,11 @@ function taskItem(task) {
 }
 
 function renderTaskList(category='daily') {
-  return (TASK_DATA[category] || TASK_DATA.daily).map(task=>taskItem({...task,category})).join('');
+  const base=(TASK_DATA[category] || TASK_DATA.daily).map(task=>({...task,category}));
+  const generated=category==='desire'
+    ? (runtimeState().tasks?.generated||[]).map(task=>({...task,category:'desire',dynamicTask:true}))
+    : [];
+  return [...base,...generated].map(task=>taskItem(task)).join('');
 }
 
 function taskMarkup() {
@@ -2491,7 +2569,7 @@ async function ensureCleanStart(){
     arousal:0,lubrication:0,orgasm:0,recovery:0,specialMark:0,
   };
   state.upgrades={};
-  state.tasks={storyDay:1,active:{},completed:{},dailyCompleted:{},everCompleted:{}};
+  state.tasks={storyDay:1,active:{},generated:[],completed:{},dailyCompleted:{},everCompleted:{}};
   state.pending=[];
   state.history=[];
   state.men={current:[],recent:[],returning:[],archive:{}};
