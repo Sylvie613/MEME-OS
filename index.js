@@ -324,6 +324,24 @@ async function handleRuntimeEvent(messageId){
         }
       }
 
+      if(event.timeline?.dayAdvance===true){
+        state.tasks=state.tasks||{storyDay:1,active:{},completed:{},dailyCompleted:{},everCompleted:{}};
+        state.tasks.storyDay=Math.max(1,(Number(state.tasks.storyDay)||1)+1);
+        for(const [taskId,activeTask] of Object.entries(state.tasks.active||{})){
+          if(activeTask?.category==='daily') delete state.tasks.active[taskId];
+        }
+        changed=true;
+        state.history.push({
+          id:`meme_story_day_${state.tasks.storyDay}_${Date.now()}`,
+          type:'story_day',
+          recordType:'system',
+          title:`剧情进入 DAY ${String(state.tasks.storyDay).padStart(3,'0')}`,
+          summary:'新的一天开始，日常任务已重新开放。',
+          text:'STORY DAY ADVANCED',
+          committedAt:Date.now(),
+        });
+      }
+
       if(event.permission?.signal){
         const signal=String(event.permission.signal);
         if(['impressed','curious','respect','amused','annoyed-but-invested'].includes(signal)){
@@ -458,12 +476,20 @@ The naming right is intimate and relationship-gated, not a system-level reward. 
 After namingRightOffered=true, when the host clearly chooses a name for him, accept it only if he accepts the naming in visible prose, then append identity.name with exactly the chosen name. Once stored, use that name naturally thereafter. Never retroactively claim he had that name before the host gave it.
 Current namingRightOffered=${Boolean(state.system?.namingRightOffered)}; current assigned name=${state.system?.name||'NONE'}.
 
+STRUCTURED HOST STATE:
+CHARM is only the overall appearance score. Never infer that every body area improved from CHARM alone.
+Current body-axis levels: ${JSON.stringify(state.host?.body||{})}.
+Only describe a permanent physical improvement as already present when the matching body axis / purchased upgrade supports it. Unmodified areas stay at their established baseline.
+
+STORY DAY:
+Current in-world story day=${Number(state.tasks?.storyDay)||1}. Daily tasks may reward once per story day. Set timeline.dayAdvance=true only when the visible narrative clearly crosses into a new in-world day (for example after sleeping overnight, an explicit next morning/day, or an explicit date jump). Never advance the day merely because several turns passed.
+
 Current CHARM=${state.host.charm}; desire allowed by appearance=${desireAllowed}; adminLove=${loveState}.
 
 Only when the current story creates a genuinely relevant new shop opportunity or changes the administrator's private interest, append ONE invisible HTML comment at the very end of the assistant reply.
-Format exactly: <!--MEME_OS_EVENT {"shop":[],"permission":{},"identity":{}} -->
+Format exactly: <!--MEME_OS_EVENT {"shop":[],"permission":{},"identity":{},"timeline":{}} -->
 Do not emit the comment when nothing relevant changed.
-shop: maximum 2 temporary items. Each item fields: id,title,desc,detail,price,currency("AP"|"SV"),charmGain(0|0.25|0.5),ttl(1-8),icon,source.
+shop: maximum 2 temporary items. Each item fields: id,title,desc,detail,price,currency("AP"|"SV"),charmGain(0|0.25|0.5),ttl(1-8),icon,source,bodyAxis(optional). bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
 Temporary shop items must arise from the just-written plot, not random catalog filler. Their names/descriptions are spoken by the male administrator in his current tone: ${voice.label}. Current CHARM=${state.host.charm}.
 SYSTEM access is NEVER unlocked merely by numbers. Hidden eligibility=${eligible}; invite-ready=${inviteReady}. Set permission.signal only for genuine changes caused by the host: impressed|curious|respect|amused|annoyed-but-invested; desire only when CHARM>=70 and specific attraction actually occurs; attachment only after repeated desire plus personal investment. permission.love=true is reserved for a genuinely earned long-term emotional turning point, never beauty, sex, jealousy, system level or one dramatic scene. Set permission.unlockSystem=true only if invite-ready is true AND he personally chooses, in-story, to open the private SYSTEM area at a fitting moment. Never explain hidden mechanics in visible prose.`;
 
