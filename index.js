@@ -750,6 +750,20 @@ function runtimeMessageAlreadyProcessed(state,messageId,messageKey){
   return list.includes(messageKey) || (Number.isInteger(messageId) && list.includes(messageId));
 }
 
+function migrateLegacyRuntimeMessageKey(state,messageId,messageKey){
+  if(!Number.isInteger(messageId) || !messageKey) return false;
+  state.runtime=state.runtime||{processedAssistantMessages:[]};
+  const list=Array.isArray(state.runtime.processedAssistantMessages)
+    ? state.runtime.processedAssistantMessages
+    : [];
+  if(!list.includes(messageId) || list.includes(messageKey)) return false;
+  state.runtime.processedAssistantMessages=[
+    ...list.filter(id=>id!==messageId),
+    messageKey,
+  ].slice(-4000);
+  return true;
+}
+
 function markRuntimeMessageProcessed(state,messageKey){
   if(!messageKey) return;
   state.runtime=state.runtime||{processedAssistantMessages:[]};
@@ -773,6 +787,9 @@ async function handleRuntimeEvent(messageId){
   const state=runtimeState();
   const messageKey=assistantTurnKey(context,messageId,message);
   if(runtimeMessageAlreadyProcessed(state,messageId,messageKey)){
+    if(migrateLegacyRuntimeMessageKey(state,messageId,messageKey)){
+      await saveState(state);
+    }
     console.info(`[MÉMÉ OS] runtime event skipped: assistant turn ${messageKey} already processed`);
     return;
   }
