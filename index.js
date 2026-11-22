@@ -1028,6 +1028,7 @@ Judge completion from the visible user narration and immediately relevant story 
 Do NOT emit AP/SV values. The extension owns the reward table and will add the correct resources automatically in the same assistant-response cycle.
 Do not verify intentions, promises, partial attempts, vague claims, or a task that is not currently active. If completion is unclear, leave it active.
 A completed task should disappear/cross out as soon as this reply is processed; there is no separate claim step.
+For sample, oral and drain: after their first-ever completion they become repeatable collection tasks, at most once per in-world story day. The extension automatically switches later payouts to SV-only repeat rewards. Never invent extra AP for repeated completions.
 
 STORY DAY:
 Current in-world story day=${Number(state.tasks?.storyDay)||1}. Daily tasks may reward once per story day. Set timeline.dayAdvance=true only when the visible narrative clearly crosses into a new in-world day (for example after sleeping overnight, an explicit next morning/day, or an explicit date jump). Never advance the day merely because several turns passed.
@@ -1587,26 +1588,26 @@ function systemEvolutionReadiness(state=runtimeState(),targetLevel=(Number(state
   const target=Math.max(1,Math.min(4,Number(targetLevel)||current));
   if(target!==current+1) return {ok:false,reason:'只能逐级进化',target};
   const day=Math.max(1,Number(state.tasks?.storyDay)||1);
-  const tasks=Math.max(0,Number(state.permission?.milestones?.completedTasks)||0);
+  const settlements=Math.max(0,Number(state.permission?.milestones?.taskSettlements)||0);
   const upgrades=totalUpgradeLevels(state);
 
   if(target===2){
     return {
-      ok:day>=2 && tasks>=4 && upgrades>=4,
+      ok:day>=2 && settlements>=4 && upgrades>=4,
       reason:'需要更稳定的周目运行与基础改造进度',
       target,
     };
   }
   if(target===3){
     return {
-      ok:day>=5 && tasks>=10 && upgrades>=16,
+      ok:day>=5 && settlements>=12 && upgrades>=16,
       reason:'需要中期任务与改造进度支撑实体化',
       target,
     };
   }
   if(target===4){
     return {
-      ok:day>=9 && tasks>=18 && upgrades>=34,
+      ok:day>=9 && settlements>=28 && upgrades>=34,
       reason:'需要长线周目进度支撑稳定具现',
       target,
     };
@@ -1804,25 +1805,37 @@ function taskItem(task) {
   const state=runtimeState();
   const unlock=taskUnlock(task,state);
   const storyDay=Math.max(1,Number(state.tasks?.storyDay)||1);
+  const repeatable=task.repeatable==='daily';
+  const dailyLike=task.category==='daily' || repeatable;
   const activeRecord=state.tasks?.active?.[task.id];
-  const active=Boolean(activeRecord) && (task.category!=='daily' || Number(activeRecord.storyDay||storyDay)===storyDay);
-  const completed=task.category==='daily'
+  const active=Boolean(activeRecord) && (!dailyLike || Number(activeRecord.storyDay||storyDay)===storyDay);
+  const completed=dailyLike
     ? Number(state.tasks?.dailyCompleted?.[task.id]?.day||0)===storyDay
     : Boolean(state.tasks?.completed?.[task.id]);
+  const hasHistory=Boolean(state.tasks?.everCompleted?.[task.id]);
   const pending=pendingFor('taskAccept',task.id,state);
   let button='接取';
   if(!unlock.ok) button='没资格';
-  else if(completed) button=task.category==='daily'?'今天已完成':'已完成';
+  else if(completed) button='今天已完成';
   else if(pending) button='待发送';
   else if(active) button='待验收';
+  else if(repeatable && hasHistory) button='再做一次';
+
+  const statusText=completed
+    ? (dailyLike?'今天已完成':'已完成')
+    : active
+      ? '等待剧情验收'
+      : repeatable && hasHistory
+        ? '今日可重复'
+        : unlock.ok?task.state:unlock.reason;
 
   return `
     <article class="meme-task-card ${!unlock.ok ? 'is-locked' : ''} ${completed?'is-done':''}" data-task-id="${task.id}">
-      <div class="meme-task-top"><span>${task.type}</span><em>${completed?'已完成':active?'等待剧情验收':unlock.ok?task.state:unlock.reason}</em></div>
+      <div class="meme-task-top"><span>${task.type}</span><em>${statusText}</em></div>
       <div data-task-detail><h4>${taskVoiceName(task,state)}</h4><p>${taskVoiceDesc(task,state)}</p></div>
       <div class="meme-task-detail">${task.detail}</div>
       <div class="meme-task-foot">
-        <b>${task.reward}</b>
+        <b>${taskRewardLabel(task,state)}</b>
         <button type="button" data-task-action="${task.id}" ${(!unlock.ok||completed||pending||active)?'disabled':''}>${button}</button>
       </div>
     </article>
@@ -1847,7 +1860,7 @@ function taskMarkup() {
     <section class="meme-page-card meme-task-rules">
       <div class="meme-card-title"><small>MY RULES</small><h3>听清楚再接</h3></div>
       ${labelValue('日常',`DAY ${String(Math.max(1,Number(state.tasks?.storyDay)||1)).padStart(3,'0')} · 每项每天可结算一次，剧情跨天后刷新。`)}
-      ${labelValue('欲望','主要产出 SV。魅力不够就别做梦。')}
+      ${labelValue('欲望','首次完成给里程碑奖励；部分采集任务之后每天还能再做一次，只发 SV，不重复发大额 AP。')}
       ${labelValue('特殊','我什么时候想发，什么时候才有。')}
       ${labelValue('结算','接取后把完成过程写在同一条或后续剧情里；模型验收通过的那条回复中，扩展直接发奖励并划掉任务。')}
     </section>
@@ -2286,10 +2299,12 @@ async function handleTaskAction(id){
   }
 
   const storyDay=Math.max(1,Number(state.tasks?.storyDay)||1);
-  const completedToday=task.category==='daily' && Number(state.tasks?.dailyCompleted?.[id]?.day||0)===storyDay;
-  const completedPermanent=task.category!=='daily' && Boolean(state.tasks?.completed?.[id]);
+  const repeatable=task.repeatable==='daily';
+  const dailyLike=task.category==='daily' || repeatable;
+  const completedToday=dailyLike && Number(state.tasks?.dailyCompleted?.[id]?.day||0)===storyDay;
+  const completedPermanent=!dailyLike && task.category!=='daily' && Boolean(state.tasks?.completed?.[id]);
   if(completedToday || completedPermanent){
-    globalThis.toastr?.info?.(task.category==='daily'?'今天已经做完了。':'这份任务已经结算过了。');
+    globalThis.toastr?.info?.(completedToday?'今天已经结算过了。':'这份任务已经结算过了。');
     return;
   }
   if(state.tasks?.active?.[id]){
@@ -2302,7 +2317,7 @@ async function handleTaskAction(id){
   }
 
   const voiced=taskVoiceName(task,state);
-  const dayTag=task.category==='daily'?`DAY ${String(storyDay).padStart(3,'0')}｜`:'';
+  const dayTag=dailyLike?`DAY ${String(storyDay).padStart(3,'0')}｜`:'';
   const text=`【MÉMÉ OS｜任务接取】${dayTag}TASK_ID:${task.id}｜「${voiced}」\n任务要求：${taskVoiceDesc(task,state)}\n完成过程：`;
 
   await queueAction(createPendingAction({
@@ -2494,6 +2509,7 @@ async function ensureCleanStart(){
     },
     milestones:{
       completedTasks:0,
+      taskSettlements:0,
       purchasedUpgrades:0,
       returningMen:0,
     },
