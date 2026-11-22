@@ -197,3 +197,6 @@
         border-radius: 28px 28px 0 0;
     }
 }
+
+/* Respect character-specific visibility regardless of launcher styling. */
+#meme-os-launcher[hidden] { display: none !important; }
