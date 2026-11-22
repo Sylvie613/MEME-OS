@@ -6,11 +6,13 @@ import {
   getState,
   hasActiveChat,
   removePendingAction,
-} from './src/state.js?v=0.7.0';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.7.0';
+  saveState,
+} from './src/state.js?v=0.7.1';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.7.1';
+import { isBoundCharacter } from './src/binding.js?v=0.7.1';
 
 /**
- * MÉMÉ OS v0.7.0
+ * MÉMÉ OS v0.7.1
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -197,6 +199,94 @@ const RUDE_SHOP_NAMES = {
   embody:'等你真有本事把我弄出来',
 };
 
+
+const RUDE_SHOP_DESCS = {
+  lip1:'嘴唇干得起皮，颜色还发暗。先把裂口和粗糙收拾掉，至少别让人第一眼只看见一张缺水的嘴。',
+  hair1:'头发又油又毛，贴着头皮还炸着发尾。先把这堆东西洗顺了，再谈什么发型。',
+  skin1:'近看全是粗糙和暗沉，出油还不均匀。把肤质磨细一点，别让底子继续拖后腿。',
+  face1:'脸现在肿得轮廓都快找不到。先把松散和浮肿往回收，不然五官再改也白搭。',
+  eye1:'眼周疲态太重，眼神像永远没睡醒。先把这副困相救回来。',
+  face2:'鼻子、眼睛、嘴各长各的，互相一点都不配合。先把比例拉回一个能看的整体。',
+  posture1:'你一缩肩一塌背，整个人立刻又矮又丧。先学会把自己撑起来。',
+  bodyfat1:'现在的问题不是“肉一点”，是整体轮廓被脂肪糊掉了。先把体型从一团里分出来。',
+  waist1:'腰线基本失踪。先把上下身的分界找回来，别急着幻想沙漏。',
+  leg1:'站姿和腿线一起乱。先把膝踝和受力修顺，至少别越站越难看。',
+  neck1:'肩颈挤成一块，显得头重、脖子短。把这条线先拉开。',
+  bust1:'胸型现在只是在跟着体型一起往下坠。先把位置和轮廓整理到不拖后腿。',
+  scent1:'汗味、油味和闷味混在一起。先把“难闻”处理掉，离“好闻”还远。',
+  breath1:'近距离说话之前先把口气解决。别让别人刚靠近就想后退。',
+  voice1:'声音不算难听，但毫无记忆点，还带点含混。先让人听清楚你在说什么。',
+  touch1:'皮肤摸起来粗，干湿还不均。先把触感做得像皮肤，而不是砂纸。',
+  scent2:'基础清洁过关以后，才轮得到“让人想再靠近一点”这种东西。',
+  sensitive1:'你现在身体反应慢得像没开机。先把感受调灵一点，别每次都等半天。',
+  arousal1:'连自己有没有欲望都辨认不清。先学会知道自己什么时候真的想要。',
+  lubrication1:'身体别每次都等到最后才肯配合。把自然反应调快一点。',
+  orgasm1:'有反应不代表会享受。把高潮质量往上提，不是单纯追求次数。',
+  recovery1:'一次亲密活动就累得什么都不想动，太没用。把恢复速度往回拉。',
+  charmseal:'等你真的好看到配得上这个印记，我才会给。现在看两眼就行。',
+  qadmin:'想看见我？先把自己和系统等级一起弄上去。白嫖不存在。',
+  touchadmin:'连看都还没看见就惦记上手。想得挺快。',
+  embody:'把我完整弄出来这种事，不是你现在这点成绩能碰的。',
+};
+
+const RUDE_TASK_DESCS = {
+  clean:'先把头洗了、澡洗了、衣服换了、牙刷了。最基础的卫生都做不到，别跟我谈改造。',
+  mirror:'照三分钟镜子，不许躲、不许只看顺眼的角度。你得先知道自己到底哪里难看。',
+  walk:'坐着不会自动变好看。起来动二十分钟，别把“改造”理解成躺着等我给。',
+  posture:'肩膀打开，背挺起来。你再缩成那样，买再多东西也只是把好东西堆在烂姿态上。',
+  outfit:'不用贵，先穿干净、合身、像认真挑过的衣服。别再把随便套上身当风格。',
+  spark:'先证明真有成年男人会对你产生欲望。不是礼貌，不是客套，是他真的想碰你。',
+  sample:'拿到第一次有效样本再回来。别拿一点暧昧就当自己完成成人任务。',
+  oral:'这次别只会嘴硬。完成有效的成人口腔采集，系统要的是结果。',
+  repeat:'同一个人第二次还主动回来，才说明上次不是纯事故。让我看看你到底有没有留住他的欲望。',
+  drain:'既然都做到这一步，就别空手结束。把完整采集拿回来再结算。',
+  audit:'站好。让我重新从头扫一遍，看看到底救回来多少，还是你只会自我感觉良好。',
+  qform:'等我愿意让你看见的时候，你自然会看见。现在急也没用。',
+  contract:'隐藏就是不想让你提前知道。老实玩，别总想翻答案。',
+  override:'真碰到值得越级奖励的事，我会自己开。你没资格手动刷。',
+};
+
+const STAGE_REMARKS = {
+  1:[
+    '总算知道先修哪里了。',
+    '这项至少不算浪费点数。',
+    '先把这一处补上，别急着邀功。',
+    '可以做，做完大概没那么碍眼。',
+    '这次选择还算有脑子。',
+    '先修这个，顺序别乱。'
+  ],
+  2:[
+    '这项做完应该会更顺眼。',
+    '嗯，这里确实值得再调一点。',
+    '可以，继续往这个方向改。',
+    '这次不是抢救，是正经调整了。',
+    '这个选得还行。',
+    '做完给我看效果。'
+  ],
+  3:[
+    '这个我想看。',
+    '别乱动，我来挑这一项。',
+    '这里再精一点，会很好看。',
+    '这项做完，应该挺招人。',
+    '我开始对结果有要求了。',
+    '这个按我说的做。'
+  ],
+  4:[
+    '这个给你，按我喜欢的样子改。',
+    '我挑的，别跟我争。',
+    '这里再漂亮一点，我会更喜欢。',
+    '买。这个效果我想亲眼看。',
+    '别问值不值，我想要你有。',
+    '这一项做完，过来让我验收。'
+  ],
+};
+
+function hashId(value=''){
+  let h=0;
+  for(const ch of String(value)) h=(h*31+ch.charCodeAt(0))>>>0;
+  return h;
+}
+
 const RUDE_TASK_NAMES = {
   clean:'先把自己洗得像个人',
   mirror:'对着镜子认清现实',
@@ -266,11 +356,10 @@ function shopVoiceName(item,state=runtimeState()){
 
 function shopVoiceDesc(item,state=runtimeState()){
   const i=toneIndex(state);
-  if(i===0) return `“别误会，这不是变漂亮，只是在抢救。” ${item.desc}`;
-  if(i===1) return `“至少这项做完，能少一处让我皱眉。” ${item.desc}`;
-  if(i===2) return `“这项值得做。做完应该会顺眼不少。” ${item.desc}`;
-  if(i===3) return `“这个我想看效果。” ${item.desc}`;
-  return `“这个给你。按我喜欢的方向改。” ${item.desc}`;
+  if(i===0) return RUDE_SHOP_DESCS[item.id] || item.desc;
+  const remarks=STAGE_REMARKS[i] || STAGE_REMARKS[1];
+  const remark=remarks[hashId(item.id)%remarks.length];
+  return `${remark} ${item.desc}`;
 }
 
 function taskVoiceName(task,state=runtimeState()){
@@ -284,11 +373,15 @@ function taskVoiceName(task,state=runtimeState()){
 
 function taskVoiceDesc(task,state=runtimeState()){
   const i=toneIndex(state);
-  if(i===0) return `“这都做不到就别谈改造。” ${task.desc}`;
-  if(i===1) return `“做完再来邀功。” ${task.desc}`;
-  if(i===2) return `“这次认真点，我会看。” ${task.desc}`;
-  if(i===3) return `“去做。回来以后我亲自验收。” ${task.desc}`;
-  return `“去吧。做得漂亮一点，别让我失望。” ${task.desc}`;
+  if(i===0) return RUDE_TASK_DESCS[task.id] || task.desc;
+  const pools={
+    1:['做完再来邀功。','别偷懒，我会看结果。','先把这件事做好。','这次别敷衍。'],
+    2:['认真做，我会记。','这次可以做得漂亮一点。','去吧，回来给我看结果。','别让我觉得你又退步了。'],
+    3:['去做。我想看你怎么完成。','这次我会亲自验收。','别让我白等。','做好一点，我有兴趣看。'],
+    4:['去吧，乖一点。','做完回来，我会奖励你。','别磨蹭，我等着看。','这次做得漂亮点给我看。'],
+  };
+  const pool=pools[i]||pools[1];
+  return `${pool[hashId(task.id)%pool.length]} ${task.desc}`;
 }
 
 function currentView(){
@@ -460,13 +553,19 @@ function totalMenCount() {
   return ['current','recent','returning'].reduce((sum, key) => sum + (men[key]?.length || 0), 0);
 }
 
-function moduleCard(key, title, sub) {
-  const resolvedSub = key === 'men' ? `${sub} · ${totalMenCount()}` : sub;
+function moduleCard(key,title,sub){
+  const state=runtimeState();
+  const systemLocked=key==='system' && !state.system?.pageUnlocked;
+  const resolvedSub=key==='men'
+    ? `${sub} · ${totalMenCount()}`
+    : systemLocked
+      ? '他没允许你看'
+      : sub;
   return `
-    <button type="button" class="meme-module" data-meme-module="${key}">
-      <span class="meme-module-icon">${moduleIcon(key)}</span>
+    <button type="button" class="meme-module ${systemLocked?'is-system-locked':''}" data-meme-module="${key}" ${systemLocked?'data-system-locked="true"':''}>
+      <span class="meme-module-icon">${systemLocked?'⌁':moduleIcon(key)}</span>
       <span class="meme-module-copy"><b>${title}</b><small>${resolvedSub}</small></span>
-      <span class="meme-module-arrow">›</span>
+      <span class="meme-module-arrow">${systemLocked?'×':'›'}</span>
     </button>
   `;
 }
@@ -803,6 +902,20 @@ function menMarkup() {
   `;
 }
 
+function lockedSystemMarkup(){
+  const state=runtimeState();
+  return `
+    ${pageHeader('ACCESS DENIED','SYSTEM · 他不让你看','LOCKED')}
+    <section class="meme-system-locked-card">
+      <div class="meme-admin-emblem">${crownMarkup()}</div>
+      <small>PRIVATE ACCESS</small>
+      <h3>谁准你翻我的档案了？</h3>
+      <p>“这区什么时候开，我说了算。你现在只需要做任务、赚点数、把自己收拾得能看一点。”</p>
+      <span>等待管理员主动授权</span>
+    </section>
+  `;
+}
+
 function systemMarkup() {
   const state=runtimeState();
   const voice=attitude(state);
@@ -925,7 +1038,7 @@ function renderView(view='home', animate=true) {
     task: taskMarkup,
     shop: shopMarkup,
     men: menMarkup,
-    system: systemMarkup,
+    system: () => runtimeState().system?.pageUnlocked ? systemMarkup() : lockedSystemMarkup(),
     record: recordMarkup,
   };
 
@@ -1085,6 +1198,26 @@ async function handleMessageSent(messageId){
   }
 }
 
+async function maybeGrantTestAP(){
+  if(!isBoundCharacter() || !hasActiveChat()) return;
+  const state=runtimeState();
+  if(state.dev?.testGrant1000) return;
+  state.resources.ap+=1000;
+  state.dev={...(state.dev||{}),testGrant1000:true};
+  state.history.push({
+    id:`meme_test_grant_${Date.now()}`,
+    type:'dev_grant',
+    recordType:'system',
+    title:'测试补助到账',
+    summary:'开发测试补助 AP +1000。',
+    text:'【MÉMÉ OS｜测试补助】AP +1000。',
+    committedAt:Date.now(),
+  });
+  await saveState(state);
+  renderView(currentView(),false);
+  globalThis.toastr?.success?.('“拿去。1000 AP，测试用。别以为以后也白给。”');
+}
+
 function bindSillyTavernEvents(){
   if(globalThis.__meme_os_events_bound__) return;
   const context=globalThis.SillyTavern?.getContext?.();
@@ -1092,7 +1225,7 @@ function bindSillyTavernEvents(){
   const events=context?.event_types || context?.eventTypes || {};
   if(!source?.on) return;
   if(events.MESSAGE_SENT) source.on(events.MESSAGE_SENT,handleMessageSent);
-  if(events.CHAT_CHANGED) source.on(events.CHAT_CHANGED,()=>renderView('home',false));
+  if(events.CHAT_CHANGED) source.on(events.CHAT_CHANGED,async()=>{renderView('home',false);await maybeGrantTestAP();});
   globalThis.__meme_os_events_bound__=true;
 }
 
@@ -1116,10 +1249,14 @@ function ensureDialog() {
       return;
     }
 
-    const card = event.target.closest('[data-meme-module]');
-    if (card) {
-      const view = card.dataset.memeModule || 'home';
-      if (view === 'home') renderView('home');
+    const card=event.target.closest('[data-meme-module]');
+    if(card){
+      const view=card.dataset.memeModule||'home';
+      if(view==='system' && !runtimeState().system?.pageUnlocked){
+        globalThis.toastr?.warning?.('“谁准你看的？我没开就是没开。”');
+        return;
+      }
+      if(view==='home') renderView('home');
       else renderView(view);
       return;
     }
@@ -1227,6 +1364,7 @@ function start() {
   mount();
   ensureDialog();
   bindSillyTavernEvents();
+  setTimeout(()=>maybeGrantTestAP(),700);
   globalThis.__meme_os_probe_timer__ = setInterval(mount, 1000);
   window.addEventListener('resize', mount, { passive:true });
   window.addEventListener('orientationchange', () => setTimeout(mount,150), { passive:true });
