@@ -19,13 +19,13 @@
       "adult"
     ],
     "creator": "Sylvie & River",
-    "character_version": "0.1.0-alpha",
+    "character_version": "0.1.1-alpha",
     "extensions": {
       "meme_os": {
         "enabled": true,
         "profile": "beauty_reconstruction_v1",
         "schema_version": 1,
-        "minimum_extension_version": "0.1.0"
+        "minimum_extension_version": "0.1.1"
       }
     },
     "character_book": {
