@@ -1,5 +1,5 @@
 /**
- * MÉMÉ OS v0.2.0
+ * MÉMÉ OS v0.2.1
  * Visual-only succubus shell. Keeps the proven timing-safe launcher mount.
  */
 const MEME_ID = 'meme-os-heart-launcher';
@@ -187,6 +187,44 @@ function ensureOverlay() {
   overlay.setAttribute('aria-hidden', 'true');
   overlay.innerHTML = shellMarkup();
 
+  // Hard-pin the modal to the real viewport. This avoids SillyTavern theme/layout
+  // transforms and iOS Safari stacking contexts swallowing the visual window.
+  overlay.style.setProperty('position', 'fixed', 'important');
+  overlay.style.setProperty('inset', '0', 'important');
+  overlay.style.setProperty('width', '100vw', 'important');
+  overlay.style.setProperty('height', '100dvh', 'important');
+  overlay.style.setProperty('z-index', '2147483000', 'important');
+  overlay.style.setProperty('display', 'block', 'important');
+  overlay.style.setProperty('opacity', '0', 'important');
+  overlay.style.setProperty('pointer-events', 'none', 'important');
+  overlay.style.setProperty('transform', 'none', 'important');
+  overlay.style.setProperty('overflow', 'visible', 'important');
+
+  const dim = overlay.querySelector('.meme-os-dim');
+  if (dim) {
+    dim.style.setProperty('position', 'fixed', 'important');
+    dim.style.setProperty('inset', '0', 'important');
+    dim.style.setProperty('width', '100vw', 'important');
+    dim.style.setProperty('height', '100dvh', 'important');
+    dim.style.setProperty('z-index', '2147483001', 'important');
+  }
+
+  const win = overlay.querySelector('.meme-os-window');
+  if (win) {
+    win.style.setProperty('position', 'fixed', 'important');
+    win.style.setProperty('left', '50%', 'important');
+    win.style.setProperty('right', 'auto', 'important');
+    win.style.setProperty('top', 'auto', 'important');
+    win.style.setProperty('bottom', 'max(18px, env(safe-area-inset-bottom))', 'important');
+    win.style.setProperty('width', 'min(390px, calc(100vw - 20px))', 'important');
+    win.style.setProperty('max-height', '78dvh', 'important');
+    win.style.setProperty('z-index', '2147483002', 'important');
+    win.style.setProperty('display', 'flex', 'important');
+    win.style.setProperty('visibility', 'visible', 'important');
+    win.style.setProperty('opacity', '1', 'important');
+    win.style.setProperty('transform', 'translateX(-50%) translateY(14px) scale(.985)', 'important');
+  }
+
   overlay.addEventListener('click', (event) => {
     if (event.target.closest('[data-meme-close]')) {
       closeMemeOS();
@@ -201,22 +239,34 @@ function ensureOverlay() {
     }
   });
 
-  document.body.appendChild(overlay);
+  document.documentElement.appendChild(overlay);
   return overlay;
 }
 
 function openMemeOS() {
   const overlay = ensureOverlay();
+  const win = overlay.querySelector('.meme-os-window');
   overlay.setAttribute('aria-hidden', 'false');
   overlay.classList.add('is-open');
+  overlay.style.setProperty('opacity', '1', 'important');
+  overlay.style.setProperty('pointer-events', 'auto', 'important');
+  if (win) {
+    win.style.setProperty('transform', 'translateX(-50%) translateY(0) scale(1)', 'important');
+  }
   document.documentElement.classList.add('meme-os-open');
 }
 
 function closeMemeOS() {
   const overlay = document.getElementById(OVERLAY_ID);
   if (!overlay) return;
+  const win = overlay.querySelector('.meme-os-window');
   overlay.setAttribute('aria-hidden', 'true');
   overlay.classList.remove('is-open');
+  overlay.style.setProperty('opacity', '0', 'important');
+  overlay.style.setProperty('pointer-events', 'none', 'important');
+  if (win) {
+    win.style.setProperty('transform', 'translateX(-50%) translateY(14px) scale(.985)', 'important');
+  }
   document.documentElement.classList.remove('meme-os-open');
 }
 
