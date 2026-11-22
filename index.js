@@ -886,6 +886,63 @@ function markRuntimeMessageProcessed(state,messageKey){
 
 
 
+async function reconcileRecentVisibleSettlements(){
+  if(!isBoundCharacter() || !hasActiveChat()) return;
+  const context=globalThis.SillyTavern?.getContext?.()||{};
+  const chat=Array.isArray(context.chat)?context.chat:[];
+  const state=runtimeState();
+  let changed=false;
+  const recent=chat.slice(Math.max(0,chat.length-16));
+  const baseIndex=Math.max(0,chat.length-16);
+
+  recent.forEach((message,offset)=>{
+    if(!message || message.is_user) return;
+    const raw=String(message.mes||'');
+    const re=/【(?:DAILY|STORY)\s*TASK\s*ID:([a-zA-Z0-9_-]+)[^】]*?(?:「([^」]+)」)?[^】]*?已结算】[\s\S]{0,500}?【奖励\s*[:：]\s*AP\s*\+(\d+)[^】]*】/g;
+    for(const match of raw.matchAll(re)){
+      const originalId=String(match[1]||'').trim();
+      if(!originalId || state.tasks?.everCompleted?.[originalId]) continue;
+      const shown=Math.max(0,Number(match[3])||0);
+      const choices=[70,100,150];
+      const ap=choices.reduce((best,n)=>Math.abs(n-shown)<Math.abs(best-shown)?n:best,100);
+      const difficulty=ap===70?'light':ap===150?'hard':'normal';
+      const title=String(match[2]||originalId).trim().slice(0,48);
+      const historyId=`meme_legacy_visible_${baseIndex+offset}_${originalId}`;
+      if((state.history||[]).some(entry=>entry.id===historyId)) continue;
+
+      state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
+      state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
+      const task={
+        id:originalId,type:'DAILY',category:'daily',dynamicDailyTask:true,difficulty,
+        title,desc:'由旧版剧情文本识别并同步到MÉMÉ OS。',detail:'兼容旧回复中的显式剧情任务结算。',
+        reward:`AP +${ap}`,state:'已完成',locked:false,
+        createdDay:Number(state.tasks.storyDay)||1,createdTurn:Number(state.shop?.plotTurn)||0,source:'旧版剧情兼容',
+      };
+      state.tasks.generatedDaily=[task,...state.tasks.generatedDaily.filter(old=>old.id!==originalId)].slice(0,8);
+      state.resources.ap=Math.max(0,Number(state.resources.ap||0)+ap);
+      state.tasks.dailyCompleted[originalId]={
+        id:originalId,title,category:'daily',day:Number(state.tasks.storyDay)||1,count:1,
+        evidence:'旧版回复明确标记该剧情任务已结算。',
+        completedAt:Date.now(),completedTurn:Number(state.shop?.plotTurn)||0,
+      };
+      state.tasks.everCompleted[originalId]={id:originalId,title,category:'daily',firstCompletedAt:Date.now()};
+      state.permission.milestones.taskSettlements=Math.max(0,Number(state.permission.milestones.taskSettlements)||0)+1;
+      state.permission.milestones.completedTasks=Math.max(0,Number(state.permission.milestones.completedTasks)||0)+1;
+      state.history.push({
+        id:historyId,type:'legacy_story_task_sync',recordType:'task',title:`同步旧剧情任务：${title}`,
+        summary:`识别旧版显式结算并同步；AP +${ap}。`,text:`LEGACY VISIBLE SETTLEMENT: ${originalId}`,committedAt:Date.now(),
+      });
+      changed=true;
+    }
+  });
+
+  if(changed){
+    if(state.history.length>240) state.history=state.history.slice(-240);
+    await saveState(state);
+    renderView(currentView(),false);
+  }
+}
+
 async function handleRuntimeEvent(messageId){
   if(!isBoundCharacter() || !hasActiveChat()) return;
   const context=globalThis.SillyTavern?.getContext?.()||{};
@@ -2149,12 +2206,17 @@ function taskItem(task) {
   const unlock=taskUnlock(task,state);
   const storyDay=Math.max(1,Number(state.tasks?.storyDay)||1);
   const repeatable=task.repeatable==='daily';
-  const dailyLike=task.category==='daily' || repeatable;
+  const isRollingDaily=task.category==='daily';
+  const dailyLike=isRollingDaily || repeatable;
   const activeRecord=state.tasks?.active?.[task.id];
   const active=Boolean(activeRecord) && (!dailyLike || Number(activeRecord.storyDay||storyDay)===storyDay);
-  const completed=dailyLike
-    ? Number(state.tasks?.dailyCompleted?.[task.id]?.day||0)===storyDay
-    : Boolean(state.tasks?.completed?.[task.id]);
+  const dailyRecord=state.tasks?.dailyCompleted?.[task.id];
+  const justCompleted=isRollingDaily && Boolean(dailyRecord) && Number(dailyRecord.completedTurn??-1)===Number(state.shop?.plotTurn||0);
+  const completed=isRollingDaily
+    ? justCompleted
+    : repeatable
+      ? Number(dailyRecord?.day||0)===storyDay
+      : Boolean(state.tasks?.completed?.[task.id]);
   const hasHistory=Boolean(state.tasks?.everCompleted?.[task.id]);
   const pending=pendingFor('taskAccept',task.id,state);
   let button='接取';
@@ -2186,9 +2248,28 @@ function taskItem(task) {
 }
 
 function renderTaskList(category='daily') {
-  const base=(TASK_DATA[category] || TASK_DATA.daily).map(task=>({...task,category}));
+  const state=runtimeState();
+  if(category==='daily'){
+    const turn=Number(state.shop?.plotTurn)||0;
+    const shouldShowDaily=task=>{
+      const done=state.tasks?.dailyCompleted?.[task.id];
+      if(!state.tasks?.everCompleted?.[task.id]) return true;
+      return Boolean(done) && Number(done.completedTurn??-1)===turn;
+    };
+    const base=TASK_DATA.daily
+      .map(task=>({...task,category:'daily'}))
+      .filter(shouldShowDaily);
+    const generatedDaily=(state.tasks?.generatedDaily||[])
+      .map(task=>({...task,category:'daily',dynamicDailyTask:true}))
+      .filter(shouldShowDaily);
+    const all=[...base,...generatedDaily];
+    return all.length
+      ? all.map(task=>taskItem(task)).join('')
+      : '<div class="meme-men-empty"><small>DAILY BOARD</small><b>这轮暂时没新活</b><p>继续走剧情。下一次有值得管的事，我会往这里塞。</p></div>';
+  }
+  const base=(TASK_DATA[category] || []).map(task=>({...task,category}));
   const generated=category==='desire'
-    ? (runtimeState().tasks?.generated||[]).map(task=>({...task,category:'desire',dynamicTask:true}))
+    ? (state.tasks?.generated||[]).map(task=>({...task,category:'desire',dynamicTask:true}))
     : [];
   return [...base,...generated].map(task=>taskItem(task)).join('');
 }
@@ -2206,7 +2287,7 @@ function taskMarkup() {
     <section class="meme-task-list" data-task-list>${renderTaskList('daily')}</section>
     <section class="meme-page-card meme-task-rules">
       <div class="meme-card-title"><small>MY RULES</small><h3>听清楚再接</h3></div>
-      ${labelValue('日常',`DAY ${String(Math.max(1,Number(state.tasks?.storyDay)||1)).padStart(3,'0')} · 每项每天可结算一次，剧情跨天后刷新。`)}
+      ${labelValue('日常','滚动任务板 · 做完当轮划掉，下一轮退场；空位按当前剧情补新任务。')}
       ${labelValue('欲望','五个基础里程碑之外，系统会随剧情继续生成新的成人任务；每个不同任务只计一次进化进度，重复采集只负责赚 SV。')}
       ${labelValue('不同任务',`${distinctEroticTaskCount(state)} 个已完成`,'重复做同一任务不重复计数')}
       ${labelValue('特殊','我什么时候想发，什么时候才有。')}
@@ -2911,6 +2992,7 @@ function mount() {
 function start() {
   mount();
   ensureDialog();
+  reconcileRecentVisibleSettlements().catch(error=>console.warn('[MÉMÉ OS] legacy settlement sync failed',error));
   bindSillyTavernEvents();
   installRuntimePrompt();
   globalThis.__meme_os_probe_timer__ = setInterval(mount, 1000);
