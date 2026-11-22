@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -25,11 +25,16 @@ const DEFAULT_STATE = Object.freeze({
         systemEligible: false,
         systemInviteReady: false,
         systemUnlockedByAdmin: false,
+        adminInterestSignals: 0,
         milestones: {
             completedTasks: 0,
             purchasedUpgrades: 0,
             returningMen: 0,
         },
+    },
+    shop: {
+        dynamic: [],
+        plotTurn: 0,
     },
     upgrades: {},
     tasks: {
@@ -81,6 +86,11 @@ function mergeState(raw) {
                 ...base.permission.milestones,
                 ...(raw.permission?.milestones ?? {}),
             },
+        },
+        shop: {
+            ...base.shop,
+            ...(raw.shop ?? {}),
+            dynamic: Array.isArray(raw.shop?.dynamic) ? raw.shop.dynamic : [],
         },
         upgrades: { ...base.upgrades, ...(raw.upgrades ?? {}) },
         tasks: {
@@ -229,6 +239,7 @@ function applyEffect(state, effect) {
 
     if (effect.purchase && typeof effect.purchase === 'object') {
         const item = effect.purchase;
+        const wasOwned = Boolean(state.upgrades[item.id]);
         const current = Number(state.upgrades[item.id]?.level) || 0;
         state.upgrades[item.id] = {
             ...(state.upgrades[item.id] || {}),
@@ -238,6 +249,7 @@ function applyEffect(state, effect) {
             level: Math.max(current + 1, Number(item.level) || current + 1),
             purchasedAt: Date.now(),
         };
+        if (!wasOwned) state.permission.milestones.purchasedUpgrades += 1;
     }
 
     if (effect.taskAccept && typeof effect.taskAccept === 'object') {
@@ -252,6 +264,7 @@ function applyEffect(state, effect) {
 
     if (effect.taskComplete && typeof effect.taskComplete === 'object') {
         const task = effect.taskComplete;
+        const wasCompleted = Boolean(state.tasks.completed[task.id]);
         delete state.tasks.active[task.id];
         state.tasks.completed[task.id] = {
             id: task.id,
@@ -259,6 +272,7 @@ function applyEffect(state, effect) {
             category: task.category,
             completedAt: Date.now(),
         };
+        if (!wasCompleted) state.permission.milestones.completedTasks += 1;
     }
 
     if (effect.men && typeof effect.men === 'object') {
@@ -271,6 +285,17 @@ function applyEffect(state, effect) {
     state.host.stage = tone.stage;
     state.system.attitudeStage = tone.attitudeStage;
     state.host.progress = Math.min(100, Math.max(Number(state.host.progress) || 0, state.host.charm * 1.45));
+
+    const milestones = state.permission.milestones;
+    state.permission.systemEligible =
+        state.host.charm >= 1 &&
+        milestones.completedTasks >= 2 &&
+        milestones.purchasedUpgrades >= 1 &&
+        state.permission.adminInterestSignals >= 1;
+
+    state.permission.systemInviteReady =
+        state.permission.systemEligible &&
+        state.permission.adminInterestSignals >= 2;
 }
 
 export function createPendingAction({
