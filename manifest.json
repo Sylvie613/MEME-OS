@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS clean-start reset: AP/SV/CHARM zeroed, test traces removed, SYSTEM remains admin-controlled.",
-  "js": "index.js?v=0.7.4",
-  "css": "style.css?v=0.7.4",
+  "description": "MÉMÉ OS clean formal start: AP/SV/CHARM all begin at zero; SYSTEM remains administrator-controlled.",
+  "js": "index.js?v=0.7.5",
+  "css": "style.css?v=0.7.5",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
