@@ -7,9 +7,9 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.9.5';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.9.5';
-import { isBoundCharacter } from './src/binding.js?v=0.9.5';
+} from './src/state.js?v=0.9.6';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.9.6';
+import { isBoundCharacter } from './src/binding.js?v=0.9.6';
 
 /**
  * MÉMÉ OS v0.9.6
@@ -554,6 +554,11 @@ function recordAdminBondMoment(state,{kind,signal,reason,tag,messageId}){
   const fingerprint=`${kind}|${signal||kind}|${cleanTag}|${cleaned.toLowerCase()}`;
   const id=`bond_${messageId}_${hashId(fingerprint).toString(36)}`;
   if(state.permission.adminBond.moments.some(item=>item.id===id)) return false;
+  if(state.permission.adminBond.moments.some(item=>
+    item.kind===kind &&
+    String(item.signal||item.kind)===String(signal||kind) &&
+    String(item.reason||'').toLowerCase()===cleaned.toLowerCase()
+  )) return false;
   const now=Date.now();
   const moment={
     id,
@@ -565,7 +570,7 @@ function recordAdminBondMoment(state,{kind,signal,reason,tag,messageId}){
     plotTurn:Number(state.shop?.plotTurn)||0,
     createdAt:now,
   };
-  state.permission.adminBond.moments=[...state.permission.adminBond.moments,moment].slice(-24);
+  state.permission.adminBond.moments=[...state.permission.adminBond.moments,moment].slice(-32);
   if(kind==='interest' && !state.permission.adminBond.firstInterestAt) state.permission.adminBond.firstInterestAt=now;
   if(kind==='desire' && !state.permission.adminBond.firstDesireAt) state.permission.adminBond.firstDesireAt=now;
   if(kind==='attachment' && !state.permission.adminBond.firstAttachmentAt) state.permission.adminBond.firstAttachmentAt=now;
@@ -879,19 +884,32 @@ contactDelta counts meaningful new contact/events only; use 0 for continued pres
 Do not decide CURRENT/RECENT/RETURNING yourself. The extension derives the bucket from presence and prior archive history. Do not create affection scores.
 
 ADMIN RELATIONSHIP MEMORY:
-Hidden remembered turning points: ${JSON.stringify((state.permission?.adminBond?.moments||[]).slice(-12).map(m=>({kind:m.kind,signal:m.signal,reason:m.reason,storyDay:m.storyDay})))}.
+Hidden remembered turning points: ${JSON.stringify((state.permission?.adminBond?.moments||[]).slice(-16).map(m=>({kind:m.kind,signal:m.signal,tag:m.tag,reason:m.reason,storyDay:m.storyDay})))}.
 These moments are private continuity memory, not a visible affection meter and not facts the administrator has necessarily confessed aloud.
-A relationship signal is valid only when the current reply contains a concrete new event that genuinely changes his personal attitude. If you emit permission.signal, permission.signalReason is REQUIRED and must describe the specific cause in one concise sentence. Generic reasons such as "she is interesting", "he likes her more", "they got closer", "she is beautiful", or repeated restatements of an older event do not count.
-interest signals (impressed|curious|respect|amused|annoyed-but-invested) record personal attention only.
-desire records a new genuine sexual-attraction turning point only and requires CHARM>=70; it does NOT automatically increase personal interest.
-attachment records a new emotional-investment turning point only after repeated established desire and real personal investment.
-permission.love=true is allowed only for a clear long-term emotional turning point where he himself has genuinely crossed into love. loveReason is REQUIRED and must name the concrete reason/decision that makes this different from desire, habit, jealousy, possessiveness or attachment.
-Do not emit a new relationship signal merely because a previous feeling continues. Continuity is expressed in prose; state events are only for actual changes.
+
+THIS ROMANCE IS DELIBERATELY SLOW-BURN. Do not hurry it because the host is attractive, sexually available, affectionate, frequently present, or because the player seems to want romance. Long stretches where his feelings remain unchanged are correct and desirable.
+
+A relationship signal is valid only when the current reply contains a concrete NEW turning point that genuinely changes his personal attitude. If you emit permission.signal, permission.signalReason is REQUIRED and must describe the specific cause in one concise sentence. Rephrasing an old reason does not create progress.
+
+Pacing gates are enforced by the extension:
+- interest: at most one new interest turning point per in-world story day.
+- desire: impossible before CHARM 70, and also requires at least 5 interest moments spread across 4 different story days. Desire is not interest and does not increase interest automatically.
+- attachment: requires at least 7 interest moments plus at least 3 desire turning points spread across 3 different days. Attachment events must be genuine personal-investment events and are spaced by a minimum 2-story-day cooldown.
+- love: intentionally very late. It requires at least 8 interest moments, 4 desire moments, 5 attachment moments, at least 17 total remembered relationship turning points, at least 10 distinct story days of relationship history, attachment progress across at least 5 different days, and at least 3 different forms of personal investment. Meeting all of that only makes love POSSIBLE; it never makes love automatic.
+
+For attachment, permission.signalTag is REQUIRED and must be one of:
+personal_priority | protective_choice | trust | vulnerability | sacrifice | habit_broken_for_host | private_disclosure | future_choice
+
+For permission.love=true, permission.loveReason and permission.loveTag are REQUIRED. loveTag must be one of:
+sacrifice | personal_priority | vulnerability | future_choice | identity_choice
+The love event must involve a meaningful choice affecting his own interest, habits, privacy, identity, future, or system utility. Beauty, sex, orgasm, jealousy, possessiveness, fear of losing access to the host, a dramatic rescue, or one emotional confession alone is NOT enough.
+
+Do not emit a new relationship signal merely because a previous feeling continues. Continuity is expressed in prose; state events are only for actual changes. It is acceptable for many story days to pass with no bond-state increase.
 
 Current CHARM=${state.host.charm}; desire allowed by appearance=${desireAllowed}; adminLove=${loveState}.
 
 Only when the current story creates a genuinely relevant MÉMÉ OS state update — shop, feedback, MEN, permission, identity, or timeline — append ONE invisible HTML comment at the very end of the assistant reply.
-Format exactly: <!--MEME_OS_EVENT {"shop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"permission":{"signal":null,"signalReason":"","love":false,"loveReason":"","systemAccess":null},"identity":{},"timeline":{}} -->
+Format exactly: <!--MEME_OS_EVENT {"shop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{},"timeline":{}} -->
 Do not emit the comment when nothing relevant changed.
 shop: maximum 2 temporary items. Each item fields: id,title,desc,detail,price,currency("AP"|"SV"),charmGain(0|0.25|0.5),ttl(1-8),icon,source,bodyAxis(optional),sourceIssueId(optional). bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
 feedback.issues: max 2, only direct story evidence; fields id,axis(optional),source,note,severity(low|medium|high).
@@ -906,7 +924,7 @@ PEEK→OPEN qualification: open-ready=${openReady}. OPEN means he deliberately a
 OPEN→PRIVATE qualification: private-ready=${privateReady}. PRIVATE is a major act of personal trust/attachment and must be his autonomous choice. Do not grant it simply because the host asks, flirts, has sex, or reaches a CHARM number.
 When he visibly chooses to advance exactly one stage, set permission.systemAccess to "peek", "open", or "private" matching that next stage.
 PRIVATE still does NOT reveal the naming-right secret. Naming remains separately sealed until the late-love event “来自他的坦白”.
-Set permission.signal only for a genuinely new change caused by a concrete event, and always include permission.signalReason. Allowed interest signals: impressed|curious|respect|amused|annoyed-but-invested. desire requires CHARM>=70 and a new specific attraction turning point. attachment requires repeated desire plus genuine personal investment. permission.love=true requires permission.loveReason and is reserved for a genuinely earned long-term emotional turning point, never beauty, sex, jealousy, system level or one dramatic scene.
+Set permission.signal only for a genuinely new change caused by a concrete event, and always include permission.signalReason. Allowed interest signals: impressed|curious|respect|amused|annoyed-but-invested. desire requires CHARM>=70 plus the slow-burn history gates above. attachment requires permission.signalTag and the long-term investment gates above. permission.love=true requires both permission.loveReason and permission.loveTag and must satisfy the full late-game slow-burn gates; never use beauty, sex, jealousy, system level or one dramatic scene as a shortcut.
 Never explain hidden qualification mechanics in visible prose.`;
 
   context.setExtensionPrompt(MEME_RUNTIME_PROMPT_ID,prompt,1,2,false,0);
