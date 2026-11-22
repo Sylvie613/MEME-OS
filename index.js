@@ -604,17 +604,48 @@ async function handleRuntimeEvent(messageId){
         }
       }
 
-      if(event.permission?.unlockSystem===true && state.permission?.systemInviteReady){
+      const currentAccess=systemAccessStage(state);
+      const requestedAccess=String(event.permission?.systemAccess||'').toLowerCase();
+      let targetAccess=requestedAccess;
+
+      // Backward compatibility: old unlockSystem means only the first peek, never a full skip.
+      if(!targetAccess && event.permission?.unlockSystem===true) targetAccess='peek';
+
+      const validNext={
+        locked:'peek',
+        peek:'open',
+        open:'private',
+        private:null,
+      }[currentAccess];
+
+      const canAdvance=
+        targetAccess===validNext &&
+        (
+          (targetAccess==='peek' && Boolean(state.permission?.systemInviteReady)) ||
+          (targetAccess==='open' && systemOpenReady(state)) ||
+          (targetAccess==='private' && systemPrivateReady(state))
+        );
+
+      if(canAdvance){
+        state.system.accessStage=targetAccess;
         state.system.pageUnlocked=true;
+        state.system.accessChangedAt=Date.now();
         state.permission.systemUnlockedByAdmin=true;
         changed=true;
+
+        const accessCopy={
+          peek:['SYSTEM · PEEK','管理员只开放了一小部分 SYSTEM 资料。'],
+          open:['SYSTEM · OPEN','管理员正式开放了 SYSTEM 基本档案。'],
+          private:['SYSTEM · PRIVATE','管理员主动开放了更深的私人档案权限。'],
+        }[targetAccess];
+
         state.history.push({
-          id:`meme_system_unlock_${Date.now()}`,
-          type:'system_unlock',
+          id:`meme_system_access_${targetAccess}_${Date.now()}`,
+          type:'system_access',
           recordType:'system',
-          title:'SYSTEM 权限由管理员主动开放',
-          summary:'管理员自行决定开放 SYSTEM 私人区域。',
-          text:'SYSTEM ACCESS GRANTED BY ADMIN',
+          title:accessCopy[0],
+          summary:accessCopy[1],
+          text:`SYSTEM ACCESS: ${targetAccess.toUpperCase()}`,
           committedAt:Date.now(),
         });
       }
