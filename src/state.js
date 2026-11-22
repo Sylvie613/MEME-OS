@@ -239,6 +239,9 @@ function mergeState(raw) {
         merged.host.body[key] = Math.max(0, Number(merged.host.body[key]) || 0);
     }
 
+    // Purge pre-release test-only metadata if an old chat still carries it.
+    delete merged.dev;
+
     return merged;
 }
 
