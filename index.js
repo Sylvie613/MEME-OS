@@ -1011,12 +1011,16 @@ function meMarkup() {
 function taskItem(task) {
   const state=runtimeState();
   const unlock=taskUnlock(task,state);
-  const active=Boolean(state.tasks?.active?.[task.id]);
-  const completed=Boolean(state.tasks?.completed?.[task.id]);
+  const storyDay=Math.max(1,Number(state.tasks?.storyDay)||1);
+  const activeRecord=state.tasks?.active?.[task.id];
+  const active=Boolean(activeRecord) && (task.category!=='daily' || Number(activeRecord.storyDay||storyDay)===storyDay);
+  const completed=task.category==='daily'
+    ? Number(state.tasks?.dailyCompleted?.[task.id]?.day||0)===storyDay
+    : Boolean(state.tasks?.completed?.[task.id]);
   const pending=pendingFor(active?'taskComplete':'taskAccept',task.id,state);
   let button='挂上';
   if(!unlock.ok) button='没资格';
-  else if(completed) button='交过了';
+  else if(completed) button=task.category==='daily'?'今天交过了':'交过了';
   else if(pending) button='待发送';
   else if(active) button='交差';
 
@@ -1034,14 +1038,14 @@ function taskItem(task) {
 }
 
 function renderTaskList(category='daily') {
-  return (TASK_DATA[category] || TASK_DATA.daily).map(taskItem).join('');
+  return (TASK_DATA[category] || TASK_DATA.daily).map(task=>taskItem({...task,category})).join('');
 }
 
 function taskMarkup() {
   const state=runtimeState();
   return `
     ${pendingTrayMarkup(state)}
-    ${pageHeader('MISSION CENTER','TASK · 去干活，别光发骚',attitude(state).code)}
+    ${pageHeader('MISSION CENTER','TASK · 去干活，别光发骚',`DAY ${String(Math.max(1,Number(state.tasks?.storyDay)||1)).padStart(3,'0')}`)}
     <div class="meme-tabbar" data-task-tabs>
       <button class="is-active" type="button" data-task-tab="daily">日常</button>
       <button type="button" data-task-tab="desire">欲望</button>
@@ -1050,7 +1054,7 @@ function taskMarkup() {
     <section class="meme-task-list" data-task-list>${renderTaskList('daily')}</section>
     <section class="meme-page-card meme-task-rules">
       <div class="meme-card-title"><small>MY RULES</small><h3>听清楚再接</h3></div>
-      ${labelValue('日常','低 AP。该做的基本事，不值得我夸。')}
+      ${labelValue('日常',`DAY ${String(Math.max(1,Number(state.tasks?.storyDay)||1)).padStart(3,'0')} · 每项每天可结算一次，剧情跨天后刷新。`)}
       ${labelValue('欲望','主要产出 SV。魅力不够就别做梦。')}
       ${labelValue('特殊','我什么时候想发，什么时候才有。')}
       ${labelValue('结算','发进聊天后才算完成操作，别让正文再扣第二次。')}
