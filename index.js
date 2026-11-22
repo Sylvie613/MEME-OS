@@ -590,6 +590,24 @@ function runtimeState(){
   return getState();
 }
 
+function bodyLevel(key,state=runtimeState()){
+  return Math.max(0,Number(state.host?.body?.[key])||0);
+}
+
+function bodyScore(keys,state=runtimeState()){
+  const list=Array.isArray(keys)?keys:[keys];
+  const total=list.reduce((sum,key)=>sum+bodyLevel(key,state),0);
+  return Math.min(100,Math.max(2,4+total*18));
+}
+
+function bodyStatus(keys,baseline,levels,state=runtimeState()){
+  const list=Array.isArray(keys)?keys:[keys];
+  const total=list.reduce((sum,key)=>sum+bodyLevel(key,state),0);
+  if(total<=0) return baseline;
+  const options=Array.isArray(levels)?levels:[String(levels||'已改善')];
+  return options[Math.min(options.length-1,total-1)] || options[options.length-1];
+}
+
 function attitude(state=runtimeState()){
   const charm=Number(state.host?.charm)||0;
   return VOICE_STAGES.find(stage=>charm>=stage.min && charm<=stage.max) || VOICE_STAGES[0];
@@ -964,27 +982,27 @@ function meMarkup() {
     <section class="meme-page-card">
       <div class="meme-card-title"><small>BASELINE SCAN</small><h3>${initial ? '别躲，难看也得看完' : '复检结果'}</h3></div>
       <div class="meme-scan-list">
-        ${scanRow('面部',initial?'浮肿 / 比例不协调':'轮廓正在修复',Math.max(2,state.host.charm), initial?'bad':'low')}
-        ${scanRow('体型',initial?'明显肥胖 / 线条模糊':'体态正在重塑',Math.max(1,state.host.charm-1), initial?'bad':'low')}
-        ${scanRow('皮肤',initial?'粗糙 / 暗沉 / 出油':'肤质逐步改善',Math.max(2,state.host.charm), initial?'bad':'low')}
-        ${scanRow('头发',initial?'油腻 / 毛躁 / 缺乏打理':'至少像认真洗过了',Math.max(1,state.host.charm), initial?'bad':'low')}
-        ${scanRow('气味',initial?'清洁度不足':'气味正在优化',Math.max(0,state.host.charm-2), initial?'bad':'low')}
-        ${scanRow('声线',initial?'普通 / 没辨识度':'听感逐步修正',Math.max(4,state.host.charm+1),'low')}
-        ${scanRow('仪态',initial?'含胸 / 缩肩':'姿态正在修正',Math.max(2,state.host.charm),'low')}
+        ${scanRow('面部',bodyStatus(['lips','face','eyes'],'浮肿 / 比例不协调 / 唇部状态差',['局部开始修复','轮廓与细节已有改善','五官协调度明显提升','面部进入精修状态'],state),bodyScore(['lips','face','eyes'],state),bodyLevel('lips',state)+bodyLevel('face',state)+bodyLevel('eyes',state)>0?'low':'bad')}
+        ${scanRow('体型',bodyStatus(['bodyShape','waistHip','legs','neckShoulders','bust'],'明显肥胖 / 线条模糊',['整体轮廓开始调整','局部比例开始成形','体型与线条已有明显变化','身体比例进入精修状态'],state),bodyScore(['bodyShape','waistHip','legs','neckShoulders','bust'],state),bodyLevel('bodyShape',state)+bodyLevel('waistHip',state)+bodyLevel('legs',state)+bodyLevel('neckShoulders',state)+bodyLevel('bust',state)>0?'low':'bad')}
+        ${scanRow('皮肤',bodyStatus(['skin','touch'],'粗糙 / 暗沉 / 出油',['肤质开始修复','细腻度与触感都在改善','皮肤状态已经明显精细'],state),bodyScore(['skin','touch'],state),bodyLevel('skin',state)+bodyLevel('touch',state)>0?'low':'bad')}
+        ${scanRow('头发',bodyStatus('hair','油腻 / 毛躁 / 缺乏打理',['发质开始修复','头发状态明显改善','发质进入精修状态'],state),bodyScore('hair',state),bodyLevel('hair',state)>0?'low':'bad')}
+        ${scanRow('气味',bodyStatus(['scent','breath'],'汗油味 / 近距离气息差',['基础气味开始清理','近距离气味明显改善','已经具备主动吸引力'],state),bodyScore(['scent','breath'],state),bodyLevel('scent',state)+bodyLevel('breath',state)>0?'low':'bad')}
+        ${scanRow('声线',bodyStatus('voice','普通 / 没辨识度',['音色与稳定度开始调整','声线已有明显辨识度','声线进入精修状态'],state),bodyScore('voice',state),bodyLevel('voice',state)>0?'low':'bad')}
+        ${scanRow('仪态',bodyStatus('posture','含胸 / 缩肩',['姿态开始修正','仪态已经明显舒展','仪态进入稳定精修'],state),bodyScore('posture',state),bodyLevel('posture',state)>0?'low':'bad')}
       </div>
     </section>
 
     <section class="meme-page-card">
       <div class="meme-card-title"><small>RECONSTRUCTION</small><h3>我允许你改的地方</h3></div>
       <div class="meme-upgrade-list">
-        ${levelRow('面部精修',state.upgrades.face2?'已启用':'未开始','轮廓、眼型、五官协调与细节修复')}
-        ${levelRow('体态塑形',state.upgrades.bodyfat1?'已启用':'未开始','体脂趋势、腰臀、腿型与肩颈线条')}
-        ${levelRow('皮肤优化',state.upgrades.skin1?'已启用':'未开始','肤质、细腻度、触感与光泽')}
-        ${levelRow('发质系统',state.upgrades.hair1?'已启用':'未开始','清洁感、顺滑度与发丝状态')}
-        ${levelRow('体香系统',state.upgrades.scent1?'已启用':'未开始','基础气味、近距离存在感与诱导体香')}
-        ${levelRow('声线调整',state.upgrades.voice1?'已启用':'未开始','音色、稳定度与辨识度')}
-        ${levelRow('仪态修正',state.upgrades.posture1?'已启用':'未开始','站姿、坐姿、肩颈与动作习惯')}
-        ${levelRow('成人反应',state.tasks.completed.sample?'可解锁':'LOCKED','敏感度、分泌、高潮与恢复','SV · LOCK')}
+        ${levelRow('面部精修',bodyLevel('face',state)+bodyLevel('eyes',state)+bodyLevel('lips',state)>0?'已启用':'未开始','轮廓、眼型、唇部与五官协调')}
+        ${levelRow('体态塑形',bodyLevel('bodyShape',state)+bodyLevel('waistHip',state)+bodyLevel('legs',state)+bodyLevel('neckShoulders',state)+bodyLevel('bust',state)>0?'已启用':'未开始','整体体型、腰臀、腿型、肩颈与胸型')}
+        ${levelRow('皮肤优化',bodyLevel('skin',state)+bodyLevel('touch',state)>0?'已启用':'未开始','肤质、细腻度、触感与光泽')}
+        ${levelRow('发质系统',bodyLevel('hair',state)>0?'已启用':'未开始','清洁感、顺滑度与发丝状态')}
+        ${levelRow('体香系统',bodyLevel('scent',state)+bodyLevel('breath',state)>0?'已启用':'未开始','体香、口腔气息与近距离存在感')}
+        ${levelRow('声线调整',bodyLevel('voice',state)>0?'已启用':'未开始','音色、稳定度与辨识度')}
+        ${levelRow('仪态修正',bodyLevel('posture',state)>0?'已启用':'未开始','站姿、坐姿、肩颈与动作习惯')}
+        ${levelRow('成人反应',bodyLevel('sensitivity',state)+bodyLevel('arousal',state)+bodyLevel('lubrication',state)+bodyLevel('orgasm',state)+bodyLevel('recovery',state)>0?'已改造':state.tasks.completed.sample?'可解锁':'LOCKED','敏感度、欲望、分泌、高潮与恢复','SV · LOCK')}
       </div>
     </section>
   `;
