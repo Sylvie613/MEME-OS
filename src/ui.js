@@ -7,6 +7,7 @@ import {
     removePendingAction,
 } from './state.js';
 import { appendToInput, removeFromInput } from './input.js';
+import { getBinding, isBoundCharacter } from './binding.js';
 
 const ROOT_ID = 'meme-os-root';
 const PANEL_ID = 'meme-os-panel';
@@ -97,6 +98,11 @@ function closePanel() {
 }
 
 async function handleTestPurchase() {
+    if (!isBoundCharacter()) {
+        globalThis.toastr?.warning?.('当前角色卡没有绑定 MÉMÉ OS。');
+        return;
+    }
+
     if (!hasActiveChat()) {
         globalThis.toastr?.warning?.('请先打开一个角色聊天，再使用 MÉMÉ OS。');
         return;
@@ -146,6 +152,22 @@ function refreshUi() {
     const root = document.getElementById(ROOT_ID);
     if (!root) return;
 
+    const launcher = root.querySelector(`#${LAUNCHER_ID}`);
+    const panel = root.querySelector(`#${PANEL_ID}`);
+    const binding = getBinding();
+
+    if (!binding) {
+        launcher.hidden = true;
+        panel.setAttribute('aria-hidden', 'true');
+        panel.classList.remove('is-open');
+        root.dataset.bound = 'false';
+        return;
+    }
+
+    launcher.hidden = false;
+    root.dataset.bound = 'true';
+    root.dataset.profile = binding.profile;
+
     const state = getState();
     setText(root, 'ap', state.resources.ap);
     setText(root, 'sv', state.resources.sv);
@@ -166,7 +188,6 @@ function refreshUi() {
         </div>
     `).join('');
 }
-
 function setText(root, key, value) {
     const node = root.querySelector(`[data-meme="${key}"]`);
     if (node) node.textContent = String(value);
