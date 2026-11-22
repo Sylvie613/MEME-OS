@@ -1,6 +1,6 @@
 /**
- * MÉMÉ OS v0.1.8
- * Compact launcher, anchored above the send button to avoid accidental sends.
+ * MÉMÉ OS v0.1.9
+ * Pink heart launcher. Keeps the proven timing-safe mount logic.
  */
 const MEME_ID = 'meme-os-stable-probe';
 
@@ -8,15 +8,16 @@ function positionLauncher(button) {
   const send = document.getElementById('send_but');
   if (!send) {
     button.style.right = '18px';
-    button.style.bottom = '92px';
+    button.style.bottom = '112px';
     return;
   }
 
   const rect = send.getBoundingClientRect();
-  const size = 34;
-  const gap = 9;
-  const left = rect.left + (rect.width - size) / 2;
-  const top = Math.max(8, rect.top - size - gap);
+  const width = 44;
+  const height = 40;
+  const gap = 18;
+  const left = rect.left + (rect.width - width) / 2;
+  const top = Math.max(8, rect.top - height - gap);
 
   button.style.left = left + 'px';
   button.style.top = top + 'px';
@@ -31,33 +32,60 @@ function mount() {
     button = document.createElement('button');
     button.id = MEME_ID;
     button.type = 'button';
-    button.textContent = 'MÉ';
     button.title = '打开 MÉMÉ OS';
     button.setAttribute('aria-label','打开 MÉMÉ OS');
 
     Object.assign(button.style,{
       position:'fixed',
       zIndex:'2147483647',
-      display:'inline-flex',
-      alignItems:'center',
-      justifyContent:'center',
-      width:'34px',
-      height:'34px',
-      minWidth:'34px',
-      minHeight:'34px',
+      display:'block',
+      width:'44px',
+      height:'40px',
+      minWidth:'44px',
+      minHeight:'40px',
       margin:'0',
       padding:'0',
-      borderRadius:'12px',
-      border:'1px solid rgba(109,75,117,.28)',
-      background:'rgba(247,238,251,.96)',
-      color:'#6d4b75',
-      fontWeight:'800',
-      fontSize:'12px',
-      lineHeight:'1',
-      boxShadow:'0 3px 12px rgba(70,45,80,.16)',
+      border:'0',
+      outline:'0',
+      background:'transparent',
       cursor:'pointer',
-      WebkitTapHighlightColor:'transparent'
+      WebkitTapHighlightColor:'transparent',
+      filter:'drop-shadow(0 4px 8px rgba(202,93,137,.22))'
     });
+
+    button.innerHTML = `
+      <svg viewBox="0 0 100 90" width="44" height="40" aria-hidden="true"
+           style="position:absolute;inset:0;overflow:visible;">
+        <path d="M50 84
+                 C43 76 11 57 7 34
+                 C4 17 15 6 29 6
+                 C39 6 46 12 50 20
+                 C54 12 61 6 71 6
+                 C85 6 96 17 93 34
+                 C89 57 57 76 50 84Z"
+              fill="#f5a7c2"
+              stroke="#dc789d"
+              stroke-width="3"/>
+        <path d="M24 18 C31 11 40 12 46 21"
+              fill="none"
+              stroke="rgba(255,255,255,.68)"
+              stroke-width="5"
+              stroke-linecap="round"/>
+      </svg>
+      <span style="
+        position:absolute;
+        left:50%;
+        top:46%;
+        transform:translate(-50%,-50%);
+        color:#8f3f61;
+        font-size:11px;
+        line-height:1;
+        font-weight:900;
+        letter-spacing:-.2px;
+        font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','PingFang SC',sans-serif;
+        pointer-events:none;
+      ">MÉ</span>
+    `;
 
     button.addEventListener('click',(event)=>{
       event.preventDefault();
@@ -66,7 +94,7 @@ function mount() {
     });
 
     document.body.appendChild(button);
-    console.info('[MÉMÉ OS] v0.1.8 launcher mounted');
+    console.info('[MÉMÉ OS] v0.1.9 heart launcher mounted');
   }
 
   positionLauncher(button);
