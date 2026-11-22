@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 23;
+const SCHEMA_VERSION = 24;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -185,8 +185,8 @@ function mergeState(raw) {
             chatKey: raw.runtime?.chatKey ? String(raw.runtime.chatKey) : null,
             processedAssistantMessages: Array.isArray(raw.runtime?.processedAssistantMessages)
                 ? raw.runtime.processedAssistantMessages
-                    .map(value => Number(value))
-                    .filter(Number.isInteger)
+                    .map(value => typeof value === 'string' ? value : Number(value))
+                    .filter(value => typeof value === 'string' ? value.length > 0 : Number.isInteger(value))
                     .slice(-4000)
                 : [],
         },
