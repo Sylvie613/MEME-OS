@@ -12,7 +12,7 @@ import { appendToInput, removeFromInput } from './src/input.js?v=0.9.1';
 import { isBoundCharacter } from './src/binding.js?v=0.9.1';
 
 /**
- * MÉMÉ OS v0.9.1
+ * MÉMÉ OS v0.9.2
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.
  */
@@ -286,6 +286,7 @@ function sanitizeDynamicItem(raw,state=runtimeState()){
     expiresTurn:(Number(state.shop?.plotTurn)||0)+ttl,
     source:String(raw.source||'剧情临时上架').slice(0,80),
     bodyAxis,
+    sourceIssueId:String(raw.sourceIssueId||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48) || null,
   };
 }
 
@@ -293,6 +294,47 @@ function getDynamicShop(state=runtimeState()){
   const turn=Number(state.shop?.plotTurn)||0;
   return (state.shop?.dynamic||[]).filter(item=>Number(item.expiresTurn||0)>=turn && !state.upgrades?.[item.id]);
 }
+
+function sanitizeSceneIssue(raw,state=runtimeState()){
+  if(!raw || typeof raw!=='object') return null;
+  const note=String(raw.note||'').trim().slice(0,120);
+  if(!note) return null;
+  const axis=BODY_AXES.has(String(raw.axis||'')) ? String(raw.axis) : null;
+  const source=String(raw.source||'当前剧情').trim().slice(0,60);
+  const severity=['low','medium','high'].includes(String(raw.severity||'')) ? String(raw.severity) : 'medium';
+  const key=String(raw.id||raw.key||`issue_${hashId(axis+'|'+source+'|'+note)}`).replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48);
+  return {
+    id:key,
+    axis,
+    source,
+    note,
+    severity,
+    storyDay:Number(state.tasks?.storyDay)||1,
+    plotTurn:Number(state.shop?.plotTurn)||0,
+    recordedAt:Date.now(),
+  };
+}
+
+function sanitizeSceneReaction(raw,state=runtimeState()){
+  if(!raw || typeof raw!=='object') return null;
+  const note=String(raw.note||'').trim().slice(0,120);
+  if(!note) return null;
+  const axis=BODY_AXES.has(String(raw.axis||'')) ? String(raw.axis) : null;
+  const source=String(raw.source||'剧情人物').trim().slice(0,60);
+  const valence=['negative','neutral','positive','sexual'].includes(String(raw.valence||'')) ? String(raw.valence) : 'neutral';
+  const key=String(raw.id||raw.key||`reaction_${hashId(axis+'|'+source+'|'+note)}`).replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48);
+  return {
+    id:key,
+    axis,
+    source,
+    valence,
+    note,
+    storyDay:Number(state.tasks?.storyDay)||1,
+    plotTurn:Number(state.shop?.plotTurn)||0,
+    recordedAt:Date.now(),
+  };
+}
+
 
 async function handleRuntimeEvent(messageId){
   if(!isBoundCharacter() || !hasActiveChat()) return;
@@ -312,6 +354,32 @@ async function handleRuntimeEvent(messageId){
   for(const match of matches){
     try{
       const event=JSON.parse(match[1].trim());
+
+      state.reactivity=state.reactivity||{recentChanges:[],recentIssues:[],recentReactions:[]};
+
+      if(Array.isArray(event.feedback?.issues)){
+        for(const rawIssue of event.feedback.issues.slice(0,2)){
+          const issue=sanitizeSceneIssue(rawIssue,state);
+          if(!issue) continue;
+          state.reactivity.recentIssues=[
+            issue,
+            ...(state.reactivity.recentIssues||[]).filter(old=>old.id!==issue.id),
+          ].slice(0,8);
+          changed=true;
+        }
+      }
+
+      if(Array.isArray(event.feedback?.reactions)){
+        for(const rawReaction of event.feedback.reactions.slice(0,2)){
+          const reaction=sanitizeSceneReaction(rawReaction,state);
+          if(!reaction) continue;
+          state.reactivity.recentReactions=[
+            reaction,
+            ...(state.reactivity.recentReactions||[]).filter(old=>old.id!==reaction.id),
+          ].slice(0,8);
+          changed=true;
+        }
+      }
 
       if(Array.isArray(event.shop)){
         for(const candidate of event.shop.slice(0,2)){
@@ -487,12 +555,23 @@ Current in-world story day=${Number(state.tasks?.storyDay)||1}. Daily tasks may 
 Current SHOP phase=${currentShopPhase(state).label} (${currentShopPhase(state).code}); total permanent upgrade levels=${totalUpgradeLevels(state)}.
 Dynamic plot goods must respect the current SHOP phase. They may solve a concrete problem exposed by the just-written plot, but each purchase is only one incremental body-axis step and may not claim a sudden makeover, perfect body, instant beauty, or any effect far beyond the host's current progression.
 
+PLOT → SHOP → BODY → REACTION LOOP:
+Recent committed changes: ${JSON.stringify((state.reactivity?.recentChanges||[]).slice(0,6))}.
+Recent exposed issues: ${JSON.stringify((state.reactivity?.recentIssues||[]).slice(0,6))}.
+Recent observed reactions: ${JSON.stringify((state.reactivity?.recentReactions||[]).slice(0,6))}.
+When the visible story directly exposes a concrete body/appearance/sensory problem, you may log it in feedback.issues. Do not invent problems just to create merchandise.
+When a visible NPC or the administrator directly notices a real established improvement, you may log it in feedback.reactions. Reactions must match the actual modified body axis and the established relationship; do not make everyone suddenly attracted just because an axis improved.
+A dynamic SHOP item should preferably answer a concrete exposed issue from the current or recent story. If it does, set sourceIssueId to that issue id. Do not create plot goods merely because the SHOP is empty.
+Permanent improvements persist across later scenes. Negative or neutral feedback may remain even after some unrelated body axis improves.
+
 Current CHARM=${state.host.charm}; desire allowed by appearance=${desireAllowed}; adminLove=${loveState}.
 
 Only when the current story creates a genuinely relevant new shop opportunity or changes the administrator's private interest, append ONE invisible HTML comment at the very end of the assistant reply.
-Format exactly: <!--MEME_OS_EVENT {"shop":[],"permission":{},"identity":{},"timeline":{}} -->
+Format exactly: <!--MEME_OS_EVENT {"shop":[],"feedback":{"issues":[],"reactions":[]},"permission":{},"identity":{},"timeline":{}} -->
 Do not emit the comment when nothing relevant changed.
-shop: maximum 2 temporary items. Each item fields: id,title,desc,detail,price,currency("AP"|"SV"),charmGain(0|0.25|0.5),ttl(1-8),icon,source,bodyAxis(optional). bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
+shop: maximum 2 temporary items. Each item fields: id,title,desc,detail,price,currency("AP"|"SV"),charmGain(0|0.25|0.5),ttl(1-8),icon,source,bodyAxis(optional),sourceIssueId(optional). bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
+feedback.issues: max 2, only direct story evidence; fields id,axis(optional),source,note,severity(low|medium|high).
+feedback.reactions: max 2, only directly observed reactions to established state/change; fields id,axis(optional),source,note,valence(negative|neutral|positive|sexual).
 Temporary shop items must arise from the just-written plot, not random catalog filler. Their names/descriptions are spoken by the male administrator in his current tone: ${voice.label}. Current CHARM=${state.host.charm}.
 SYSTEM access is NEVER unlocked merely by numbers. Hidden eligibility=${eligible}; invite-ready=${inviteReady}. Set permission.signal only for genuine changes caused by the host: impressed|curious|respect|amused|annoyed-but-invested; desire only when CHARM>=70 and specific attraction actually occurs; attachment only after repeated desire plus personal investment. permission.love=true is reserved for a genuinely earned long-term emotional turning point, never beauty, sex, jealousy, system level or one dramatic scene. Set permission.unlockSystem=true only if invite-ready is true AND he personally chooses, in-story, to open the private SYSTEM area at a fitting moment. Never explain hidden mechanics in visible prose.`;
 
@@ -1703,6 +1782,7 @@ async function ensureCleanStart(){
     },
   };
   state.shop={dynamic:[],plotTurn:0};
+  state.reactivity={recentChanges:[],recentIssues:[],recentReactions:[]};
   state.dev={...(state.dev||{}),testGrant1000:true,cleanStartV074:true};
 
   await saveState(state);
