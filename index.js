@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.11';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.11';
-import { isBoundCharacter } from './src/binding.js?v=0.10.11';
+} from './src/state.js?v=0.10.12';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.12';
+import { isBoundCharacter } from './src/binding.js?v=0.10.12';
 
 /**
- * MÉMÉ OS v0.10.11
+ * MÉMÉ OS v0.10.12
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -344,6 +344,53 @@ function sanitizeGeneratedDailyTask(raw,state=runtimeState()){
     createdTurn:Number(state.shop?.plotTurn)||0,
     source,
   };
+}
+
+function inferVisibleDailyTaskOffer(raw,state=runtimeState()){
+  const text=String(raw||'');
+  const cue=/(?:一张|新的?|弹出|出现|生成|砸下|亮起)[^。\n]{0,28}(?:日常|剧情)?任务卡|(?:新的?|临时)(?:日常|剧情)?任务(?:出现|生成|弹出|亮起)/i.exec(text);
+  if(!cue) return null;
+
+  const tail=text.slice(cue.index,Math.min(text.length,cue.index+1400));
+  const quotes=[...tail.matchAll(/[“"]([^”"]{4,220})[”"]/g)].map(match=>String(match[1]||'').trim());
+  if(!quotes.length) return null;
+
+  const commandWords=/(把|去|先|给我|别|换|扔|洗|吹|擦|收拾|整理|清理|起来|站|走|动|看|做完|完成)/g;
+  let best='';
+  let bestScore=-1;
+  for(const quote of quotes){
+    const commands=quote.match(commandWords)||[];
+    let score=commands.length;
+    if(/做完|完成|奖励/.test(quote)) score+=4;
+    if(/把.+(?:了|掉|干净|完)/.test(quote)) score+=2;
+    if(score>bestScore){
+      bestScore=score;
+      best=quote;
+    }
+  }
+  if(bestScore<2) return null;
+
+  let desc=best
+    .replace(/(?:做完|完成)(?:了)?[^。！？]*?(?:奖励|AP|SV)[^。！？]*[。！？]?/g,'')
+    .replace(/\s+/g,' ')
+    .trim()
+    .slice(0,180);
+  if(!desc) desc=best.slice(0,180);
+
+  const imperative=desc.match(/(?:^|[。！？])\s*((?:先|把|去|给我|别|换|扔|洗|吹|擦|收拾|整理|清理|起来|站|走|动|看)[^。！？]{2,42})/);
+  let title=String(imperative?.[1]||desc.split(/[。！？]/).find(part=>commandWords.test(part))||'剧情临时任务')
+    .replace(/\s+/g,' ')
+    .trim();
+  commandWords.lastIndex=0;
+  title=title.replace(/[，,；;：:].*$/,'').slice(0,28) || '剧情临时任务';
+
+  return sanitizeGeneratedDailyTask({
+    title,
+    desc,
+    detail:'由当前可见剧情中的新任务卡自动同步；完成后按滚动任务规则退场。',
+    source:'可见剧情任务卡兜底',
+    difficulty:'normal',
+  },state);
 }
 
 function distinctEroticTaskCount(state=runtimeState()){
@@ -935,6 +982,52 @@ function resolveAssistantMessageId(ref){
 
 
 
+async function reconcileRecentVisibleTaskOffers(){
+  if(!isBoundCharacter() || !hasActiveChat()) return;
+  const context=globalThis.SillyTavern?.getContext?.()||{};
+  const chat=Array.isArray(context.chat)?context.chat:[];
+  const state=runtimeState();
+  state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
+  state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
+  let changed=false;
+
+  const start=Math.max(0,chat.length-16);
+  for(let i=start;i<chat.length;i++){
+    const message=chat[i];
+    if(!message || message.is_user) continue;
+    const raw=String(message.mes||'');
+    if(/<!--MEME_OS_EVENT\s+[\s\S]*?"dailyTaskOffers"\s*:\s*\[[^\]]+\]/.test(raw)) continue;
+    const task=inferVisibleDailyTaskOffer(raw,state);
+    if(!task) continue;
+    const historyId=`meme_visible_task_reconcile_${i}_${task.id}`;
+    if((state.history||[]).some(entry=>entry.id===historyId)) continue;
+    if(state.tasks.everCompleted?.[task.id] || state.tasks.active?.[task.id] || state.tasks.generatedDaily.some(old=>old.id===task.id)){
+      state.history.push({
+        id:historyId,type:'visible_task_reconcile_seen',recordType:'task',
+        title:`已存在：${task.title}`,summary:'可见剧情任务已在MÉMÉ OS中，无需重复补入。',
+        text:`VISIBLE TASK ALREADY PRESENT: ${task.id}`,committedAt:Date.now(),
+      });
+      changed=true;
+      continue;
+    }
+    state.tasks.generatedDaily=[task,...state.tasks.generatedDaily].slice(0,8);
+    state.history.push({
+      id:historyId,type:'visible_task_reconcile',recordType:'task',
+      title:`补同步剧情任务：${task.title}`,
+      summary:'检测到旧回复中明确出现的新任务卡，但没有隐藏事件；已补入TASK。',
+      text:`VISIBLE TASK RECONCILED: ${task.id}`,committedAt:Date.now(),
+    });
+    changed=true;
+  }
+
+  if(changed){
+    if(state.history.length>240) state.history=state.history.slice(-240);
+    await saveState(state);
+    renderView(currentView(),false);
+    installRuntimePrompt();
+  }
+}
+
 async function reconcileRecentVisibleSettlements(){
   if(!isBoundCharacter() || !hasActiveChat()) return;
   const context=globalThis.SillyTavern?.getContext?.()||{};
@@ -1045,6 +1138,7 @@ async function handleRuntimeEvent(messageId){
   const allMatches=[...raw.matchAll(/<!--MEME_OS_EVENT\s+([\s\S]*?)-->/g)];
   const matches=allMatches.length ? [allMatches[allMatches.length-1]] : [];
   let changed=true;
+  let structuredDailyOfferSeen=false;
   const touchedMenIds=new Set();
 
   for(const match of matches){
@@ -1054,11 +1148,11 @@ async function handleRuntimeEvent(messageId){
       state.reactivity=state.reactivity||{recentChanges:[],recentIssues:[],recentReactions:[]};
 
       if(Array.isArray(event.dailyTaskOffers)){
+        if(event.dailyTaskOffers.length) structuredDailyOfferSeen=true;
         state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
         state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
-        const openStatic=TASK_DATA.daily.filter(task=>!state.tasks.everCompleted?.[task.id]).length;
         const openDynamic=state.tasks.generatedDaily.filter(task=>!state.tasks.everCompleted?.[task.id]).length;
-        const canGenerate=(openStatic+openDynamic)<5 && Number(state.tasks.lastGeneratedDailyTurn||0)!==Number(state.shop.plotTurn||0);
+        const canGenerate=openDynamic<8 && Number(state.tasks.lastGeneratedDailyTurn||0)!==Number(state.shop.plotTurn||0);
         if(canGenerate){
           const task=sanitizeGeneratedDailyTask(event.dailyTaskOffers[0],state);
           if(task){
@@ -1334,6 +1428,29 @@ async function handleRuntimeEvent(messageId){
     }
   }
 
+  if(!structuredDailyOfferSeen){
+    state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
+    state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
+    const fallbackTask=inferVisibleDailyTaskOffer(raw,state);
+    if(fallbackTask){
+      state.tasks.generatedDaily=[
+        fallbackTask,
+        ...state.tasks.generatedDaily.filter(old=>old.id!==fallbackTask.id),
+      ].slice(0,8);
+      state.tasks.lastGeneratedDailyTurn=Number(state.shop?.plotTurn)||0;
+      state.history.push({
+        id:`meme_visible_task_fallback_${messageKey}_${fallbackTask.id}`,
+        type:'visible_task_fallback',
+        recordType:'task',
+        title:`同步可见剧情任务：${fallbackTask.title}`,
+        summary:'模型在正文中明确发出了新任务卡但漏交隐藏事件；MÉMÉ OS 已兜底同步。',
+        text:`VISIBLE TASK FALLBACK: ${fallbackTask.id}`,
+        committedAt:Date.now(),
+      });
+      changed=true;
+    }
+  }
+
   if(decayMenBuckets(state,touchedMenIds)) changed=true;
   if(Array.isArray(state.history) && state.history.length>240){
     state.history=state.history.slice(-240);
@@ -1426,6 +1543,7 @@ Completed daily tasks are not permanent checklist items. A just-completed daily/
 Current open starter dailies: ${JSON.stringify(TASK_DATA.daily.filter(t=>!state.tasks?.everCompleted?.[t.id]).map(t=>({id:t.id,title:t.title,desc:t.desc})))}.
 Current generated daily/story tasks: ${JSON.stringify((state.tasks?.generatedDaily||[]).filter(t=>!state.tasks?.everCompleted?.[t.id]).map(t=>({id:t.id,title:t.title,desc:t.desc,difficulty:t.difficulty,source:t.source})))}.
 When the visible daily board has fewer than 5 unfinished tasks, you SHOULD create one context-fitting replacement through dailyTaskOffers if the current plot offers a sensible mundane, appearance, hygiene, movement, social-presentation or practical challenge. Do not regenerate an already completed task under a synonym.
+CRITICAL SYNC RULE: if your visible prose says or implies that MÉMÉ OS/the administrator actually creates, pops up, displays, throws out, assigns or reveals a NEW daily/story task or task card, dailyTaskOffers is REQUIRED in the same reply. Never visibly create a task card and omit its hidden event. If you are not going to emit dailyTaskOffers, do not claim that a new system task was created.
 dailyTaskOffers entries: maximum 1; fields {title,desc,detail,source,difficulty}. difficulty is only light|normal|hard. Never choose or print the AP reward; the extension maps difficulty to the reward.
 If the current visible scene itself unexpectedly completes a sensible one-off system challenge that was not previously active, you MAY use storyRewards to let the extension recognize it retroactively. storyRewards entries: maximum 2; fields {title,evidence,source,difficulty}. Never put AP/SV numbers in storyRewards or visible prose; the extension calculates the real reward. Do not use storyRewards for trivial actions merely to farm AP.
 
@@ -2929,6 +3047,7 @@ function bindSillyTavernEvents(){
     // that belongs to that chat; it never clears or mutates another save.
     runtimeState();
     await reconcileRecentVisibleSettlements();
+    await reconcileRecentVisibleTaskOffers();
     renderView('home',false);
     installRuntimePrompt();
   });
@@ -3070,6 +3189,7 @@ function start() {
   mount();
   ensureDialog();
   reconcileRecentVisibleSettlements().catch(error=>console.warn('[MÉMÉ OS] legacy settlement sync failed',error));
+  reconcileRecentVisibleTaskOffers().catch(error=>console.warn('[MÉMÉ OS] visible task sync failed',error));
   bindSillyTavernEvents();
   installRuntimePrompt();
   globalThis.__meme_os_probe_timer__ = setInterval(mount, 1000);
