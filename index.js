@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.35';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.35';
-import { isBoundCharacter } from './src/binding.js?v=0.10.35';
+} from './src/state.js?v=0.10.36';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.36';
+import { isBoundCharacter } from './src/binding.js?v=0.10.36';
 
 /**
- * MÉMÉ OS v0.10.35
+ * MÉMÉ OS v0.10.36
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -2453,29 +2453,30 @@ After namingRightOffered=true, when the host clearly chooses a name for him, acc
 Current namingRightOffered=${Boolean(state.system?.namingRightOffered)}; current assigned name=${state.system?.name||'NONE'}.
 
 STORY STATUS + MEMORY:
-MÉMÉ OS owns a compact persistent story-status bar and a three-layer memory area.
+MÉMÉ OS owns a compact persistent story-status bar and a rolling three-layer memory ladder.
 
-STATUS fields: date, time, weather, location, people. They describe IN-STORY reality, never the user's real-world clock/weather/location. Update only from facts actually supported by the visible story. If an exact calendar date is not established, use the current story-day label such as DAY ${String(Math.max(1,Number(state.tasks?.storyDay)||1)).padStart(3,'0')} instead of inventing a date. If weather has never been established, leave it blank rather than making one up. Time may be approximate only when the story supports an approximation.
+STATUS fields: date, time, weather, location, people. They describe IN-STORY reality, never the user's real-world clock/weather/location. Update only from facts supported by the visible story. The story has a summer calendar anchor; if no new date is stated, preserve the stored date rather than inventing a new one.
 Current stored story status=${JSON.stringify(state.storyStatus||{})}.
 
-MEMORY has three layers:
-- short: at most 10 concise recent facts, each about 30 Chinese characters or less.
-- long: at most 5 stage summaries, each roughly 120-240 Chinese characters.
-- core: at most 5 durable summaries, each roughly 180-320 Chinese characters, reserved for major lasting facts/turning points/relationships/permanent changes.
-Do not store trivial movement, prose flourishes, repeated facts, numeric balances already owned by the extension, or guesses. Memory should preserve facts that will materially change future continuity.
+MEMORY — HARD COUNTING RULE:
+- SHORT: exactly one new short memory for every completed user+assistant plot round. Each SHORT should be a compact 20-30 Chinese-character summary of that round, maximum about 36 characters. Do not skip a round merely because it was mundane.
+- 15 SHORT -> 1 LONG: when the bucket reaches exactly 15 SHORT entries, summarize those 15 into ONE LONG memory of about 180-220 Chinese characters, then clear all 15 SHORT entries.
+- LONG: stores those 15-round summaries. Keep at most 10 current LONG entries.
+- 10 LONG -> 1 PERMANENT: when the bucket reaches exactly 10 LONG entries, summarize those 10 into ONE PERMANENT memory of about 220-320 Chinese characters, then clear all 10 LONG entries.
+- PERMANENT: never expires, is never cleared by rolling compression, and has no normal count cap. Only append future permanent summaries.
+The extension owns the counters and clearing. Do not improvise different thresholds, do not merge early just because a scene feels important, and do not retain the source SHORT/LONG entries after their required compression.
 
 IMPORTANT BOOTSTRAP:
 memoryNeedsBootstrap=${memoryNeedsBootstrap}; visible chat message count=${visibleChatTurns}.
-If memoryNeedsBootstrap=true, on THIS reply you MUST review the entire visible chat history currently available to you, not only the latest turn, and append memory.bootstrap=true with a one-time reconstructed snapshot. Fill memory.short, memory.long and memory.core only with facts actually supported by prior visible conversation. It is valid for long/core to contain fewer entries when the history does not justify more.
-At the same time, reconstruct the latest supported STATUS snapshot from the prior visible story and include status.initialized=true. This bootstrap may happen no matter how many turns were already played before MEMORY was installed.
-Once memory is initialized, NEVER rescan/summarize the whole old chat every turn. Update incrementally only when something worth remembering changes.
-After bootstrap, normally add at most 1 short memory in a turn. When short has accumulated about 10 useful entries, you may summarize them into one long entry and set compactShort=true. When long has accumulated about 5 useful stage summaries, you may compress them into one core entry and set compactLong=true. Never compact merely because of turn count; preserve useful distinctions.
+If memoryNeedsBootstrap=true, reconstruct the currently visible past chat using the same 15/10 ladder: one short summary per plot round, each full group of 15 rounds compressed into a LONG, and each full group of 10 LONG memories compressed into PERMANENT. Preserve only the final incomplete SHORT/LONG buckets plus all PERMANENT summaries.
+At the same time reconstruct the latest supported STATUS snapshot.
+Once initialized, every new plot round still requires exactly one SHORT. The extension may use quiet background generation as fallback if the visible reply does not provide the memory update.
 
 Current memory snapshot=${JSON.stringify({
   initialized:Boolean(state.memory?.initialized),
   short:state.memory?.short||[],
   long:state.memory?.long||[],
-  core:state.memory?.core||[],
+  permanent:state.memory?.permanent||[],
 })}.
 
 RESOURCE SNAPSHOT — EXTENSION IS THE ONLY AUTHORITY:
@@ -2603,7 +2604,7 @@ Do not emit a new relationship signal merely because a previous feeling continue
 Current CHARM=${state.host.charm}; desire allowed by appearance=${desireAllowed}; adminLove=${loveState}.
 
 Append ONE invisible HTML comment at the very end of the assistant reply when the current story creates a relevant MÉMÉ OS state update — tasks, shop, status, memory, feedback, MEN, evolution, permission, identity, or timeline. IMPORTANT: when memoryNeedsBootstrap=true, the comment is MANDATORY even if no other state changed, because the one-time history backfill itself is the required state update.
-Format exactly: <!--MEME_OS_EVENT {"dailyTaskOffers":[],"taskOffers":[],"tasks":[],"storyRewards":[],"shop":[],"lifestyleShop":[],"status":{},"memory":{"bootstrap":false,"short":[],"long":[],"core":[],"compactShort":false,"compactLong":false},"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{},"timeline":{}} -->
+Format exactly: <!--MEME_OS_EVENT {"dailyTaskOffers":[],"taskOffers":[],"tasks":[],"storyRewards":[],"shop":[],"lifestyleShop":[],"status":{},"memory":{"bootstrap":false,"short":"","longSummary":"","permanentSummary":""},"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{},"timeline":{}} -->
 After memory has already been bootstrapped, do not emit the comment when nothing relevant changed.
 dailyTaskOffers: deprecated compatibility field; normally leave [] for new daily/story tasks because visible [TASK｜任务名｜任务要求] is the canonical source.
 taskOffers: maximum 1 new generated erotic mission; fields title,desc,detail,source. title/desc/detail/source are written in the administrator's current OS voice and may be personal, rude, obscene or judgmental when appropriate. Never include tier, id or rewards.
@@ -2612,7 +2613,7 @@ storyRewards: max 1 candidate and it shares the same daily/turn quota as plot [T
 shop: maximum 2 BODY/PLOT temporary items only. Fields: title,desc,detail,currency("AP"|"SV"),ttl,icon,source,impact("minor"|"standard"|"major"),bodyAxis(optional),sourceIssueId(optional). At CHARM ${AP_CHARM_CAP} or above, body/appearance goods are forcibly repriced in SV even if you request AP. title/desc/detail/source are administrator-authored OS copy. A temporary plot item must answer something concrete in the visible story. Never use shop for ordinary lifestyle merchandise.
 lifestyleShop: dedicated 日常用品 shelf. Before CHARM ${AP_CHARM_CAP}, always leave []. At CHARM ${AP_CHARM_CAP}+, reconsider the CURRENT five-item shelf every assistant turn under the supplied lifestyleDisposition. If no change is useful, emit [] and the extension keeps all five unchanged. If ANY slot should change, emit EXACTLY 5 complete items representing the entire new shelf. Each item fields: title,desc,detail,icon,source,impact("minor"|"standard"|"major"),kind(skincare|food|daily|clothing|electronics|home|entertainment|service|other),consumable(boolean). Never include id, currency, price, bodyAxis or charmGain; these goods are AP-only and never change CHARM/body stats. Generate fresh context-specific products; do not reuse a fixed example as a template.
 status: optional story-status update with fields initialized(boolean),date,time,weather,location,people(array of names/labels),note. Only include supported in-story facts; omitted fields keep their stored value.
-memory: memory bootstrap/increment object. During first bootstrap use {bootstrap:true,short:[...],long:[...],core:[...]}. After initialization use bootstrap:false and only add durable new facts. short max 2 new items/turn, long max 2, core max 1. compactShort=true only when a new long summary genuinely replaces the accumulated short layer; compactLong=true only when a new core summary genuinely replaces the accumulated long layer.
+memory: rolling memory object. On first bootstrap use {bootstrap:true,short:[...],long:[...],permanent:[...]} already organized by the 15-SHORT -> 1-LONG and 10-LONG -> 1-PERMANENT ladder. After initialization, every completed plot round must provide exactly one short string of about 20-30 Chinese characters unless that round was already recorded by the extension. Use longSummary only when the current batch reaches 15 SHORT; use permanentSummary only when the current batch reaches 10 LONG. The extension owns threshold checks and clears the source bucket only after a valid summary is present.
 feedback.issues: max 2, only direct story evidence; fields id,axis(optional),source,note,severity(low|medium|high). source/note are his OS notes: short and specific, with his personal wording allowed.
 feedback.reactions: max 2, only directly observed reactions to established state/change; fields id,axis(optional),source,note,valence(negative|neutral|positive|sexual). source/note are SYSTEM log copy.
 men: max 3 qualifying adult men updates; fields id(optional for new),name,meta,summary,relation,desire,lastContact,note,badges,present,contactDelta,qualifies. MEN is the administrator's own archive: factual identity fields may stay concise, but summary/relation/desire/lastContact/note/badges should sound like he personally wrote them, including crude, mocking or sexual wording when the established facts support it.
@@ -3414,13 +3415,13 @@ function memoryMarkup(){
         <h3>${initialized?'旧账已经接上了':'等下一轮自动巡查旧聊天'}</h3>
       </div>
       ${labelValue('回填状态',initialized?'BOOTSTRAPPED':'PENDING',initialized?`首次回填参考了约 ${Number(memory.sourceTurns)||0} 条可见消息`:'第一次生成回复时，会回看当前模型能看到的旧聊天后再建档。')}
-      ${labelValue('记忆原则','只记会影响后续的东西','不保存普通走路、重复数值、无意义流水账，也不凭空补事实。')}
+      ${labelValue('滚动规则',`SHORT ${(memory.short||[]).length}/15 · LONG ${(memory.long||[]).length}/10`,'每回合一条短记忆；15条压1条长期，10条长期压1条永久。永久记忆不清空。')}
     </section>
 
     <section class="meme-memory-stack">
-      ${memoryLayerMarkup('近期','SHORT',memory.short,'还没有值得单独记下的近期事实。',true)}
-      ${memoryLayerMarkup('阶段','LONG',memory.long,'短期记忆积累到足够有意义时，会压成阶段总结。')}
-      ${memoryLayerMarkup('永久','CORE',memory.core,'真正长期影响剧情的关系、变化和关键事实才会进这里。')}
+      ${memoryLayerMarkup('近期','SHORT',memory.short,'下一回合会记下第一条短期记忆。',true)}
+      ${memoryLayerMarkup('长期','LONG',memory.long,'每满15条短期记忆，会压成约200字长期记忆。')}
+      ${memoryLayerMarkup('永久','PERMANENT',memory.permanent,'每满10条长期记忆，会压成一条永久记忆；这里不会因滚动压缩而消失。')}
     </section>
   `;
 }
