@@ -801,6 +801,15 @@ function cleanMemoryText(value,max=240){
   return String(value||'').replace(/\s+/g,' ').trim().slice(0,max);
 }
 
+function escapeUiText(value){
+  return String(value??'')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
 function uniqueMemoryList(values,maxItems,maxChars){
   const out=[];
   const seen=new Set();
@@ -1790,6 +1799,7 @@ async function reconcileRecentVisibleSettlements(){
 async function handleRuntimeEvent(messageId){
   if(!isBoundCharacter() || !hasActiveChat()) return;
   const context=globalThis.SillyTavern?.getContext?.()||{};
+  const visibleChatTurns=Array.isArray(context?.chat)?context.chat.length:0;
   const message=Number.isInteger(messageId)?context.chat?.[messageId]:null;
   if(!message || message.is_user) return;
 
@@ -2429,9 +2439,9 @@ Do not emit a new relationship signal merely because a previous feeling continue
 
 Current CHARM=${state.host.charm}; desire allowed by appearance=${desireAllowed}; adminLove=${loveState}.
 
-Only when the current story creates a genuinely relevant MÉMÉ OS state update — tasks, shop, feedback, MEN, evolution, permission, identity, or timeline — append ONE invisible HTML comment at the very end of the assistant reply.
+Append ONE invisible HTML comment at the very end of the assistant reply when the current story creates a relevant MÉMÉ OS state update — tasks, shop, status, memory, feedback, MEN, evolution, permission, identity, or timeline. IMPORTANT: when memoryNeedsBootstrap=true, the comment is MANDATORY even if no other state changed, because the one-time history backfill itself is the required state update.
 Format exactly: <!--MEME_OS_EVENT {"dailyTaskOffers":[],"taskOffers":[],"tasks":[],"storyRewards":[],"shop":[],"lifestyleShop":[],"status":{},"memory":{"bootstrap":false,"short":[],"long":[],"core":[],"compactShort":false,"compactLong":false},"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{},"timeline":{}} -->
-Do not emit the comment when nothing relevant changed.
+After memory has already been bootstrapped, do not emit the comment when nothing relevant changed.
 dailyTaskOffers: deprecated compatibility field; normally leave [] for new daily/story tasks because visible [TASK｜任务名｜任务要求] is the canonical source.
 taskOffers: maximum 1 new generated erotic mission; fields title,desc,detail,source. title/desc/detail/source are written in the administrator's current OS voice and may be personal, rude, obscene or judgmental when appropriate. Never include tier, id or rewards.
 tasks: max 4 completed ACTIVE task entries; fields id,status("completed"),evidence. Never include rewards; the extension calculates them.
@@ -3164,7 +3174,7 @@ function memoryLayerMarkup(title,code,items,emptyText,open=false){
       <summary><span><small>${code}</small><b>${title}</b></span><em>${list.length}</em></summary>
       <div class="meme-memory-body">
         ${list.length
-          ? list.map((item,index)=>`<article><i>${String(index+1).padStart(2,'0')}</i><p>${escapeHtml(item)}</p></article>`).join('')
+          ? list.map((item,index)=>`<article><i>${String(index+1).padStart(2,'0')}</i><p>${escapeUiText(item)}</p></article>`).join('')
           : `<p class="meme-memory-empty">${emptyText}</p>`}
       </div>
     </details>
