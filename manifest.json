@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.13.3",
+  "version": "0.13.4",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS 0.13.3 captures visible retroactive story rewards (TASK + 判定 + 奖励) as authoritative AP settlements, with hidden-event dedupe and recent-chat reconciliation.",
-  "js": "index-v0.13.3.js",
-  "css": "style.css?v=0.13.3",
+  "description": "MÉMÉ OS 0.13.4 adds a final hard long-reply gate for Gemini 3.1 Pro so short user input no longer collapses normal RP replies.",
+  "js": "index-v0.13.4.js",
+  "css": "style.css?v=0.13.4",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
