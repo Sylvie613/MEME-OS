@@ -74,7 +74,9 @@
         },
         "desire_policy": {
           "hidden_until_charm": 8,
-          "preunlock_visibility": "locked_only_no_names_targets_play_rewards_conditions"
+          "preunlock_visibility": "locked_only_no_names_targets_play_rewards_conditions",
+          "sealed_before_charm": 8,
+          "hide_locked_content": true
         },
         "system_progression": {
           "lv1": "consciousness_only",
