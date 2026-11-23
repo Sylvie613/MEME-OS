@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.12.0';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.12.0';
-import { isBoundCharacter } from './src/binding.js?v=0.12.0';
+} from './src/state.js?v=0.12.1';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.12.1';
+import { isBoundCharacter } from './src/binding.js?v=0.12.1';
 
 /**
- * MÉMÉ OS v0.12.0
+ * MÉMÉ OS v0.12.1
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -118,7 +118,9 @@ function currentStaticTaskPool(category,state=runtimeState()){
     return deterministicDailyRotationForDay(list,day,3);
   }
 
-  if(category==='desire') return deterministicTaskRotation(list,category,state,3);
+  // Foundational desire entries are backend milestones only.
+  // The visible DESIRE board is fully plot/person generated.
+  if(category==='desire') return [];
   if(category==='special') return deterministicTaskRotation(list,category,state,2);
   return [...list];
 }
@@ -473,6 +475,7 @@ function sanitizeGeneratedDesireTask(raw,state=runtimeState()){
     createdDay:Number(state.tasks?.storyDay)||1,
     createdTurn:Number(state.shop?.plotTurn)||0,
     source:adminCopyText(raw.source,'当前剧情',80),
+    targetManId:String(raw.targetManId||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48) || null,
   };
 }
 
@@ -958,7 +961,7 @@ function applyMemoryEvent(state,raw,visibleTurns=0){
 }
 
 function applyStoryStatusEvent(){
-  // Retired in v0.12.0. Scene date/time/weather/location live in visible prose only.
+  // Retired in v0.12.1. Scene date/time/weather/location live in visible prose only.
   return false;
 }
 
@@ -2984,22 +2987,67 @@ DIFFICULTY SEMANTICS: light = one quick low-effort action; normal = several link
 dailyTaskOffers is deprecated for new daily/story publication and should remain empty.
 If the current visible scene itself unexpectedly completes a genuinely substantial one-off system challenge that was not previously active, you MAY use storyRewards to let the extension recognize it retroactively, but only when the shared plot-favor budget above still permits it. storyRewards entries: maximum 1 useful candidate per reply; fields {title,evidence,source,difficulty}. Never put AP/SV numbers in storyRewards or visible prose; the extension calculates the real reward. Routine chores and ordinary self-care are explicitly ineligible unless they were already published as tasks.
 
-DYNAMIC DESIRE MISSION BOARD:
-The foundational desire milestones (spark/sample/oral/repeat/drain) are templates, not a permanently fixed screen. The visible fixed candidate subset reshuffles on each natural story day; completed non-repeatable milestones stay completed, while repeatable collection milestones may return on later days.
-Today's fixed desire candidate subset: ${JSON.stringify(currentStaticTaskPool('desire',state).map(t=>({id:t.id,title:t.title,desc:t.desc,state:t.state})))}.
-Current generated/accepted desire missions: ${JSON.stringify((state.tasks?.generated||[]).map(t=>({id:t.id,title:t.title,tier:t.tier,desc:t.desc,createdDay:t.createdDay,active:Boolean(state.tasks?.active?.[t.id])})))}.
+DYNAMIC DESIRE MISSION BOARD — FULLY GENERATED, NO DAILY FIXED POOL:
+The foundational spark/sample/oral/repeat/drain entries are BACKEND MILESTONES ONLY. Never present them as a rotating daily candidate subset. The visible DESIRE tab contains only generated missions plus any already accepted legacy mission that must remain until resolution.
+Current generated/accepted desire missions: ${JSON.stringify((state.tasks?.generated||[]).map(t=>({id:t.id,title:t.title,tier:t.tier,desc:t.desc,createdDay:t.createdDay,active:Boolean(state.tasks?.active?.[t.id]),targetManId:t.targetManId||null})))}.
 Distinct erotic missions already completed: ${distinctEroticTaskCount(state)}.
 Last story day on which a new generated desire mission was created: ${Number(state.tasks?.lastGeneratedDesireDay)||0}.
-At a new natural story day, unaccepted generated desire candidates from yesterday are discarded and may be replaced by a fresh mission when the plot naturally supports one. Prefer current/returning/recent MEN who are actually relevant to the scene; vary target, act, constraint and setting instead of mechanically reusing yesterday's man or structure. A new adult man may become relevant only if the visible plot genuinely introduces him.
-When no generated desire mission has been created on the current story day and the current plot/NPC/location/body state/unlocked capability genuinely suggests a fresh challenge, you may create ONE fitting new mission through taskOffers. Do not create one just to keep the board full.
+At a new natural story day, unaccepted generated desire candidates from yesterday are discarded. Accepted long-form DESIRE missions persist until completed, explicitly failed, or genuinely made impossible by the plot.
+Do NOT generate a DESIRE mission merely to keep the tab full. Generate one only when the current plot has a usable adult target/scenario and the mission can be acted on.
 
-Every generated desire mission must read unmistakably like an explicit vulgar adult-game mission, not a romance quest. A mission must center at least one concrete sexual/body challenge: explicit sexual acts, masturbation, oral/hand/foot/breast/penetrative or anal play, semen/SV collection, orgasm or arousal control, nudity/exposure, dirty or humiliating presentation, sexual endurance, position/control constraints, multiple-stimulus challenges, toy/mechanical stimulation, or another comparably explicit adult objective supported by the current plot. Use direct body/sex vocabulary when relevant.
-Do NOT create missions whose actual objective is merely dating, kissing romantically, being complimented, getting a man's phone number, being liked, raising affection, making the administrator jealous, comforting him, earning his praise, or otherwise "攻略系统哥". Those may happen incidentally in story, but they are not sufficient erotic-mission objectives.
-Generated erotic missions are one-time challenges, not repeatable collection farming. They should vary meaningfully in act, body part, constraint, target, setting, social risk, collection goal, endurance, control, presentation, number of participants or adult scenario structure. Do not merely rename an old task or paraphrase a completed one.
-Generated mission reward tier is derived automatically from current CHARM: no dynamic desire mission exists before CHARM 8, and later reward tiers rise with progression. Do not mention or choose the internal tier.
-taskOffers entries contain only {title,desc,detail,source}. Do NOT choose tier, AP/SV rewards or ids; the extension derives the tier from current CHARM, creates a deterministic id and assigns the reward.
-All generated task names/descriptions are written in the administrator's vulgar personal voice, not neutral quest prose. Names should be shameless, dirty and specific rather than elegant euphemisms.
-Only the first completion of each distinct erotic mission counts toward administrator evolution. Repeating sample/oral/drain for SV never counts as another different mission.
+EROTIC MALE GENERATION FORMULA:
+When a DESIRE mission needs a male target, choose in this order:
+A) an actually relevant CURRENT / RETURNING / RECENT MEN person already present in the visible scene, if the task naturally fits him;
+B) otherwise, only when the visible plot can naturally introduce someone, generate ONE new explicit-adult male NPC using this formula:
+SETTING-COMPATIBLE ROLE / PROFESSION / CLASS
+× FACE / STYLE / HEIGHT VARIATION
+× PHYSIQUE
+× HYGIENE / SCENT
+× TEMPERAMENT / SPEECH
+× SEXUAL ATTITUDE / EXPERIENCE
+× CURRENT MOTIVE / AVAILABILITY
+× SEX-SPECIFIC BODY / PERFORMANCE VARIABLES
+× SCENE ROLE.
+The dimensions must vary independently. Do not collapse them into one recurring archetype.
+
+RANDOM TASK-MALE HARD RULES:
+- Explicit adult; no visibly elderly/old man.
+- Profession, class, wealth, face, style, temperament, height and social status may vary widely. Do NOT make everyone a rich tall handsome elite.
+- Body build defaults to physically usable/appealing: proportionate, sturdy, fit, athletic, lean-muscular or otherwise clearly decent shape.
+- Hard exclusions: severely obese/"肥猪型", emaciated/bony/"瘦排骨", frightening or room-filling body odor.
+- Ordinary sweat, roughness, plain/ugly face, scars, baldness, disability, poverty, awkwardness or unconventional looks may exist.
+- Sexual anatomy/performance may vary for random task NPCs; do not automatically make every random man perfect.
+- Existing MEN identity is canonical. Never redesign a known man just because a new mission uses him.
+
+LONG-TERM SOLIDIFICATION FORMULA:
+A task NPC does NOT become a romance route, protagonist, or "quality male" merely because sex happened or he entered MEN.
+Only if the host herself later actively re-cues him — mentions him again, seeks him out, contacts him, invites him, or explicitly wants continued development — may long-term solidification be considered.
+For a man to qualify for sustained relationship development, apply the quality lock: excellent appearance, excellent height conditions, excellent physique/proportions, healthy/clean body and good hygiene/scent, clearly superior sexual anatomy and strong sexual performance/stamina. Personality may still have real flaws.
+If he passes and the host actively re-cues him, then stabilize a full independent biography and preserve it: name, adult age, height, appearance, physique, voice, hygiene/scent, sexual conditions, job/economy, home/area, routine, hobbies, social circle, important relationships, core personality, speech habits, values, love/sex attitudes, past, flaws, goals, pre-host life, first meeting, CHARM stage at meeting, impression of host, and reason for continued contact.
+His life must not revolve around the host. Core traits/history cannot drift after solidification.
+
+EROTIC MISSION GENERATION FORMULA:
+MISSION =
+TARGET MAN
+× CURRENT SCENE / LOCATION
+× CURRENT CHARM TIER
+× UNLOCKED HOST BODY / SEX CAPABILITIES
+× SEXUAL ACT / BODY PART
+× CONSTRAINT / CONTROL / PRESENTATION / RISK
+× MEASURABLE COMPLETION OR SV/COLLECTION GOAL.
+
+Every generated DESIRE mission must be a concrete explicit adult-game challenge supported by the current plot. It may use masturbation, oral/hand/foot/breast/penetrative/anal play, semen/SV collection, orgasm/arousal control, nudity/exposure, dirty/humiliating presentation, endurance, position/control constraints, multiple-stimulus challenges, toy/mechanical stimulation, number-of-participants structure, or another explicit objective appropriate to the current CHARM and scene.
+Vary the combination across missions. Do not simply rename yesterday's act, swap one body part, or recycle the same man/setting/constraint pattern.
+
+Do NOT make the actual objective dating, romantic kissing, being complimented, obtaining a phone number, being liked, raising affection, making the administrator jealous, comforting him, earning his praise, or "攻略系统哥". Those may happen incidentally but are not DESIRE objectives.
+The administrator is not the default target. He can become relevant only if his physical form and the actual plot make him relevant organically.
+
+Generated mission reward tier is derived automatically from current CHARM: no dynamic DESIRE mission exists before CHARM 8, and later reward tiers rise with progression. Do not mention or choose the internal tier.
+taskOffers entries contain {title,desc,detail,source,targetManId(optional)}. Never choose tier, AP/SV rewards or ids.
+If a NEW adult man is introduced specifically for this mission, the SAME hidden MÉMÉ_OS_EVENT must also include a matching men entry so MEN can track him. Use the generated MEN id as taskOffers.targetManId when available.
+All generated task names/descriptions are written in the administrator's vulgar personal voice, not neutral quest prose.
+Only the first completion of each distinct erotic mission counts toward administrator evolution. Repeat collection farming does not count as a new distinct mission.
+
 
 TASK COMPLETION / VERIFICATION:
 Currently active tasks: ${JSON.stringify(Object.values(state.tasks?.active||{}).map(t=>({id:t.id,title:t.title,category:t.category,storyDay:t.storyDay})))}.
@@ -3080,7 +3128,7 @@ Format exactly: <!--MEME_OS_EVENT {"dailyTaskOffers":[],"taskOffers":[],"tasks":
 After memory has already been bootstrapped, do not emit the comment when nothing relevant changed.
 timeline: storyDay is the absolute in-world day represented by the visible narrative, not a turn counter. If the reply crosses into a later natural day, timeline is mandatory even if there are no other state changes. dayAdvance=true only when storyDay is greater than the current OS story day.
 dailyTaskOffers: deprecated compatibility field; normally leave [] for new daily/story tasks because visible [TASK｜任务名｜任务要求] is the canonical source.
-taskOffers: maximum 1 new generated erotic mission; fields title,desc,detail,source. title/desc/detail/source are written in the administrator's current OS voice and may be personal, rude, obscene or judgmental when appropriate. Never include tier, id or rewards.
+taskOffers: maximum 1 new generated erotic mission; fields title,desc,detail,source,targetManId(optional). title/desc/detail/source are written in the administrator's current OS voice. Never include tier, id or rewards. When a new male NPC is generated for the mission, also emit the matching men entry in the same event and link its id through targetManId.
 tasks: max 4 completed ACTIVE task entries; fields id,status("completed"),evidence. Never include rewards; the extension calculates them.
 storyRewards: max 1 candidate and it shares the same daily/turn quota as plot [TASK] issuance. Use only for substantial unexpected achievements, never ordinary chores/self-care. Fields title,evidence,source,difficulty(light|normal|hard). Never include AP/SV numbers.
 shop: maximum 2 BODY/PLOT temporary items only. Fields: title,desc,detail,currency("AP"|"SV"),ttl,icon,source,impact("minor"|"standard"|"major"),bodyAxis(optional),sourceIssueId(optional). At CHARM ${AP_CHARM_CAP} or above, body/appearance goods are forcibly repriced in SV even if you request AP. title/desc/detail/source are administrator-authored OS copy. A temporary plot item must answer something concrete in the visible story. Never use shop for ordinary lifestyle merchandise.
@@ -4179,7 +4227,7 @@ function taskMarkup() {
     <section class="meme-page-card meme-task-rules">
       <div class="meme-card-title"><small>MY RULES</small><h3>听清楚再接</h3></div>
       ${labelValue('日常','每天固定轮换 3 个基础日常；前两天出现过的任务优先禁止连续回池。当天完成后退出，剧情临时 TASK 另算，不占这 3 个位置。')}
-      ${labelValue('欲望','基础里程碑只是模板；每天会结合当前男人、地点、CHARM 与剧情刷新候选，已接取的长期任务不会被强行抹掉。')}
+      ${labelValue('欲望','欲望栏不抽固定池；任务由当前男人 × 地点 × CHARM × 性行为 × 限制条件 × 结算目标现场生成。已接取任务不会因换天被强行抹掉。')}
       ${labelValue('不同任务',`${distinctEroticTaskCount(state)} 个已完成`,'重复做同一任务不重复计数')}
       ${labelValue('特殊','候选会随自然日轮换；真正的剧情放水任务不会高频出现。')}
       ${labelValue('结算','接取只登记任务，不要求立刻完成。以后剧情里什么时候真正做到，模型验收通过时扩展才发奖励并划掉任务。')}
@@ -4383,7 +4431,7 @@ function menMarkup() {
       ${labelValue('RECENT','最多 8 个。睡过、榨过、约过、留过联系方式才配进。')}
       ${labelValue('RETURNING','最多 5 个。真的再次出现才算，不叫长期对象。')}
       ${labelValue('路人','说两句话、看两眼就走的废物我懒得记。')}
-      <p class="meme-men-rule-note">淡出 MEN 的旧人只在 RECORD 留一笔。以后真撞回来，我会把旧档案重新翻出来。</p>
+      <p class="meme-men-rule-note">随机任务男只是任务对象。只有你主动再次找他、联系他或明确想继续，而且他通过长期质量锁，才会固化成有完整小传和独立生活线的人物。</p>
     </section>
   `;
 }
@@ -4652,7 +4700,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
-        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.12.0</small>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.12.1</small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
