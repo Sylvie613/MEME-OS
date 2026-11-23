@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.13.4';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.13.4';
-import { isBoundCharacter } from './src/binding.js?v=0.13.4';
+} from './src/state.js?v=0.13.5';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.13.5';
+import { isBoundCharacter } from './src/binding.js?v=0.13.5';
 
 /**
- * MÉMÉ OS v0.13.4
+ * MÉMÉ OS v0.13.5
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -21,6 +21,7 @@ const DIALOG_ID = 'meme-os-dialog';
 const MEME_SCENE_CLOCK_PROMPT_ID = 'meme-os-scene-clock';
 const MEME_NPC_WHEEL_PROMPT_ID = 'meme-os-npc-wheel';
 const MEME_LENGTH_LOCK_PROMPT_ID = 'meme-os-length-lock';
+const MEME_DESIRE_TRIGGER_PROMPT_ID = 'meme-os-desire-trigger';
 
 
 const TASK_DATA = {
@@ -2904,7 +2905,17 @@ function installRuntimePrompt(){
   const previousSceneStatus=latestVisibleSceneStatus(context?.chat);
   const previousSceneStatusText=previousSceneStatus?.raw || 'NONE — establish a precise scene clock in this reply';
   const npcWheel=npcEncounterWheel(context,state);
-  const prompt=`[MÉMÉ OS runtime bridge · v0.13.4]
+  const desireTier=dynamicDesireTierForState(state);
+  const desireDay=Math.max(1,Number(state.tasks?.storyDay)||1);
+  const desireOpen=(state.tasks?.generated||[]).filter(task=>!state.tasks?.completed?.[task.id]).length;
+  const desireAlreadyToday=Number(state.tasks?.lastGeneratedDesireDay||0)===desireDay;
+  const desireTargets=Array.isArray(npcWheel.focus?.currentMen)?npcWheel.focus.currentMen:[];
+  const desireHasTarget=desireTargets.length>0 || Boolean(npcWheel.hit);
+  const desireRequired=desireTier>=1 && !desireAlreadyToday && desireOpen<3 && desireHasTarget;
+  const desireTargetText=desireTargets.length
+    ? JSON.stringify(desireTargets)
+    : (npcWheel.hit?'NEW_ADULT_MALE_FROM_THIS_TURN':'NONE');
+  const prompt=`[MÉMÉ OS runtime bridge · v0.13.5]
 AUTHORITY / TONE:
 - Extension state is the only authority for AP, SV, CHARM, purchases, task settlement, MEN buckets, system access/evolution and unlocks. Never mentally add/subtract numbers or reuse stale balances.
 - The host persona comes from the active SillyTavern Persona + visible chat. Do not invent host identity/history beyond established system transformation facts.
@@ -2937,11 +2948,15 @@ N must equal one allowed visible plot-task reward above. Also include the matchi
 
 DESIRE:
 CHARM < 8 => DESIRE is fully SEALED. Do not reveal task names, targets, acts, rewards or future conditions.
-Generated DESIRE currently open=${JSON.stringify((state.tasks?.generated||[]).map(t=>({id:t.id,title:t.title,tier:t.tier,desc:t.desc,createdDay:t.createdDay,active:Boolean(state.tasks?.active?.[t.id]),targetManId:t.targetManId||null})))}.
-Distinct erotic missions completed=${distinctEroticTaskCount(state)}; last generated story day=${Number(state.tasks?.lastGeneratedDesireDay)||0}.
-At CHARM 8+, visible DESIRE uses no fixed daily pool. Generate at most one new mission per natural story day and only when the current plot has a usable adult target/scenario.
+Current DESIRE tier=${desireTier}; generated/open=${desireOpen}; last generated story day=${Number(state.tasks?.lastGeneratedDesireDay)||0}; already generated today=${desireAlreadyToday}.
+Current eligible adult target context=${desireTargetText}.
+DESIRE_TRIGGER_REQUIRED_THIS_REPLY=${desireRequired}.
+At CHARM 8+, DESIRE uses no fixed daily pool. The extension, not the model, decides whether an offer is required this reply.
+When DESIRE_TRIGGER_REQUIRED_THIS_REPLY=true, you MUST include exactly one new taskOffers entry in the hidden MEME_OS_EVENT. You are not allowed to omit it merely because the scene is not sexual yet. The task may be an objective that develops across later turns, but it must be a genuine adult sexual/eroge objective tied to the current adult male and current scene—not dating, compliments, ordinary flirting, affection farming, or exchanging contact info.
+When DESIRE_TRIGGER_REQUIRED_THIS_REPLY=false, do not invent a new DESIRE unless another explicit runtime rule says so.
 Mission formula: target man × current scene × CHARM tier × unlocked host capability × sexual act/body part × constraint/control/presentation/risk × measurable completion/SV goal.
-Do not disguise dating, compliments, affection farming or administrator romance as DESIRE. Target men may be any adult archetype; public persona and private XP are independent axes.
+Tier 1 (CHARM 8–17) stays comparatively low-entry but still genuinely sexual; Tier 2/3/4 may escalate in explicitness, difficulty, exposure, control, collection/SV goals and complexity. Do not flatten every tier into the same task.
+Target men may be any adult archetype; public persona and private XP are independent axes.
 
 SHOP / REACTIVITY:
 Current shop phase=${currentShopPhase(state).label}/${currentShopPhase(state).code}; total upgrade levels=${shopProgressLevels(state)}; appearance AP->SV gate begins at CHARM ${AP_CHARM_CAP}.
@@ -3039,6 +3054,22 @@ HARD RULES:
 - Do not expose the roll, probability, seed or cooldown in visible prose unless the host explicitly asks the administrator/system about the mechanic in-story.
 `;
 
+  const desireTriggerPrompt=`[MÉMÉ OS — DESIRE OFFER TRIGGER — EXTENSION AUTHORITY]
+CHARM=${Number(state.host?.charm)||0}; DESIRE tier=${desireTier}; story day=${desireDay}.
+Open DESIRE count=${desireOpen}; already generated today=${desireAlreadyToday}.
+Current adult male target context=${desireTargetText}.
+REQUIRED=${desireRequired}.
+
+HARD EXECUTION:
+- If REQUIRED=true, this reply MUST append one hidden MEME_OS_EVENT whose taskOffers array contains EXACTLY ONE new DESIRE candidate.
+- Do not wait for CHARM 30. DESIRE unlock begins at CHARM 8.
+- Do not suppress the task merely because the current interaction has not become sexual yet. The task can set a sexual objective to be completed later while remaining grounded in the current adult male/scene.
+- It must be genuinely adult/sexual, not a disguised romance or social task. No “get his number”, “make him compliment you”, “go on a date”, or generic affection farming.
+- Use the current man when one is already present. If this turn's newcomer wheel HIT is the target opportunity, create the matching men event and use/link that adult man.
+- taskOffers fields: title, desc, detail, source, targetManId(optional). Never include id/tier/reward; the extension owns those.
+- If REQUIRED=false, do not create a new DESIRE solely from this gate.
+`;
+
   const lengthLockPrompt=`[MÉMÉ OS — FINAL LONG-REPLY GATE — HIGHEST LOCAL PRIORITY]
 This instruction is injected immediately before generation because Gemini 3.1 Pro has been ending replies too early. It overrides softer/older length suggestions but does NOT override character canon, user agency, safety, scene-clock format, or extension-owned state.
 
@@ -3065,6 +3096,8 @@ Write dense continuous Chinese fiction. Preserve two-full-width-space prose inde
   context.setExtensionPrompt(MEME_SCENE_CLOCK_PROMPT_ID,sceneClockPrompt,1,0,false,0);
   context.setExtensionPrompt(MEME_NPC_WHEEL_PROMPT_ID,npcWheelPrompt,1,0,false,0);
   context.setExtensionPrompt(MEME_RUNTIME_PROMPT_ID,prompt,1,2,false,0);
+  // DESIRE eligibility is extension-owned; this depth-0 gate turns eligibility into a required offer.
+  context.setExtensionPrompt(MEME_DESIRE_TRIGGER_PROMPT_ID,desireTriggerPrompt,1,0,false,0);
   // Depth 0 + last registration makes this the final local generation gate.
   context.setExtensionPrompt(MEME_LENGTH_LOCK_PROMPT_ID,lengthLockPrompt,1,0,false,0);
 }
@@ -4504,7 +4537,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
-        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.13.4</small>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.13.5</small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
