@@ -2802,7 +2802,7 @@ function classifyNpcEncounterSource(source=''){
   if(/(小区|楼道|走廊|电梯|楼下|门口|快递柜|物业|停车场|地下车库|公寓公共区|宿舍楼)/iu.test(text)){
     return {id:'residential',label:'住宅公共区',multiplier:0.55};
   }
-  if(/(家里|家中|卧室|客厅|厨房|浴室|卫生间|阳台|床上|房间里|宿舍里|公寓里|在家)/iu.test(text)){
+  if(/(家里|家中|卧室|客厅|厨房|浴室|卫生间|阳台|床上|房间里|宿舍里|公寓里|在家|回家|回到家|到家)/iu.test(text)){
     return {id:'home',label:'私人住宅',multiplier:0.35};
   }
   return null;
@@ -4097,7 +4097,11 @@ function renderTaskList(category='daily') {
   const generated=category==='desire'
     ? (state.tasks?.generated||[]).map(task=>({...task,category:'desire',dynamicTask:true}))
     : [];
-  return [...base,...generated].map(task=>taskItem(task)).join('');
+  const all=[...base,...generated];
+  if(category==='desire' && !all.length){
+    return '<div class="meme-men-empty"><small>DESIRE BOARD</small><b>现在没活</b><p>欲望栏已经开放，但任务只从当前剧情和成年对象现场生成；没有合适情境时不会硬塞一条。</p></div>';
+  }
+  return all.map(task=>taskItem(task)).join('');
 }
 
 function taskMarkup() {
