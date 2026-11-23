@@ -749,12 +749,6 @@ function taskFromCanonicalMarker(card,state=runtimeState()){
   return task;
 }
 
-function inferVisibleDailyTaskOffer(raw,state=runtimeState()){
-  const markers=extractCanonicalTaskMarkers(raw);
-  if(!markers.length) return null;
-  return taskFromCanonicalMarker(markers[markers.length-1],state);
-}
-
 function distinctEroticTaskCount(state=runtimeState()){
   return Object.values(state.tasks?.completed||{}).filter(task=>task?.category==='desire').length;
 }
@@ -961,11 +955,6 @@ function applyMemoryEvent(state,raw,visibleTurns=0){
   return changed;
 }
 
-function applyStoryStatusEvent(){
-  // Retired in v0.12.5. Scene date/time/weather/location live in visible prose only.
-  return false;
-}
-
 function extractJsonObject(raw){
   const text=String(raw||'').trim()
     .replace(/^\`\`\`(?:json)?\s*/i,'')
@@ -974,23 +963,6 @@ function extractJsonObject(raw){
   const end=text.lastIndexOf('}');
   if(start<0 || end<=start) return null;
   try{return JSON.parse(text.slice(start,end+1));}catch{return null;}
-}
-
-function storyDateLabel(state=runtimeState()){
-  const stored=String(state.storyStatus?.date||'').trim();
-  if(stored && !/^DAY\s+\d+/i.test(stored)) return stored;
-  const day=Math.max(1,Number(state.tasks?.storyDay)||1);
-  const date=new Date(Date.UTC(2026,6,18));
-  date.setUTCDate(date.getUTCDate()+day-1);
-  return `${date.getUTCMonth()+1}月${date.getUTCDate()}日`;
-}
-
-function advanceStoryDateLabel(label,days=1){
-  const match=String(label||'').match(/^(\d{1,2})月(\d{1,2})日$/);
-  if(!match) return label;
-  const date=new Date(Date.UTC(2026,Number(match[1])-1,Number(match[2])));
-  date.setUTCDate(date.getUTCDate()+Math.max(1,Number(days)||1));
-  return `${date.getUTCMonth()+1}月${date.getUTCDate()}日`;
 }
 
 function extractVisibleStoryDay(raw=''){
@@ -1143,29 +1115,14 @@ function reconstructStoryTimeline(chat=[]){
   };
 }
 
-function syncStoryDayTo(state,targetDay,{source='timeline-scan',explicitDate=false,allowCorrection=true}={}){
+function syncStoryDayTo(state,targetDay,{source='timeline-scan',allowCorrection=true}={}){
   const target=Math.max(1,Number(targetDay)||1);
   state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],dismissed:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
   const current=Math.max(1,Number(state.tasks.storyDay)||1);
   if(target===current) return false;
   if(target<current && !allowCorrection) return false;
 
-  const previousDate=storyDateLabel(state);
-  const delta=target-current;
   state.tasks.storyDay=target;
-  state.storyStatus=state.storyStatus||{initialized:false,date:'',time:'',weather:'晴 · 闷热',location:'',people:[],note:'盛夏',updatedTurn:0};
-
-  if(!explicitDate){
-    if(delta>0){
-      state.storyStatus.date=advanceStoryDateLabel(previousDate,delta);
-    }else{
-      const date=new Date(Date.UTC(2026,6,18));
-      date.setUTCDate(date.getUTCDate()+target-1);
-      state.storyStatus.date=`${date.getUTCMonth()+1}月${date.getUTCDate()}日`;
-    }
-    state.storyStatus.initialized=true;
-    state.storyStatus.updatedTurn=Math.max(0,Number(state.shop?.plotTurn)||0);
-  }
 
   for(const [taskId] of Object.entries(state.tasks.active||{})){
     const task=findTask(taskId,state);
@@ -1214,9 +1171,6 @@ async function quietSyncMemory({force=false,bootstrapOnly=false}={}){
   state.memory.short=Array.isArray(state.memory.short)?state.memory.short:[];
   state.memory.long=Array.isArray(state.memory.long)?state.memory.long:[];
   state.memory.permanent=Array.isArray(state.memory.permanent)?state.memory.permanent:[];
-  state.storyStatus=state.storyStatus||{
-    initialized:false,date:'',time:'',weather:'晴 · 闷热',location:'',people:[],note:'盛夏',updatedTurn:0,
-  };
 
   const turn=Math.max(0,Number(state.shop?.plotTurn)||0);
   const bootstrap=!state.memory.initialized;
@@ -1248,8 +1202,7 @@ async function quietSyncMemory({force=false,bootstrapOnly=false}={}){
 3. 最后不足15个回合的尾段，逐回合放进 short，最多14条。
 4. 每满10条 long，再把那10条压成1条约220-320字的 permanent，并从 long 中移除。permanent 永久保留。
 5. 不记录AP/SV/CHARM余额；系统结构化数值由扩展自己保存。
-6. status 反映当前最新剧情现场。若历史没有明确日期，date 写 "${currentDate}"；默认盛夏。没有明确天气时 weather 写 "${currentWeather}"。
-7. 不凭空编造人物、事件或关系。`
+6. 不凭空编造人物、事件或关系。`
     : `你正在给 MÉMÉ OS 做本回合 MEMORY 同步。
 
 当前 SHORT（${shortCount}/15）：
@@ -1267,8 +1220,7 @@ ${JSON.stringify(state.memory.permanent)}
 2. needShortCompression=${needShortCompression}。若为 true，longSummary 必须把构成本批次的15条 SHORT 压成约180-220字的一条长期记忆。若本次同时需要新short，必须把刚生成的这条也算进15条里。若为 false，longSummary 留空。
 3. needLongCompression=${needLongCompression}。若为 true，permanentSummary 必须把构成本批次的10条 LONG 压成约220-320字永久记忆；如果本次刚生成第10条 longSummary，也必须把它算进去。若为 false，permanentSummary 留空。
 4. LONG/永久总结要保留人物关系、重要变化、持续后果和关键剧情，不要写成空泛感想。
-5. status 更新到最新剧情现场。日期没有变化就沿用 "${currentDate}"；天气没有剧情变化就沿用 "${currentWeather}"。
-6. 不写AP/SV/CHARM余额，不猜不存在的事实。`;
+5. 不写AP/SV/CHARM余额，不猜不存在的事实。`;
 
   try{
     const raw=await generateQuietPrompt({quietPrompt:prompt});
@@ -2407,7 +2359,6 @@ async function reconcileRecentVisibleSettlements(){
 async function handleRuntimeEvent(messageId){
   if(!isBoundCharacter() || !hasActiveChat()) return;
   const context=globalThis.SillyTavern?.getContext?.()||{};
-  const visibleChatTurns=Array.isArray(context?.chat)?context.chat.length:0;
   const message=Number.isInteger(messageId)?context.chat?.[messageId]:null;
   if(!message || message.is_user) return;
 
@@ -2508,7 +2459,6 @@ async function handleRuntimeEvent(messageId){
   const allMatches=[...raw.matchAll(/<!--MEME_OS_EVENT\s+([\s\S]*?)-->/g)];
   const matches=allMatches.length ? [allMatches[allMatches.length-1]] : [];
   let changed=true;
-  let structuredDailyOfferSeen=canonicalTasks.length>0;
   const touchedMenIds=new Set();
 
   for(const match of matches){
@@ -2516,22 +2466,6 @@ async function handleRuntimeEvent(messageId){
       const event=JSON.parse(match[1].trim());
 
       state.reactivity=state.reactivity||{recentChanges:[],recentIssues:[],recentReactions:[]};
-
-      if(Array.isArray(event.dailyTaskOffers) && canonicalTasks.length===0){
-        if(event.dailyTaskOffers.length) structuredDailyOfferSeen=true;
-        state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
-        state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
-        const openDynamic=state.tasks.generatedDaily.filter(task=>!state.tasks.everCompleted?.[task.id]).length;
-        const canGenerate=openDynamic<8 && Number(state.tasks.lastGeneratedDailyTurn||0)!==Number(state.shop.plotTurn||0);
-        if(canGenerate){
-          const task=sanitizeGeneratedDailyTask(event.dailyTaskOffers[0],state);
-          if(task){
-            state.tasks.generatedDaily=[task,...state.tasks.generatedDaily.filter(old=>old.id!==task.id)].slice(0,8);
-            state.tasks.lastGeneratedDailyTurn=Number(state.shop.plotTurn)||0;
-            changed=true;
-          }
-        }
-      }
 
       if(Array.isArray(event.taskOffers)){
         state.tasks=state.tasks||{storyDay:1,active:{},generated:[],lastGeneratedDesireDay:0,completed:{},dailyCompleted:{},everCompleted:{}};
@@ -2623,7 +2557,6 @@ async function handleRuntimeEvent(messageId){
         }
       }
 
-      if(applyMemoryEvent(state,event.memory,visibleChatTurns)) changed=true;
 
       // timeline.storyDay/dayAdvance is advisory metadata only.
       // The complete visible chat timeline is the sole authority for storyDay.
@@ -4126,24 +4059,6 @@ function statsMarkup(compact = false) {
       <article><small>SV</small><strong>${String(state.resources.sv).padStart(3,'0')}</strong><em>精液值</em></article>
       <article><small>CHARM</small><strong>${formatCharm(state.host.charm)}</strong><em>综合魅力</em></article>
     </div>
-  `;
-}
-
-function storyStatusMarkup(state=runtimeState()){
-  const status=state.storyStatus||{};
-  const date=status.date || `DAY ${String(Math.max(1,Number(state.tasks?.storyDay)||1)).padStart(3,'0')}`;
-  const time=status.time || '—';
-  const weather=status.weather || '—';
-  const location=status.location || '—';
-  const people=Array.isArray(status.people)&&status.people.length ? status.people.join(' · ') : '—';
-  return `
-    <section class="meme-story-status">
-      <span><small>DATE</small><b>${date}</b></span>
-      <span><small>TIME</small><b>${time}</b></span>
-      <span><small>WEATHER</small><b>${weather}</b></span>
-      <span class="is-wide"><small>LOCATION</small><b>${location}</b></span>
-      <span class="is-wide"><small>WITH</small><b>${people}</b></span>
-    </section>
   `;
 }
 
