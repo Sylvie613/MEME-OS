@@ -558,6 +558,7 @@ function applyEffect(state, effect) {
             reward: String(task.reward || ''),
             tier: Number.isFinite(Number(task.tier)) ? Number(task.tier) : null,
             targetManId: task.targetManId ? String(task.targetManId) : null,
+            targetName: String(task.targetName || ''),
             dynamicTask: Boolean(task.dynamicTask),
             dynamicDailyTask: Boolean(task.dynamicDailyTask),
             storyDay: Number(state.tasks.storyDay) || 1,
