@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.13.8';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.13.8';
-import { isBoundCharacter } from './src/binding.js?v=0.13.8';
+} from './src/state.js?v=0.13.9';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.13.9';
+import { isBoundCharacter } from './src/binding.js?v=0.13.9';
 
 /**
- * MÉMÉ OS v0.13.8
+ * MÉMÉ OS v0.13.9
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -485,6 +485,17 @@ function sanitizeGeneratedDesireTask(raw,state=runtimeState()){
   if((state.tasks?.generated||[]).some(task=>task.id===id)) return null;
   if(state.tasks?.active?.[id]) return null;
 
+  const presentMen=[
+    ...(Array.isArray(state.men?.current)?state.men.current:[]),
+    ...(Array.isArray(state.men?.returning)?state.men.returning:[]),
+  ].filter((person,index,list)=>person?.id && list.findIndex(item=>item?.id===person.id)===index);
+  let targetManId=String(raw.targetManId||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48) || null;
+  if(!targetManId && presentMen.length===1) targetManId=String(presentMen[0].id);
+  if(!targetManId){
+    console.warn('[MÉMÉ OS] rejected DESIRE: missing targetManId for current adult-male task',{title});
+    return null;
+  }
+
   return {
     id,
     type:'DESIRE',
@@ -500,7 +511,7 @@ function sanitizeGeneratedDesireTask(raw,state=runtimeState()){
     createdDay:Number(state.tasks?.storyDay)||1,
     createdTurn:Number(state.shop?.plotTurn)||0,
     source:adminCopyText(raw.source,'当前剧情',80),
-    targetManId:String(raw.targetManId||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48) || null,
+    targetManId,
   };
 }
 
@@ -883,7 +894,7 @@ function escapeUiText(value){
 
 function extractVisibleStoryDay(raw=''){
   const text=String(raw||'').slice(0,6000);
-  const matches=[...text.matchAll(/[【\[]\s*DAY\s*0*(\d{1,3})\s*[】\]]/gi)];
+  const matches=[...text.matchAll(/[【\[]\s*DAY\s*0*(\d{1,3})(?=\s*(?:[｜|]|[】\]]))/gi)];
   if(!matches.length) return null;
   const days=matches
     .map(match=>Math.max(1,Number(match[1])||0))
@@ -2919,7 +2930,10 @@ function currentMaleSceneFocus(context,state=runtimeState()){
   const recent=recentSceneText(chat,3);
   const user=latestUserTurnSeed(chat);
   const userText=String(user.text||'');
-  const currentMen=Array.isArray(state.men?.current)?state.men.current:[];
+  const currentMen=[
+    ...(Array.isArray(state.men?.current)?state.men.current:[]),
+    ...(Array.isArray(state.men?.returning)?state.men.returning:[]),
+  ].filter((person,index,list)=>person?.id && list.findIndex(item=>item?.id===person.id)===index);
   const explicitNew=userExplicitlyInvitesNewMaleInteraction(context);
   const currentTurn=Math.max(0,Number(state.shop?.plotTurn)||0);
 
@@ -3071,7 +3085,7 @@ function installRuntimePrompt(){
     ...(state.tasks?.generated||[]).map(t=>({title:t.title,desc:t.desc,tier:t.tier,status:'open'})),
     ...Object.values(state.tasks?.completed||{}).filter(t=>t?.category==='desire').map(t=>({title:t.title,desc:t.desc,tier:t.tier,status:'completed'})),
   ].slice(-6);
-  const prompt=`[MÉMÉ OS runtime bridge · v0.13.8]
+  const prompt=`[MÉMÉ OS runtime bridge · v0.13.9]
 AUTHORITY / TONE:
 - Extension state is the only authority for AP, SV, CHARM, purchases, task settlement, MEN buckets, system access/evolution and unlocks. Never mentally add/subtract numbers or reuse stale balances.
 - The host persona comes from the active SillyTavern Persona + visible chat. Do not invent host identity/history beyond established system transformation facts.
@@ -3089,7 +3103,7 @@ Body/upgrades=${JSON.stringify(state.host?.body||{})}.
 TASK BOARD:
 Base DAILY today=${JSON.stringify(currentStaticTaskPool('daily',state).map(t=>({id:t.id,title:t.title,desc:t.desc,reward:t.reward})))}.
 Plot DAILY currently open=${JSON.stringify((state.tasks?.generatedDaily||[]).map(t=>({id:t.id,title:t.title,desc:t.desc,difficulty:t.difficulty,source:t.source,createdDay:t.createdDay,active:Boolean(state.tasks?.active?.[t.id])})))}.
-Active tasks=${JSON.stringify(Object.values(state.tasks?.active||{}).map(t=>({id:t.id,title:t.title,category:t.category,desc:t.desc||null,detail:t.detail||null,reward:t.reward||null,tier:t.tier||null,targetManId:t.targetManId||null,storyDay:t.storyDay})))}.
+Active tasks=${JSON.stringify(Object.values(state.tasks?.active||{}).map(t=>({id:t.id,title:t.title,category:t.category,desc:t.desc||null,detail:t.detail||null,reward:t.reward||null,tier:t.tier||null,targetManId:t.targetManId||null,targetName:t.targetName||null,storyDay:t.storyDay})))}.
 Completed daily action tags today=${JSON.stringify([...completedDailyActionTags(state)])}.
 Dismissed plot tasks today=${JSON.stringify((state.tasks?.dismissed||[]).filter(t=>Number(t.storyDay||0)===Number(state.tasks?.storyDay||1)).map(t=>({title:t.title,actionTags:t.actionTags})))}.
 Plot-task budget today=${plotTaskFreq.count}/${plotTaskFreq.limit||2}; current turn=${plotTaskFreq.turn}; last issued turn=${plotTaskFreq.last}; canIssue=${plotTaskFreq.canIssue}.
@@ -3157,7 +3171,7 @@ HIDDEN EVENT:
 Append at most ONE invisible comment at the very end ONLY when this reply changes structured MÉMÉ OS state, or when a MEN presence heartbeat/exit is required.
 Exact container: <!--MEME_OS_EVENT {"taskOffers":[],"tasks":[],"storyRewards":[],"shop":[],"lifestyleShop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{}} -->
 Do NOT add retired compatibility fields. Scene chronology is owned by the dedicated extension path.
-taskOffers: max 1 new DESIRE; fields title,desc,detail,source,targetManId(optional). Never include id/tier/reward. If it introduces a new relevant man, include matching men entry and link targetManId.
+taskOffers: max 1 new DESIRE; fields title,desc,detail,source,targetManId. Never include task id/tier/reward. targetManId is REQUIRED for DESIRE: reuse the current/returning MEN id when known; if this reply introduces a new relevant man, include a matching men entry with a stable id and link that exact id.
 tasks: max 4 ACTIVE completions; fields id,status:"completed",evidence. Only report completed when the visible/current story actually satisfies the accepted task requirement. evidence must name the exact act/result/constraint that was achieved; vague completion labels are invalid. For DESIRE, do not report completion until the required explicit sexual act and any measurable result such as ejaculation/orgasm/SV collection have actually occurred. Extension independently validates evidence and calculates rewards.
 storyRewards: max 1 substantial unexpected non-routine achievement; fields title,evidence,source,difficulty(light|normal|hard). If the visible reply uses the three-line retroactive reward card 【TASK｜title】/【判定：...】/【奖励：AP +N】, this hidden storyRewards entry is mandatory and must describe the same completed action.
 shop: max 2 temporary BODY/PLOT candidates; fields title,desc,detail,currency(AP|SV),ttl,icon,source,impact(minor|standard|major),bodyAxis(optional),sourceIssueId(optional). No price/charmGain.
@@ -3243,7 +3257,7 @@ HARD EXECUTION:
 - STIMULATION LOCK: choose a provocative but scene-plausible angle that exploits what is actually happening now—proximity, embarrassment, a usable object/place, public/private tension, his specific role/personality, or an immediate physical opportunity. Do not invent nonexistent props/access or force unestablished actions.
 - source must identify the exact scene trigger; detail must preserve the concrete location/opportunity/constraint so the task remains auditable.
 - Use the current man when one is already present. If this turn's newcomer wheel HIT is the target opportunity, create the matching men event and use/link that adult man.
-- taskOffers fields: title, desc, detail, source, targetManId(optional). Never include id/tier/reward; the extension owns those. desc/detail must define one atomic completion contract; avoid optional A-or-B wording. If multiple acts/results are listed, all are mandatory for settlement.
+- taskOffers fields: title, desc, detail, source, targetManId. targetManId is REQUIRED. Reuse the exact current/returning MEN id; if the target is the newly introduced man, the men event must declare the same stable id. Never include task id/tier/reward; the extension owns those. desc/detail must define one atomic completion contract; avoid optional A-or-B wording. If multiple acts/results are listed, all are mandatory for settlement.
 - If REQUIRED=false, do not create a new DESIRE solely from this gate.
 `;
 
@@ -4724,7 +4738,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
-        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.13.8</small>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.13.9</small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
