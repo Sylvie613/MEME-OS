@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 31;
+const SCHEMA_VERSION = 32;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -84,12 +84,12 @@ const DEFAULT_STATE = Object.freeze({
     },
     storyStatus: {
         initialized: false,
-        date: '',
+        date: '7月18日',
         time: '',
-        weather: '',
+        weather: '晴 · 闷热',
         location: '',
         people: [],
-        note: '',
+        note: '盛夏',
         updatedTurn: 0,
     },
     memory: {
@@ -146,6 +146,13 @@ function clone(value) {
 
 function cloneDefaultState() {
     return clone(DEFAULT_STATE);
+}
+
+function defaultStoryDateForDay(day) {
+    const n = Math.max(1, Number(day) || 1);
+    const date = new Date(Date.UTC(2026, 6, 18));
+    date.setUTCDate(date.getUTCDate() + (n - 1));
+    return `${date.getUTCMonth() + 1}月${date.getUTCDate()}日`;
 }
 
 function charmToStage(charm) {
@@ -214,14 +221,14 @@ function mergeState(raw) {
             ...base.storyStatus,
             ...(raw.storyStatus ?? {}),
             initialized: Boolean(raw.storyStatus?.initialized),
-            date: String(raw.storyStatus?.date || '').slice(0, 40),
+            date: String(raw.storyStatus?.date || defaultStoryDateForDay(raw.tasks?.storyDay || 1)).slice(0, 40),
             time: String(raw.storyStatus?.time || '').slice(0, 24),
-            weather: String(raw.storyStatus?.weather || '').slice(0, 48),
+            weather: String(raw.storyStatus?.weather || base.storyStatus.weather).slice(0, 48),
             location: String(raw.storyStatus?.location || '').slice(0, 80),
             people: Array.isArray(raw.storyStatus?.people)
                 ? raw.storyStatus.people.map(v => String(v).trim()).filter(Boolean).slice(0, 8)
                 : [],
-            note: String(raw.storyStatus?.note || '').slice(0, 120),
+            note: String(raw.storyStatus?.note || base.storyStatus.note).slice(0, 120),
             updatedTurn: Math.max(0, Number(raw.storyStatus?.updatedTurn) || 0),
         },
         memory: {
@@ -298,6 +305,11 @@ function mergeState(raw) {
     merged.resources.sv = Math.max(0, Number(merged.resources.sv) || 0);
     merged.host.charm = Math.min(100, Math.max(0, Number(merged.host.charm) || 0));
     merged.host.progress = Math.min(100, Math.max(0, merged.host.charm));
+    if (!merged.storyStatus.date || /^DAY\s+\d+/i.test(String(merged.storyStatus.date))) {
+        merged.storyStatus.date = defaultStoryDateForDay(merged.tasks.storyDay);
+    }
+    if (!merged.storyStatus.weather) merged.storyStatus.weather = '晴 · 闷热';
+    if (!merged.storyStatus.note) merged.storyStatus.note = '盛夏';
     const allowedAccessStages = ['locked','peek','open','private'];
     if (!allowedAccessStages.includes(merged.system.accessStage)) {
         merged.system.accessStage = merged.system.pageUnlocked ? 'open' : 'locked';
