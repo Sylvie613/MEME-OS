@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 25;
+const SCHEMA_VERSION = 26;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -85,6 +85,9 @@ const DEFAULT_STATE = Object.freeze({
     runtime: {
         chatKey: null,
         processedAssistantMessages: [],
+        lastTurnKey: null,
+        lastTurnVariant: null,
+        lastTurnBase: null,
     },
     upgrades: {},
     tasks: {
@@ -191,6 +194,11 @@ function mergeState(raw) {
                     .filter(value => typeof value === 'string' ? value.length > 0 : Number.isInteger(value))
                     .slice(-4000)
                 : [],
+            lastTurnKey: raw.runtime?.lastTurnKey ? String(raw.runtime.lastTurnKey) : null,
+            lastTurnVariant: raw.runtime?.lastTurnVariant ? String(raw.runtime.lastTurnVariant) : null,
+            lastTurnBase: raw.runtime?.lastTurnBase && typeof raw.runtime.lastTurnBase === 'object'
+                ? clone(raw.runtime.lastTurnBase)
+                : null,
         },
         upgrades: { ...base.upgrades, ...(raw.upgrades ?? {}) },
         tasks: {
