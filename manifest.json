@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.10.9",
+  "version": "0.10.10",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS: extension-authoritative resources, rolling plot-aware tasks, synchronized story rewards, stable per-chat saves, and mobile-safe launcher positioning.",
-  "js": "index.js?v=0.10.9",
-  "css": "style.css?v=0.10.9",
+  "description": "MÉMÉ OS: extension-authoritative resources, rolling plot-aware tasks, synchronized story rewards, mobile-safe launcher positioning, and retry-safe idempotent settlement.",
+  "js": "index.js?v=0.10.10",
+  "css": "style.css?v=0.10.10",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
