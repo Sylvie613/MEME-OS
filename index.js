@@ -1413,7 +1413,7 @@ function extractVisibleStoryRewardMarkers(raw=''){
   // 【TASK｜把该洗的都洗了】
   // 【判定：宿主独立完成全部鞋履与衣物深度清洁。】
   // 【奖励：AP +110】
-  const re=/[【\[]\s*TASK\s*[｜|]\s*([^｜|\]】\n]{1,60})\s*[】\]][\s\S]{0,480}?[【\[]\s*判定\s*[:：]\s*([^】\]\n]{2,220})\s*[】\]][\s\S]{0,260}?[【\[]\s*奖励\s*[:：]\s*AP\s*\+\s*(\d{1,4})\s*[】\]]/giu;
+  const re=/[【\[]\s*TASK\s*[｜|]\s*([^｜|\]】\n]{1,60})\s*[】\]][\s\r\n]{0,80}[【\[]\s*判定\s*[:：]\s*([^】\]\n]{2,220})\s*[】\]][\s\r\n]{0,80}[【\[]\s*奖励\s*[:：]\s*AP\s*\+\s*(\d{1,4})\s*[】\]]/giu;
   for(const match of text.matchAll(re)){
     const title=String(match[1]||'').replace(/\s+/g,' ').trim().slice(0,60);
     const evidence=String(match[2]||'').replace(/\s+/g,' ').trim().slice(0,220);
@@ -2187,8 +2187,8 @@ async function reconcileRecentVisibleSettlements(){
   const chat=Array.isArray(context.chat)?context.chat:[];
   const state=runtimeState();
   let changed=false;
-  const recent=chat.slice(Math.max(0,chat.length-16));
-  const baseIndex=Math.max(0,chat.length-16);
+  const recent=chat.slice(Math.max(0,chat.length-64));
+  const baseIndex=Math.max(0,chat.length-64);
 
   recent.forEach((message,offset)=>{
     if(!message || message.is_user) return;
