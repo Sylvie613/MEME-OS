@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 33;
+const SCHEMA_VERSION = 34;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -82,16 +82,6 @@ const DEFAULT_STATE = Object.freeze({
         items: {},
         recent: [],
     },
-    storyStatus: {
-        initialized: false,
-        date: '7月18日',
-        time: '',
-        weather: '晴 · 闷热',
-        location: '',
-        people: [],
-        note: '盛夏',
-        updatedTurn: 0,
-    },
     memory: {
         initialized: false,
         bootstrappedAt: null,
@@ -146,13 +136,6 @@ function clone(value) {
 
 function cloneDefaultState() {
     return clone(DEFAULT_STATE);
-}
-
-function defaultStoryDateForDay(day) {
-    const n = Math.max(1, Number(day) || 1);
-    const date = new Date(Date.UTC(2026, 6, 18));
-    date.setUTCDate(date.getUTCDate() + (n - 1));
-    return `${date.getUTCMonth() + 1}月${date.getUTCDate()}日`;
 }
 
 function charmToStage(charm) {
@@ -218,20 +201,6 @@ function mergeState(raw) {
         inventory: {
             items: raw.inventory?.items && typeof raw.inventory.items === 'object' ? { ...raw.inventory.items } : {},
             recent: Array.isArray(raw.inventory?.recent) ? raw.inventory.recent.slice(0, 20) : [],
-        },
-        storyStatus: {
-            ...base.storyStatus,
-            ...(raw.storyStatus ?? {}),
-            initialized: Boolean(raw.storyStatus?.initialized),
-            date: String(raw.storyStatus?.date || defaultStoryDateForDay(raw.tasks?.storyDay || 1)).slice(0, 40),
-            time: String(raw.storyStatus?.time || '').slice(0, 24),
-            weather: String(raw.storyStatus?.weather || base.storyStatus.weather).slice(0, 48),
-            location: String(raw.storyStatus?.location || '').slice(0, 80),
-            people: Array.isArray(raw.storyStatus?.people)
-                ? raw.storyStatus.people.map(v => String(v).trim()).filter(Boolean).slice(0, 8)
-                : [],
-            note: String(raw.storyStatus?.note || base.storyStatus.note).slice(0, 120),
-            updatedTurn: Math.max(0, Number(raw.storyStatus?.updatedTurn) || 0),
         },
         memory: {
             ...base.memory,
@@ -311,11 +280,6 @@ function mergeState(raw) {
     merged.resources.sv = Math.max(0, Number(merged.resources.sv) || 0);
     merged.host.charm = Math.min(100, Math.max(0, Number(merged.host.charm) || 0));
     merged.host.progress = Math.min(100, Math.max(0, merged.host.charm));
-    if (!merged.storyStatus.date || /^DAY\s+\d+/i.test(String(merged.storyStatus.date))) {
-        merged.storyStatus.date = defaultStoryDateForDay(merged.tasks.storyDay);
-    }
-    if (!merged.storyStatus.weather) merged.storyStatus.weather = '晴 · 闷热';
-    if (!merged.storyStatus.note) merged.storyStatus.note = '盛夏';
     const allowedAccessStages = ['locked','peek','open','private'];
     if (!allowedAccessStages.includes(merged.system.accessStage)) {
         merged.system.accessStage = merged.system.pageUnlocked ? 'open' : 'locked';
@@ -336,6 +300,10 @@ function mergeState(raw) {
     for (const key of Object.keys(base.host.body)) {
         merged.host.body[key] = Math.max(0, Number(merged.host.body[key]) || 0);
     }
+
+    // Scene date/time/weather/location moved to visible prose in 0.11.x.
+    // Drop the legacy persisted copy so it cannot drift or reappear.
+    delete merged.storyStatus;
 
     // Purge pre-release test-only metadata if an old chat still carries it.
     delete merged.dev;
