@@ -3050,7 +3050,7 @@ lifestyleShop: [] to keep shelf, or exactly 5 full items after unlock; fields ti
 feedback.issues: max 2 direct observed issues {id,axis?,source,note,severity}; feedback.reactions: max 2 direct reactions {id,axis?,source,note,valence}.
 men: max 3 updates {id?,name,meta,summary,relation,desire,lastContact,note,badges,present,contactDelta,qualifies}. Reuse known ids. Heartbeat uses contactDelta:0.
 evolution: only a visible one-step form change that is mechanically ready; targetLevel=current+1 and short concrete reason.
-permission.signal may be interest|desire|attachment only on a genuinely new event. signalTag must be one of personal_priority|protective_choice|trust|vulnerability|sacrifice|habit_broken_for_host|private_disclosure|future_choice.
+permission.signal may be impressed|curious|respect|amused|annoyed-but-invested|desire|attachment only on a genuinely new event. signalTag must be one of personal_priority|protective_choice|trust|vulnerability|sacrifice|habit_broken_for_host|private_disclosure|future_choice.
 permission.love=true only for a genuinely established love change involving meaningful personal investment/choice; loveTag must be sacrifice|personal_priority|vulnerability|future_choice|identity_choice.
 permission.systemAccess may request peek|open|private only when the corresponding readiness above is satisfied and the administrator actually chooses to grant it.
 identity is only for real administrator identity/name state changes supported by the story.
