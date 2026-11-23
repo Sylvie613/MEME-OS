@@ -1319,12 +1319,10 @@ function taskCompletionEvidenceValid(task,evidence,sceneText=''){
 
   const requirement=(task?.title||'')+' '+(task?.desc||'')+' '+(task?.detail||'');
   const requiredAxes=DESIRE_COMPLETION_AXES.filter(axis=>axis.req.test(requirement));
-  if(requiredAxes.length){
-    const grounded=requiredAxes.filter(axis=>axis.done.test(claim) && axis.done.test(scene));
-    if(!grounded.length) return {ok:false,reason:'evidence and visible story do not match the required sexual act'};
-  }
-  for(const axis of requiredAxes.filter(axis=>axis.id==='ejaculation'||axis.id==='orgasm')){
-    if(!axis.done.test(claim) || !axis.done.test(scene)) return {ok:false,reason:'required measurable sexual outcome missing from evidence or visible story'};
+  for(const axis of requiredAxes){
+    if(!axis.done.test(claim) || !axis.done.test(scene)){
+      return {ok:false,reason:'required DESIRE condition missing: '+axis.id};
+    }
   }
   return {ok:true,reason:'desire evidence grounded'};
 }
@@ -1418,7 +1416,7 @@ function settleVisibleTaskCompletion(state,completion,messageId){
   const dailyLike=isRollingDaily || repeatable;
 
   if(dailyLike && Number(state.tasks?.dailyCompleted?.[id]?.day||0)===currentDay) return false;
-  if(!dailyLike && state.tasks?.completed?.[id]) return false;
+  if(!dailyLike && (state.tasks?.completed?.[id] || state.tasks?.everCompleted?.[id])) return false;
 
   const historyId=`meme_visible_task_complete_${currentDay}_${messageId}_${id}`;
   if((state.history||[]).some(entry=>entry.id===historyId)) return false;
@@ -1629,7 +1627,7 @@ function settleTaskFromModel(state,rawTask,messageId,sceneText=''){
   if(repeatable && Number(active.storyDay||0)!==currentDay) return false;
   if(repeatable && Number(state.tasks?.dailyCompleted?.[id]?.day||0)===currentDay) return false;
   if(isRollingDaily && Number(state.tasks?.dailyCompleted?.[id]?.day||0)===currentDay) return false;
-  if(!dailyLike && state.tasks?.completed?.[id]) return false;
+  if(!dailyLike && (state.tasks?.completed?.[id] || state.tasks?.everCompleted?.[id])) return false;
 
   const evidence=String(rawTask.evidence||'').replace(/\s+/g,' ').trim().slice(0,240);
   if(!evidence) return false;
@@ -3099,7 +3097,7 @@ SCENE-FIT IS HARD:
 
 The task may develop across later turns, but it must be a genuine adult sexual/eroge objective tied to this adult man and this scene—not dating, compliments, ordinary flirting, affection farming, or exchanging contact info.
 When DESIRE_TRIGGER_REQUIRED_THIS_REPLY=false, do not invent a new DESIRE unless another explicit runtime rule says so.
-Mission formula: target man × current scene anchors × CHARM tier × unlocked host capability × sexual act/body part × constraint/control/presentation/risk × measurable completion/SV goal.
+Mission formula: target man × current scene anchors × CHARM tier × unlocked host capability × sexual act/body part × constraint/control/presentation/risk × measurable completion/SV goal. Completion conditions must be atomic and auditable: do not use optional A-or-B alternatives. If multiple acts/results are listed, ALL are required for settlement.
 Tier 1 (CHARM 8–17) is lower-complexity, NOT lower-sexuality. From the FIRST DESIRE onward, the task must already cross an explicit sexual threshold: explicit sex act, explicit genital/breast/anus exposure or stimulation, or a concrete sexual result such as orgasm/ejaculation/SV collection. Flirting, kissing alone, accidental touching, cleavage, pulling a neckline, making him look, teasing, exchanging contact info, or "make him want you" are NEVER enough to qualify as DESIRE. Tier 2/3/4 escalate difficulty, exposure, control, collection/SV goals, combinations, duration and complexity—not whether the content is genuinely sexual.
 Target men may be any adult archetype; public persona and private XP are independent axes.
 
@@ -3218,7 +3216,7 @@ HARD EXECUTION:
 - STIMULATION LOCK: choose a provocative but scene-plausible angle that exploits what is actually happening now—proximity, embarrassment, a usable object/place, public/private tension, his specific role/personality, or an immediate physical opportunity. Do not invent nonexistent props/access or force unestablished actions.
 - source must identify the exact scene trigger; detail must preserve the concrete location/opportunity/constraint so the task remains auditable.
 - Use the current man when one is already present. If this turn's newcomer wheel HIT is the target opportunity, create the matching men event and use/link that adult man.
-- taskOffers fields: title, desc, detail, source, targetManId(optional). Never include id/tier/reward; the extension owns those.
+- taskOffers fields: title, desc, detail, source, targetManId(optional). Never include id/tier/reward; the extension owns those. desc/detail must define one atomic completion contract; avoid optional A-or-B wording. If multiple acts/results are listed, all are mandatory for settlement.
 - If REQUIRED=false, do not create a new DESIRE solely from this gate.
 `;
 
