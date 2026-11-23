@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.10.24",
+  "version": "0.10.25",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS: compact collapsible adult-protocol preview on home, fixed administrator comment fallback, stronger early erotic tone, low-engagement foul-mouthed administrator, rotating tasks, adaptive economy and correction controls.",
-  "js": "index.js?v=0.10.24",
-  "css": "style.css?v=0.10.24",
+  "description": "MÉMÉ OS: AP rescue progression capped at CHARM 30 with SV-only refinement beyond the cap; adult protocol home block removed; low-engagement foul-mouthed administrator, rotating tasks, adaptive economy and correction controls.",
+  "js": "index.js?v=0.10.25",
+  "css": "style.css?v=0.10.25",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
