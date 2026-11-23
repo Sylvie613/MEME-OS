@@ -2358,7 +2358,9 @@ async function handleRuntimeEvent(messageId){
 
   const allMatches=[...raw.matchAll(/<!--MEME_OS_EVENT\s+([\s\S]*?)-->/g)];
   const matches=allMatches.length ? [allMatches[allMatches.length-1]] : [];
-  let changed=Boolean(visibleCompletionChanged || visibleStoryRewardChanged || canonicalTasks.length || encounterCooldownChanged || preflightTimelineChanged);
+  // plotTurn and encounter bookkeeping advance every assistant turn, so the
+  // runtime event must still persist even when there is no structured event.
+  let changed=true;
   const touchedMenIds=new Set();
 
   for(const match of matches){
