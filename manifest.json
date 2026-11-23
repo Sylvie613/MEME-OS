@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.13.2",
+  "version": "0.13.3",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS 0.13.2 removes the automatic MEMORY subsystem and its extra model calls. Narrative continuity now relies on real chat context plus extension-owned structured state for resources, tasks, MEN, DAY, upgrades, permissions and system progression.",
-  "js": "index-v0.13.2.js",
-  "css": "style.css?v=0.13.2",
+  "description": "MÉMÉ OS 0.13.3 captures visible retroactive story rewards (TASK + 判定 + 奖励) as authoritative AP settlements, with hidden-event dedupe and recent-chat reconciliation.",
+  "js": "index-v0.13.3.js",
+  "css": "style.css?v=0.13.3",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
