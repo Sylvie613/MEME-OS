@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.15';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.15';
-import { isBoundCharacter } from './src/binding.js?v=0.10.15';
+} from './src/state.js?v=0.10.16';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.16';
+import { isBoundCharacter } from './src/binding.js?v=0.10.16';
 
 /**
- * MÉMÉ OS v0.10.15
+ * MÉMÉ OS v0.10.16
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -517,109 +517,50 @@ function sanitizeGeneratedDailyTask(raw,state=runtimeState()){
   };
 }
 
-function extractFormalVisibleDailyCards(raw=''){
+function extractCanonicalTaskMarkers(raw=''){
   const text=String(raw||'');
-  const cards=[];
-  const re=/【\s*(?:DAILY|日常)\s*[·•・⋅∙:：|｜-]\s*([^】\n]{2,48})】/gi;
-  const matches=[...text.matchAll(re)];
-  for(let i=0;i<matches.length;i++){
-    const match=matches[i];
+  const tasks=[];
+  // Canonical syntax:
+  // [TASK｜任务名｜任务要求]
+  // [TASK: 任务名｜任务要求]
+  const re=/\[\s*TASK\s*(?:[｜|]|[:：])\s*([^｜|\]\n]{2,48})\s*[｜|]\s*([^\]\n]{2,220})\s*\]/gi;
+  for(const match of text.matchAll(re)){
     const title=String(match[1]||'').replace(/\s+/g,' ').trim().slice(0,48);
-    const start=Number(match.index||0)+String(match[0]||'').length;
-    const nextIndex=i+1<matches.length ? Number(matches[i+1].index||text.length) : text.length;
-    const after=text.slice(start,nextIndex);
-    const lines=after.split(/\r?\n/);
-    const requirement=[];
-    for(const rawLine of lines){
-      const line=String(rawLine||'').trim();
-      if(!line){
-        if(requirement.length) break;
-        continue;
-      }
-      if(/^【/.test(line)) break;
-      if(/^(?:你|他|男人|管理员|系统)(?:[：:“"”]|.{0,6}(?:说|看|盯|笑|冷笑|顿|停|问|答|开口|声音|视线))/u.test(line) && requirement.length) break;
-      requirement.push(line);
-      if(requirement.join(' ').length>=220) break;
-    }
-    const desc=requirement.join(' ').replace(/\s+/g,' ').trim().slice(0,180);
-    if(title && desc) cards.push({title,desc});
+    const desc=String(match[2]||'').replace(/\s+/g,' ').trim().slice(0,180);
+    if(title && desc) tasks.push({title,desc});
   }
-  return cards;
+  return tasks;
+}
+
+function taskFromCanonicalMarker(card,state=runtimeState()){
+  if(!card) return null;
+  const title=String(card.title||'').replace(/\s+/g,' ').trim().slice(0,48);
+  const desc=String(card.desc||'').replace(/\s+/g,' ').trim().slice(0,180);
+  if(!title || !desc) return null;
+
+  const actionCount=(desc.match(/[，,、；;]/g)||[]).length+1;
+  const hardCue=/(二十分钟|半小时|一小时|坚持|运动|出门|公共|社交|当众|长时间|彻底|完整完成|连续)/.test(desc);
+  const lightCue=actionCount<=1 && /(扔|擦|关|拿|喝|换一件|刷牙|洗脸|吹干)/.test(desc);
+  const difficulty=hardCue?'hard':lightCue?'light':'normal';
+
+  const task=sanitizeGeneratedDailyTask({
+    title,
+    desc,
+    detail:'由正文 [TASK] 标记直接同步；完成后按滚动任务规则退场。',
+    source:'剧情[TASK]标记',
+    difficulty,
+  },state);
+  if(task){
+    task.canonicalMarker=true;
+    task.source='剧情[TASK]标记';
+  }
+  return task;
 }
 
 function inferVisibleDailyTaskOffer(raw,state=runtimeState()){
-  const text=String(raw||'');
-
-  // Highest priority: visible structured task cards. When one exists, its
-  // own title + requirement text are the source of truth; nearby dialogue
-  // must never be promoted into a competing task.
-  const formal=extractFormalVisibleDailyCards(text);
-  if(formal.length){
-    const card=formal[formal.length-1];
-    const title=card.title;
-    const desc=card.desc;
-    const actionCount=(desc.match(/[，,、；;]/g)||[]).length+1;
-    const hardCue=/(二十分钟|半小时|一小时|坚持|运动|出门|公共|社交|当众|长时间|彻底|完整完成)/.test(desc);
-    const lightCue=actionCount<=1 && /(扔|擦|关|拿|喝|换一件|刷牙|洗脸)/.test(desc);
-    const difficulty=hardCue?'hard':lightCue?'light':'normal';
-    const task=sanitizeGeneratedDailyTask({
-      title,desc,
-      detail:'由当前可见剧情中的正式任务卡同步；完成后按滚动任务规则退场。',
-      source:'当前剧情正式任务卡',
-      difficulty,
-    },state);
-    if(task) task.formalVisibleCard=true;
-    return task;
-  }
-
-  const cue=/(?:一张|新的?|弹出|出现|生成|砸下|亮起)[^。\n]{0,28}(?:日常|剧情)?任务卡|(?:新的?|临时)(?:日常|剧情)?任务(?:出现|生成|弹出|亮起)/i.exec(text);
-  if(!cue) return null;
-
-  const tail=text.slice(cue.index,Math.min(text.length,cue.index+1400));
-  const quotes=[...tail.matchAll(/[“"]([^”"]{4,220})[”"]/g)].map(match=>String(match[1]||'').trim());
-  if(!quotes.length) return null;
-
-  const commandWords=/(把|去|先|给我|别|换|扔|洗|吹|擦|收拾|整理|清理|起来|站|走|动|看|做完|完成)/g;
-  const commandCheck=/(把|去|先|给我|别|换|扔|洗|吹|擦|收拾|整理|清理|起来|站|走|动|看|做完|完成)/;
-  let best='';
-  let bestScore=-1;
-  for(const quote of quotes){
-    const commands=quote.match(commandWords)||[];
-    let score=commands.length;
-    if(/做完|完成|奖励/.test(quote)) score+=4;
-    if(/把.+(?:了|掉|干净|完)/.test(quote)) score+=2;
-    if(score>bestScore){
-      bestScore=score;
-      best=quote;
-    }
-  }
-  if(bestScore<2) return null;
-
-  let desc=best
-    .replace(/(?:做完|完成)(?:了)?[^。！？]*?(?:奖励|AP|SV)[^。！？]*[。！？]?/g,'')
-    .replace(/\s+/g,' ')
-    .trim()
-    .slice(0,180);
-  if(!desc) desc=best.slice(0,180);
-
-  const imperative=desc.match(/(?:^|[。！？])\s*((?:先|把|去|给我|别|换|扔|洗|吹|擦|收拾|整理|清理|起来|站|走|动|看)[^。！？]{2,42})/);
-  let title=String(imperative?.[1]||desc.split(/[。！？]/).find(part=>commandCheck.test(part))||'剧情临时任务')
-    .replace(/\s+/g,' ')
-    .trim();
-  title=title.replace(/[，,；;：:].*$/,'').slice(0,28) || '剧情临时任务';
-
-  const actionCount=(desc.match(/[，,、；;]/g)||[]).length+1;
-  const hardCue=/(二十分钟|半小时|一小时|坚持|运动|出门|公共|社交|当众|长时间|彻底|完整完成)/.test(desc);
-  const lightCue=actionCount<=1 && /(扔|擦|关|拿|喝|换一件|刷牙|洗脸)/.test(desc);
-  const difficulty=hardCue?'hard':lightCue?'light':'normal';
-
-  return sanitizeGeneratedDailyTask({
-    title,
-    desc,
-    detail:'由当前可见剧情中的新任务卡自动同步；完成后按滚动任务规则退场。',
-    source:'当前可见剧情直接触发',
-    difficulty,
-  },state);
+  const markers=extractCanonicalTaskMarkers(raw);
+  if(!markers.length) return null;
+  return taskFromCanonicalMarker(markers[markers.length-1],state);
 }
 
 function distinctEroticTaskCount(state=runtimeState()){
@@ -1243,6 +1184,115 @@ function removeFallbackTasksCompetingWithFormalCard(state,formalTask){
   return changed;
 }
 
+function purgeKnownLegacyWrongGeneratedTasks(state=runtimeState()){
+  state.tasks=state.tasks||{};
+  state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
+  const badTitle=/(先把自己收拾干净|现在先把头洗了|先把头洗了)/;
+  let changed=false;
+  state.tasks.generatedDaily=state.tasks.generatedDaily.filter(task=>{
+    if(state.tasks?.active?.[task.id]) return true;
+    if(badTitle.test(String(task.title||''))){
+      changed=true;
+      return false;
+    }
+    // All pre-canonical dialogue/fallback guesses are retired once 0.10.16 loads.
+    const source=String(task.source||'');
+    if(/可见剧情任务卡兜底|当前可见剧情直接触发/.test(source)){
+      changed=true;
+      return false;
+    }
+    return true;
+  });
+  return changed;
+}
+
+function removeGeneratedDailyByTitle(state,title){
+  const needle=String(title||'').trim();
+  if(!needle) return null;
+  state.tasks=state.tasks||{};
+  state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
+  let removed=null;
+  state.tasks.generatedDaily=state.tasks.generatedDaily.filter(task=>{
+    const taskTitle=String(task.title||'').trim();
+    const match=taskTitle===needle || taskTitle.includes(needle) || needle.includes(taskTitle);
+    if(match && !removed){
+      removed=task;
+      return false;
+    }
+    return true;
+  });
+  if(removed && state.tasks?.active?.[removed.id]) delete state.tasks.active[removed.id];
+  return removed;
+}
+
+function removeLatestGeneratedDaily(state){
+  state.tasks=state.tasks||{};
+  const list=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
+  if(!list.length) return null;
+  const sorted=[...list].sort((a,b)=>
+    Number(b.createdTurn||0)-Number(a.createdTurn||0) ||
+    Number(b.createdDay||0)-Number(a.createdDay||0)
+  );
+  const target=sorted[0];
+  return removeGeneratedDailyByTitle(state,target.title);
+}
+
+function parseOsTaskCorrections(text=''){
+  const source=String(text||'');
+  const directives=[];
+  const re=/[（(]\s*(?:MÉMÉ\s*OS|MEME\s*OS|OS)\s*[：:]\s*([^）)]+)[）)]/gi;
+  for(const match of source.matchAll(re)){
+    const body=String(match[1]||'').trim();
+    if(!body) continue;
+    if(!/(删|删除|删掉|移除|不该出现|不应该出现|撤掉|去掉)/.test(body)) continue;
+    const quoted=body.match(/[“"「『]([^”"」』]{1,48})[”"」』]/)?.[1]
+      || body.match(/(?:删掉|删除|移除|去掉)\s*([^，。；;]{2,48})/)?.[1]?.trim();
+    directives.push({
+      type:'remove_task',
+      title:quoted||null,
+      latest:/这个任务|刚才(?:那个)?任务|上一(?:个|条)?任务|不该出现这个|不应该出现这个/.test(body),
+      raw:body,
+    });
+  }
+  return directives;
+}
+
+async function applyOsTaskCorrectionsFromUserMessage(text=''){
+  const directives=parseOsTaskCorrections(text);
+  if(!directives.length) return [];
+  const state=runtimeState();
+  state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
+  state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
+  const results=[];
+
+  for(const directive of directives){
+    let removed=null;
+    if(directive.title) removed=removeGeneratedDailyByTitle(state,directive.title);
+    if(!removed && directive.latest) removed=removeLatestGeneratedDaily(state);
+    if(!removed && !directive.title) removed=removeLatestGeneratedDaily(state);
+    if(!removed) continue;
+
+    state.history.push({
+      id:`meme_user_task_correction_${Date.now()}_${removed.id}`,
+      type:'user_task_correction',
+      recordType:'task',
+      title:`宿主纠错：删除「${removed.title}」`,
+      summary:`宿主通过 OS 括号指令判定该剧情任务不应存在，已从 TASK 移除。`,
+      text:`USER TASK CORRECTION REMOVE: ${removed.id}`,
+      committedAt:Date.now(),
+    });
+    results.push(removed);
+  }
+
+  if(results.length){
+    if(state.history.length>240) state.history=state.history.slice(-240);
+    await saveState(state);
+    renderView(currentView(),false);
+    installRuntimePrompt();
+  }
+  return results;
+}
+
 async function reconcileRecentVisibleTaskOffers(){
   if(!isBoundCharacter() || !hasActiveChat()) return;
   const context=globalThis.SillyTavern?.getContext?.()||{};
@@ -1251,16 +1301,16 @@ async function reconcileRecentVisibleTaskOffers(){
   state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
   state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
   let changed=pruneRedundantGeneratedDaily(state);
+  if(purgeKnownLegacyWrongGeneratedTasks(state)) changed=true;
 
   const start=Math.max(0,chat.length-16);
   for(let i=start;i<chat.length;i++){
     const message=chat[i];
     if(!message || message.is_user) continue;
     const raw=String(message.mes||'');
-    if(/<!--MEME_OS_EVENT\s+[\s\S]*?"dailyTaskOffers"\s*:\s*\[[^\]]+\]/.test(raw)) continue;
     const task=inferVisibleDailyTaskOffer(raw,state);
     if(!task) continue;
-    if(task.formalVisibleCard && removeFallbackTasksCompetingWithFormalCard(state,task)) changed=true;
+    if(task.canonicalMarker && removeFallbackTasksCompetingWithFormalCard(state,task)) changed=true;
     const historyId=`meme_visible_task_reconcile_${i}_${task.id}`;
     if((state.history||[]).some(entry=>entry.id===historyId)) continue;
     if(state.tasks.everCompleted?.[task.id] || state.tasks.active?.[task.id] || state.tasks.generatedDaily.some(old=>old.id===task.id)){
@@ -1398,10 +1448,22 @@ async function handleRuntimeEvent(messageId){
   });
 
   const raw=String(message.mes||'');
+  const canonicalCards=extractCanonicalTaskMarkers(raw);
+  const canonicalTask=canonicalCards.length ? taskFromCanonicalMarker(canonicalCards[canonicalCards.length-1],state) : null;
+  if(canonicalTask){
+    purgeKnownLegacyWrongGeneratedTasks(state);
+    removeFallbackTasksCompetingWithFormalCard(state,canonicalTask);
+    state.tasks.generatedDaily=[
+      canonicalTask,
+      ...state.tasks.generatedDaily.filter(old=>old.id!==canonicalTask.id),
+    ].slice(0,8);
+    state.tasks.lastGeneratedDailyTurn=Number(state.shop?.plotTurn)||0;
+  }
+
   const allMatches=[...raw.matchAll(/<!--MEME_OS_EVENT\s+([\s\S]*?)-->/g)];
   const matches=allMatches.length ? [allMatches[allMatches.length-1]] : [];
   let changed=true;
-  let structuredDailyOfferSeen=false;
+  let structuredDailyOfferSeen=Boolean(canonicalTask);
   const touchedMenIds=new Set();
 
   for(const match of matches){
@@ -1410,7 +1472,7 @@ async function handleRuntimeEvent(messageId){
 
       state.reactivity=state.reactivity||{recentChanges:[],recentIssues:[],recentReactions:[]};
 
-      if(Array.isArray(event.dailyTaskOffers)){
+      if(Array.isArray(event.dailyTaskOffers) && !canonicalTask){
         if(event.dailyTaskOffers.length) structuredDailyOfferSeen=true;
         state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
         state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
@@ -1691,30 +1753,6 @@ async function handleRuntimeEvent(messageId){
     }
   }
 
-  if(!structuredDailyOfferSeen){
-    state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
-    state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
-    const fallbackTask=inferVisibleDailyTaskOffer(raw,state);
-    if(fallbackTask){
-      if(fallbackTask.formalVisibleCard) removeFallbackTasksCompetingWithFormalCard(state,fallbackTask);
-      state.tasks.generatedDaily=[
-        fallbackTask,
-        ...state.tasks.generatedDaily.filter(old=>old.id!==fallbackTask.id),
-      ].slice(0,8);
-      state.tasks.lastGeneratedDailyTurn=Number(state.shop?.plotTurn)||0;
-      state.history.push({
-        id:`meme_visible_task_fallback_${messageKey}_${fallbackTask.id}`,
-        type:'visible_task_fallback',
-        recordType:'task',
-        title:`同步可见剧情任务：${fallbackTask.title}`,
-        summary:'模型在正文中明确发出了新任务卡但漏交隐藏事件；MÉMÉ OS 已兜底同步。',
-        text:`VISIBLE TASK FALLBACK: ${fallbackTask.id}`,
-        committedAt:Date.now(),
-      });
-      changed=true;
-    }
-  }
-
   if(decayMenBuckets(state,touchedMenIds)) changed=true;
   if(Array.isArray(state.history) && state.history.length>240){
     state.history=state.history.slice(-240);
@@ -1809,11 +1847,12 @@ Completed daily tasks are not permanent checklist items. A just-completed daily/
 Current open starter dailies: ${JSON.stringify(TASK_DATA.daily.filter(t=>!state.tasks?.everCompleted?.[t.id]).map(t=>({id:t.id,title:t.title,desc:t.desc})))}.
 Current generated daily/story tasks: ${JSON.stringify((state.tasks?.generatedDaily||[]).filter(t=>!state.tasks?.everCompleted?.[t.id]).map(t=>({id:t.id,title:t.title,desc:t.desc,difficulty:t.difficulty,source:t.source})))}.
 When the visible daily board has fewer than 5 unfinished tasks, you SHOULD create one context-fitting replacement through dailyTaskOffers if the current plot offers a sensible mundane, appearance, hygiene, movement, social-presentation or practical challenge. Do not regenerate an already completed task under a synonym.
-CRITICAL SYNC RULE: if your visible prose says or implies that MÉMÉ OS/the administrator actually creates, pops up, displays, throws out, assigns or reveals a NEW daily/story task or task card — especially if you print a visible block like 【DAILY · 任务名】 — dailyTaskOffers is REQUIRED in the same reply. Never visibly create a task card and omit its hidden event. If you are not going to emit dailyTaskOffers, do not claim that a new system task was created.
+CANONICAL VISIBLE TASK PROTOCOL: when MÉMÉ OS/the administrator truly publishes a NEW temporary daily/story task, you MUST show exactly one visible marker on its own line using this exact syntax: [TASK｜任务名｜任务要求]. This visible [TASK] marker is the canonical task source and the extension reads it immediately after the reply appears. Do NOT use 【DAILY · ...】, vague "new task card" narration, ordinary dialogue, or hidden dailyTaskOffers as the authoritative source. If no [TASK｜...｜...] marker appears, no new temporary daily/story task has been published. Ordinary commands or insults such as "去洗头" remain dialogue only.
+USER CORRECTION AUTHORITY: parenthetical user instructions beginning with （OS：...） or (OS:...) are out-of-story control directives. The extension may remove an incorrect generated task immediately. Never argue with, reinterpret or roleplay against these correction directives.
 PLOT RELEVANCE RULE: every generated daily/story task must be caused by something concrete in the CURRENT visible scene: a mess that was just created, an unmet practical need, a body/presentation problem just noticed, a plan the host just stated, a location-specific opportunity, or a direct consequence of the immediately preceding action. Do not throw in generic self-improvement chores unrelated to what is happening now. source must briefly name the actual scene trigger.
 DIFFICULTY SEMANTICS: light = one quick low-effort action; normal = several linked actions or a sustained moderate effort; hard = substantial time, discomfort, persistence, social exposure/risk or a genuinely demanding multi-step requirement. Choose difficulty from the actual scene demand, not from the reward you want.
 ECONOMY RULE: never choose or display a numeric AP reward for generated tasks. MÉMÉ OS calculates the reward from difficulty plus the current spendable AP and nearby shop-price band. This keeps a task useful when the host is broke without letting trivial chores print money when the host is already rich.
-dailyTaskOffers entries: maximum 1; fields {title,desc,detail,source,difficulty}. difficulty is only light|normal|hard. Never include AP/SV reward values.
+dailyTaskOffers is deprecated for new daily/story publication and should normally remain empty. Use the visible [TASK｜任务名｜任务要求] marker instead; the extension derives difficulty/reward from the marker and current OS state.
 If the current visible scene itself unexpectedly completes a sensible one-off system challenge that was not previously active, you MAY use storyRewards to let the extension recognize it retroactively. storyRewards entries: maximum 2; fields {title,evidence,source,difficulty}. Never put AP/SV numbers in storyRewards or visible prose; the extension calculates the real reward. Do not use storyRewards for trivial actions merely to farm AP.
 
 DYNAMIC DESIRE MISSION BOARD:
@@ -1896,7 +1935,7 @@ Current CHARM=${state.host.charm}; desire allowed by appearance=${desireAllowed}
 Only when the current story creates a genuinely relevant MÉMÉ OS state update — tasks, shop, feedback, MEN, evolution, permission, identity, or timeline — append ONE invisible HTML comment at the very end of the assistant reply.
 Format exactly: <!--MEME_OS_EVENT {"dailyTaskOffers":[],"taskOffers":[],"tasks":[],"storyRewards":[],"shop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{},"timeline":{}} -->
 Do not emit the comment when nothing relevant changed.
-dailyTaskOffers: maximum 1 new rolling daily/story task; fields title,desc,detail,source,difficulty(light|normal|hard). Never include id or reward values.
+dailyTaskOffers: deprecated compatibility field; normally leave [] for new daily/story tasks because visible [TASK｜任务名｜任务要求] is the canonical source.
 taskOffers: maximum 1 new generated erotic mission; fields title,desc,detail,source. Never include tier, id or rewards.
 tasks: max 4 completed ACTIVE task entries; fields id,status("completed"),evidence. Never include rewards; the extension calculates them.
 storyRewards: max 2 one-off plot tasks that visibly became complete without prior acceptance; fields title,evidence,source,difficulty(light|normal|hard). Never include AP/SV numbers.
@@ -3288,7 +3327,11 @@ async function handleMessageSent(messageId){
     sentMessage=[...chat].reverse().find(message=>message?.is_user) || null;
   }
   if(!sentMessage?.is_user) return;
+  const corrections=await applyOsTaskCorrectionsFromUserMessage(sentMessage.mes || '');
   const {committed}=await commitPendingActions(sentMessage.mes || '');
+  if(corrections.length){
+    globalThis.toastr?.success?.(`MÉMÉ OS 已删除 ${corrections.length} 个错误剧情任务。`);
+  }
   if(committed.length){
     renderView(currentView(),false);
     globalThis.toastr?.success?.(`MÉMÉ OS 已登记 ${committed.length} 项操作。`);
@@ -3457,6 +3500,10 @@ function mount() {
 function start() {
   mount();
   ensureDialog();
+  {
+    const state=runtimeState();
+    if(purgeKnownLegacyWrongGeneratedTasks(state)) saveState(state).catch(error=>console.warn('[MÉMÉ OS] legacy task purge failed',error));
+  }
   reconcileRecentVisibleSettlements().catch(error=>console.warn('[MÉMÉ OS] legacy settlement sync failed',error));
   reconcileRecentVisibleTaskOffers().catch(error=>console.warn('[MÉMÉ OS] visible task sync failed',error));
   bindSillyTavernEvents();
