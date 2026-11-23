@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.12.3",
+  "version": "0.12.4",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS 0.12.3: MEN person cards no longer show gender/avatar icons; header layout tightened to use the freed space.",
-  "js": "index-v0.12.3.js",
-  "css": "style.css?v=0.12.3",
+  "description": "MÉMÉ OS 0.12.4: deterministic per-turn adult male NPC encounter wheel based on CHARM and scene exposure; public base=max(10,CHARM)%, scene multipliers, 2-turn newcomer cooldown, and CHARM-stage reaction guidance.",
+  "js": "index-v0.12.4.js",
+  "css": "style.css?v=0.12.4",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
