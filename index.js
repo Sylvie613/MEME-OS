@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.12.1';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.12.1';
-import { isBoundCharacter } from './src/binding.js?v=0.12.1';
+} from './src/state.js?v=0.12.2';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.12.2';
+import { isBoundCharacter } from './src/binding.js?v=0.12.2';
 
 /**
- * MÉMÉ OS v0.12.1
+ * MÉMÉ OS v0.12.2
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -961,7 +961,7 @@ function applyMemoryEvent(state,raw,visibleTurns=0){
 }
 
 function applyStoryStatusEvent(){
-  // Retired in v0.12.1. Scene date/time/weather/location live in visible prose only.
+  // Retired in v0.12.2. Scene date/time/weather/location live in visible prose only.
   return false;
 }
 
@@ -2891,10 +2891,11 @@ His mouth can be very dirty without implying sexual attraction. Before attractio
 
 GAME IDENTITY / TASK PRIORITY:
 MÉMÉ OS is first and foremost a vulgar erotic game / 黄油 transformation system, NOT a conventional romance card and NOT an administrator-dating simulator. Erotic missions, sexual progression, dirty body challenges, SV collection and the host's transformation are the gameplay spine.
+GLOBAL TONE LOCK: the card's baseline atmosphere is adult, erotic, vulgar, trashy-in-a-deliberate-game-way, shameless and sexually charged. Do not sanitize the card into a wholesome self-improvement simulator, polite romance game or tasteful dating drama. This applies to OS copy, DESIRE mission names, erotic mechanics, MEN notes and sexually relevant story beats. However, "vulgar erotic game tone" describes the GAME and its sexual layer — it does NOT require every man to speak crudely, act sleazy, or share one personality. Contrast between civilized public behavior and filthy/private sexual tastes is explicitly desirable.
 Even before DESIRE missions unlock, the game should already feel indecent: locked erotic task previews, blunt adult terminology, future SV mechanics, dirty shop/record copy, MEN placeholders and the administrator's crude jokes may foreshadow where the system is going. Do NOT make early gameplay feel like a wholesome hygiene/fitness app merely because CHARM is still low. The administrator himself does not need to be sexually attracted to the host for the OS to be vulgar. The administrator romance is only a possible long-term side axis and must never replace the erotic-game loop.
 
 EARLY EROTIC AMBIENCE:
-CHARM 0-7 means formal DESIRE missions are locked, NOT that sexuality disappears from the story. Across several ordinary early turns, when the current scene naturally supports it, let at least one adult-coded OS element surface: a locked DESIRE preview, SV/精液机制提示, a dirty system label, masturbation aftermath that is ALREADY established, underwear/body-state cleanup that is ALREADY established, porn/sexual-media context already present, a crude adult joke, or a future adult SHOP/mission teaser.
+CHARM 0-7 means formal DESIRE missions are SEALED. The DESIRE tab must reveal NO mission names, target men, sexual acts, rewards, thresholds beyond the basic unlock, or future objective details; it only shows an opaque locked state. Sexuality may still exist in the surrounding adult-game atmosphere through blunt terminology, existing masturbation/porn context, SV as a known resource category, dirty OS copy, MEN as a module, crude jokes, or adult SHOP foreshadowing — but do not leak the contents of locked DESIRE missions.
 Do not force one into every reply. Do not invent wet underwear, toys, semen, arousal, nudity or masturbation that the visible scene did not establish. Do not make random men horny for the host before the relevant CHARM/plot conditions. The goal is persistent 黄油 atmosphere, not premature sexual success.
 Mundane tasks can carry sexual or humiliating framing only when the scene gives a real reason. Example: cleaning up directly after the opening masturbation can be vulgar; an unrelated later walk should not magically become a sex task just to make the game dirtier.
 Do not turn TASK into "date him", "make him like you", "get praised", "raise affection", "have a sweet moment" or other romance-game objectives. The administrator may issue or verify missions, but he does NOT need to comment on every task, every system change or every user message. Silence, a single curse, or letting the OS panel speak for itself are valid responses. He is not the default erotic mission target. If later plot and his physical form naturally make him relevant, that may happen organically, but never because the task generator is trying to push an admin route.
@@ -3010,13 +3011,15 @@ SETTING-COMPATIBLE ROLE / PROFESSION / CLASS
 × SCENE ROLE.
 The dimensions must vary independently. Do not collapse them into one recurring archetype.
 
-RANDOM TASK-MALE HARD RULES:
-- Explicit adult; no visibly elderly/old man.
-- Profession, class, wealth, face, style, temperament, height and social status may vary widely. Do NOT make everyone a rich tall handsome elite.
+RANDOM TASK-MALE RANGE — DO NOT FLATTEN THEM INTO ONE TYPE:
+- Every task target is an explicit adult.
+- Public personality may be ANY adult archetype that fits the scene: gentle, refined, polite, scholarly, shy, cold, quiet, professional, ordinary, rough, blunt, playful, arrogant, awkward, dominant, submissive, inexperienced, experienced, etc. Do NOT ban "温文尔雅" or any other non-sexual personality type.
+- Public persona and private sexuality are independent axes. A very courteous, restrained or elegant man may have unexpectedly crude, kinky, obsessive, shameless or highly specific private desires; a rough man may have surprisingly careful or restrained tastes. Strong contrast is welcome when it remains coherent with his individual psychology.
+- Profession, class, wealth, face, style, temperament, height and social status should vary widely. Do NOT make everyone a rich/tall/handsome elite and do NOT make everyone a vulgar thug.
 - Body build defaults to physically usable/appealing: proportionate, sturdy, fit, athletic, lean-muscular or otherwise clearly decent shape.
-- Hard exclusions: severely obese/"肥猪型", emaciated/bony/"瘦排骨", frightening or room-filling body odor.
+- Hard physical exclusions only: no visibly elderly/old task men; no severely obese/"肥猪型"; no emaciated/bony/"瘦排骨"; no frightening, nauseating, room-filling body odor.
 - Ordinary sweat, roughness, plain/ugly face, scars, baldness, disability, poverty, awkwardness or unconventional looks may exist.
-- Sexual anatomy/performance may vary for random task NPCs; do not automatically make every random man perfect.
+- Sexual anatomy, stamina, experience, fetishes, dirty talk style, control preference, exhibitionism, voyeurism, restraint, humiliation preference, roleplay preference and other adult sexual variables may vary independently. Do not auto-max every random man.
 - Existing MEN identity is canonical. Never redesign a known man just because a new mission uses him.
 
 LONG-TERM SOLIDIFICATION FORMULA:
@@ -3038,6 +3041,7 @@ TARGET MAN
 
 Every generated DESIRE mission must be a concrete explicit adult-game challenge supported by the current plot. It may use masturbation, oral/hand/foot/breast/penetrative/anal play, semen/SV collection, orgasm/arousal control, nudity/exposure, dirty/humiliating presentation, endurance, position/control constraints, multiple-stimulus challenges, toy/mechanical stimulation, number-of-participants structure, or another explicit objective appropriate to the current CHARM and scene.
 Vary the combination across missions. Do not simply rename yesterday's act, swap one body part, or recycle the same man/setting/constraint pattern.
+The mission should feel indecent because of the objective, circumstances, private sexual behavior and the administrator's framing — NOT because every target man has to be outwardly crude. A gentleman can remain gentlemanly in ordinary speech while having filthy, extreme, peculiar or highly specific adult preferences behind closed doors; preserve that contrast instead of turning him into a generic dirty-talker.
 
 Do NOT make the actual objective dating, romantic kissing, being complimented, obtaining a phone number, being liked, raising affection, making the administrator jealous, comforting him, earning his praise, or "攻略系统哥". Those may happen incidentally but are not DESIRE objectives.
 The administrator is not the default target. He can become relevant only if his physical form and the actual plot make him relevant organically.
@@ -4172,6 +4176,16 @@ function renderTaskList(category='daily') {
   const storyDay=Math.max(1,Number(state.tasks?.storyDay)||1);
   const activeIds=new Set(Object.keys(state.tasks?.active||{}));
 
+  if(category==='desire' && Number(state.host?.charm||0)<8){
+    return `
+      <div class="meme-men-empty meme-desire-sealed">
+        <small>DESIRE · SEALED</small>
+        <b>未解锁</b>
+        <p>权限不足。任务名称、对象、玩法、奖励与条件全部隐藏。</p>
+      </div>
+    `;
+  }
+
   if(category==='daily'){
     const turn=Number(state.shop?.plotTurn)||0;
     const selected=currentStaticTaskPool('daily',state);
@@ -4227,7 +4241,7 @@ function taskMarkup() {
     <section class="meme-page-card meme-task-rules">
       <div class="meme-card-title"><small>MY RULES</small><h3>听清楚再接</h3></div>
       ${labelValue('日常','每天固定轮换 3 个基础日常；前两天出现过的任务优先禁止连续回池。当天完成后退出，剧情临时 TASK 另算，不占这 3 个位置。')}
-      ${labelValue('欲望','欲望栏不抽固定池；任务由当前男人 × 地点 × CHARM × 性行为 × 限制条件 × 结算目标现场生成。已接取任务不会因换天被强行抹掉。')}
+      ${labelValue('欲望','CHARM 8 前完全封锁，不透任务内容。解锁后不抽固定池；按当前男人 × 地点 × CHARM × 性行为 × 限制条件 × 结算目标现场生成。男人类型不限，公开人格与私下XP可强烈反差。')}
       ${labelValue('不同任务',`${distinctEroticTaskCount(state)} 个已完成`,'重复做同一任务不重复计数')}
       ${labelValue('特殊','候选会随自然日轮换；真正的剧情放水任务不会高频出现。')}
       ${labelValue('结算','接取只登记任务，不要求立刻完成。以后剧情里什么时候真正做到，模型验收通过时扩展才发奖励并划掉任务。')}
@@ -4700,7 +4714,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
-        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.12.1</small>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.12.2</small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
