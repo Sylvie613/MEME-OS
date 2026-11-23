@@ -7,17 +7,18 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.11.8';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.11.8';
-import { isBoundCharacter } from './src/binding.js?v=0.11.8';
+} from './src/state.js?v=0.11.9';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.11.9';
+import { isBoundCharacter } from './src/binding.js?v=0.11.9';
 
 /**
- * MÉMÉ OS v0.11.8
+ * MÉMÉ OS v0.11.9
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
 const MEME_ID = 'meme-os-heart-launcher';
 const DIALOG_ID = 'meme-os-dialog';
+const MEME_SCENE_CLOCK_PROMPT_ID = 'meme-os-scene-clock';
 
 let memoryQuietSyncInFlight=false;
 let memoryQuietLastAttemptTurn=-999;
@@ -889,7 +890,7 @@ function applyMemoryEvent(state,raw,visibleTurns=0){
 }
 
 function applyStoryStatusEvent(){
-  // Retired in v0.11.8. Scene date/time/weather/location live in visible prose only.
+  // Retired in v0.11.9. Scene date/time/weather/location live in visible prose only.
   return false;
 }
 
@@ -2941,23 +2942,6 @@ Do not verify intentions, promises, partial attempts, vague claims, or a task th
 A completed task should disappear/cross out as soon as this reply is processed; there is no separate claim step.
 For sample, oral and drain: after their first-ever completion they become repeatable collection tasks, at most once per in-world story day. The extension automatically switches later payouts to SV-only repeat rewards. Never invent extra AP for repeated completions.
 
-VISIBLE SCENE STATUS — PRECISE STORY CLOCK — HARD FORMAT RULE:
-Every normal assistant story reply MUST begin with exactly one compact visible status line BEFORE any prose, in EXACTLY this shape:
-【DAY ${String(Math.max(1,Number(state.tasks?.storyDay)||1)).padStart(3,'0')}｜<M月D日>｜<HH:MM>｜<天气>｜<地点>】
-
-Current previous visible scene status:
-${previousSceneStatusText}
-
-STRICT DATE/TIME RULES:
-1. 日期 MUST contain both month AND day, e.g. "11月23日". Never output only "11月", "23日", "今天", "次日" or another vague date.
-2. 时间 MUST be exact 24-hour HH:MM, e.g. "08:17", "14:05", "23:41". Never output "上午 / 下午 / 清晨 / 晚上 / 深夜" in the time slot.
-3. Treat the previous visible scene status as the story-clock anchor. Advance from its exact date/time according to the amount of time visibly consumed by the current narrative actions. Immediate continuation may advance only a few minutes; walking, eating, bathing, travel, sleep, waiting, etc. must advance by a plausible matching duration.
-4. Do NOT randomly reset the clock or invent large time jumps just to change the header. If the story has not established a large jump, preserve continuity and advance only as much as the described actions reasonably take.
-5. When HH:MM passes midnight, advance M月D日 and the natural DAY number consistently. When the story explicitly says "第二天 / 次日 / N天后", advance the calendar by the stated amount even if no sleep scene is shown.
-6. If an older header is incomplete (for example "11月｜上午"), repair it ONCE in the next reply by establishing a specific M月D日 and HH:MM consistent with the visible story, then use that precise value as the stable anchor from then on.
-7. Weather and location must follow narrative continuity. Keep them unchanged unless the story actually changes them.
-8. This line belongs to visible正文, not the MÉMÉ OS panel. Do not include AP, SV, CHARM or a people/WITH list.
-
 STORY DAY:
 Current reconstructed in-world story day=${Number(state.tasks?.storyDay)||1}. The extension reconstructs chronology from the COMPLETE VISIBLE CHAT, so do not force visible DAY headings merely to feed the OS. Keep natural time progression internally consistent. If the story goes through night/sleep and then wakes into the next morning, that is a new natural day. Explicit "次日 / 第二天 / N天后 / N周后" jumps are also real day transitions. timeline.storyDay/dayAdvance may be emitted as advisory metadata, but they do not control the stored day.
 
@@ -3097,6 +3081,26 @@ PRIVATE still does NOT reveal the naming-right secret. Naming remains separately
 Set permission.signal only for a genuinely new change caused by a concrete event, and always include permission.signalReason. Allowed interest signals: impressed|curious|respect|amused|annoyed-but-invested. desire requires CHARM>=70 plus the slow-burn history gates above. attachment requires permission.signalTag and the long-term investment gates above. permission.love=true requires both permission.loveReason and permission.loveTag and must satisfy the full late-game slow-burn gates; never use beauty, sex, jealousy, system level or one dramatic scene as a shortcut.
 Never explain hidden qualification mechanics in visible prose.`;
 
+  const sceneClockPrompt=`[MÉMÉ OS — SCENE CLOCK — ABSOLUTE OUTPUT FORMAT]
+This instruction controls ONLY the FIRST visible line of the next assistant story reply and overrides any older scene-header format found in chat history.
+
+Previous visible scene header:
+${previousSceneStatusText}
+
+MANDATORY FIRST LINE — EXACTLY FIVE FIELDS:
+【DAY ${String(Math.max(1,Number(state.tasks?.storyDay)||1)).padStart(3,'0')}｜<M月D日>｜<HH:MM>｜<天气>｜<地点>】
+
+NON-NEGOTIABLE:
+- <M月D日> MUST be a concrete Chinese month+day such as 11月23日. NEVER output only 11月, only 23日, 今天, 次日, or any vague date.
+- <HH:MM> MUST be a concrete 24-hour clock time such as 08:17, 16:42, 23:05. NEVER output 上午, 下午, 清晨, 晚上, 深夜, or another time-of-day word in this field.
+- The old format “【DAY 003｜11月｜下午｜晴｜卧室】” is INVALID and MUST NOT be repeated.
+- Continue from the previous precise header when one exists. Advance minutes/hours only by the amount of time plausibly consumed by the visible narrative.
+- If the previous header is old/incomplete, repair it NOW into a concrete M月D日 + HH:MM consistent with the current story, then treat that repaired value as the new anchor.
+- Keep weather/location unchanged unless the story changes them.
+- Output this header BEFORE any narration, dialogue, TASK card, or other text.
+`;
+
+  context.setExtensionPrompt(MEME_SCENE_CLOCK_PROMPT_ID,sceneClockPrompt,1,0,false,0);
   context.setExtensionPrompt(MEME_RUNTIME_PROMPT_ID,prompt,1,2,false,0);
 }
 
@@ -4570,7 +4574,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
-        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.11.8</small>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.11.9</small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
