@@ -41,6 +41,29 @@ const TASK_DATA = {
   ],
 };
 
+function deterministicTaskRotation(list,category,state=runtimeState(),count=3){
+  const items=Array.isArray(list)?list:[];
+  if(items.length<=count) return [...items];
+  const day=Math.max(1,Number(state.tasks?.storyDay)||1);
+  const salt={daily:17,desire:31,special:47}[category]||7;
+  return [...items]
+    .map((task,index)=>({
+      task,
+      score:hashId(`${category}|${day}|${salt}|${task.id}|${index}`),
+    }))
+    .sort((a,b)=>a.score-b.score)
+    .slice(0,count)
+    .map(entry=>entry.task);
+}
+
+function currentStaticTaskPool(category,state=runtimeState()){
+  const list=TASK_DATA[category]||[];
+  if(category==='daily') return deterministicTaskRotation(list,category,state,3);
+  if(category==='desire') return deterministicTaskRotation(list,category,state,3);
+  if(category==='special') return deterministicTaskRotation(list,category,state,2);
+  return [...list];
+}
+
 const DYNAMIC_DESIRE_TIERS = {
   1:{minCharm:8, ap:120, sv:20, label:'TIER I'},
   2:{minCharm:18, ap:180, sv:35, label:'TIER II'},
@@ -423,11 +446,15 @@ function taskActionTags(task){
 
 function completedDailyActionTags(state=runtimeState()){
   const tags=new Set();
-  for(const [id,record] of Object.entries(state.tasks?.everCompleted||{})){
+  const day=Math.max(1,Number(state.tasks?.storyDay)||1);
+  for(const [id,record] of Object.entries(state.tasks?.dailyCompleted||{})){
+    if(Number(record?.day||0)!==day) continue;
     const saved=Array.isArray(record?.actionTags)?record.actionTags:[];
     saved.forEach(tag=>tags.add(String(tag)));
     const staticTags=STATIC_DAILY_ACTIONS[id]||[];
     staticTags.forEach(tag=>tags.add(tag));
+    const task=findTask(id,state);
+    taskActionTags(task).forEach(tag=>tags.add(tag));
   }
   return tags;
 }
@@ -445,7 +472,7 @@ function hasOpenSemanticDuplicate(task,state=runtimeState()){
   const tagSet=new Set(tags);
   const open=[
     ...(state.tasks?.generatedDaily||[]),
-    ...TASK_DATA.daily.filter(item=>!state.tasks?.everCompleted?.[item.id]),
+    ...currentStaticTaskPool('daily',state),
   ];
   return open.some(existing=>{
     if(existing.id===task.id) return false;
@@ -528,7 +555,7 @@ function sanitizeGeneratedDailyTask(raw,state=runtimeState()){
   const reward=dynamicDailyRewardMeta(difficulty,state);
   const source=String(raw.source||'当前剧情').replace(/\s+/g,' ').trim().slice(0,80);
   const actionTags=extractDailyActionTags(`${title} ${desc} ${detail}`);
-  const fingerprint=`${title.toLowerCase()}|${desc.toLowerCase()}|${source.toLowerCase()}`;
+  const fingerprint=`${title.toLowerCase()}|${desc.toLowerCase()}|${source.toLowerCase()}|day:${Math.max(1,Number(state.tasks?.storyDay)||1)}`;
   const id=`daily_${hashId(fingerprint).toString(36)}`;
   const candidate={id,title,desc,detail,actionTags};
   if(state.tasks?.everCompleted?.[id]) return null;
@@ -561,15 +588,42 @@ function extractCanonicalTaskMarkers(raw=''){
   const text=String(raw||'');
   const tasks=[];
   // Canonical syntax:
-  // [TASK｜任务名｜任务要求]
-  // [TASK: 任务名｜任务要求]
-  const re=/\[\s*TASK\s*(?:[｜|]|[:：])\s*([^｜|\]\n]{2,48})\s*[｜|]\s*([^\]\n]{2,220})\s*\]/gi;
+  // [TASK｜任务名｜任务要求｜AP +90]
+  const re=/\[\s*TASK\s*[｜|]\s*([^｜|\]\n]{2,48})\s*[｜|]\s*([^｜|\]\n]{2,220})\s*[｜|]\s*(?:奖励\s*)?AP\s*\+\s*(\d{1,4})\s*\]/gi;
   for(const match of text.matchAll(re)){
     const title=String(match[1]||'').replace(/\s+/g,' ').trim().slice(0,48);
     const desc=String(match[2]||'').replace(/\s+/g,' ').trim().slice(0,180);
-    if(title && desc) tasks.push({title,desc});
+    const shownReward=Math.max(0,Number(match[3])||0);
+    if(title && desc) tasks.push({title,desc,shownReward});
   }
   return tasks;
+}
+
+function plotTaskFrequency(state=runtimeState()){
+  const day=Math.max(1,Number(state.tasks?.storyDay)||1);
+  const turn=Number(state.shop?.plotTurn)||0;
+  const sameDay=Number(state.tasks?.plotTaskIssuedDay||0)===day;
+  const count=sameDay?Math.max(0,Number(state.tasks?.plotTaskIssuedCount)||0):0;
+  const last=sameDay?Number(state.tasks?.lastPlotTaskTurn??-999):-999;
+  return {
+    day,turn,count,last,
+    canIssue:count===0 || (count===1 && turn-last>=8),
+  };
+}
+
+function plotTaskRewardOptions(state=runtimeState()){
+  return {
+    light:dynamicDailyRewardMeta('light',state).ap,
+    normal:dynamicDailyRewardMeta('normal',state).ap,
+    hard:dynamicDailyRewardMeta('hard',state).ap,
+  };
+}
+
+function markPlotTaskIssued(state){
+  const freq=plotTaskFrequency(state);
+  state.tasks.plotTaskIssuedDay=freq.day;
+  state.tasks.plotTaskIssuedCount=freq.count+1;
+  state.tasks.lastPlotTaskTurn=freq.turn;
 }
 
 function taskFromCanonicalMarker(card,state=runtimeState()){
@@ -578,10 +632,12 @@ function taskFromCanonicalMarker(card,state=runtimeState()){
   const desc=String(card.desc||'').replace(/\s+/g,' ').trim().slice(0,180);
   if(!title || !desc) return null;
 
+  const options=plotTaskRewardOptions(state);
+  const rewardMatch=Object.entries(options).find(([,value])=>Number(value)===Number(card.shownReward));
   const actionCount=(desc.match(/[，,、；;]/g)||[]).length+1;
   const hardCue=/(二十分钟|半小时|一小时|坚持|运动|出门|公共|社交|当众|长时间|彻底|完整完成|连续)/.test(desc);
   const lightCue=actionCount<=1 && /(扔|擦|关|拿|喝|换一件|刷牙|洗脸|吹干)/.test(desc);
-  const difficulty=hardCue?'hard':lightCue?'light':'normal';
+  const difficulty=rewardMatch?.[0] || (hardCue?'hard':lightCue?'light':'normal');
 
   const task=sanitizeGeneratedDailyTask({
     title,
@@ -593,6 +649,8 @@ function taskFromCanonicalMarker(card,state=runtimeState()){
   if(task){
     task.canonicalMarker=true;
     task.source='剧情[TASK]标记';
+    task.shownReward=Number(card.shownReward)||0;
+    task.rewardVerified=Number(taskReward(task,state).ap)===Number(card.shownReward);
   }
   return task;
 }
@@ -840,7 +898,7 @@ function settleTaskFromModel(state,rawTask,messageId){
   const dailyLike=isRollingDaily || repeatable;
   if(repeatable && Number(active.storyDay||0)!==currentDay) return false;
   if(repeatable && Number(state.tasks?.dailyCompleted?.[id]?.day||0)===currentDay) return false;
-  if(isRollingDaily && state.tasks?.everCompleted?.[id]) return false;
+  if(isRollingDaily && Number(state.tasks?.dailyCompleted?.[id]?.day||0)===currentDay) return false;
   if(!dailyLike && state.tasks?.completed?.[id]) return false;
 
   const evidence=String(rawTask.evidence||'').replace(/\s+/g,' ').trim().slice(0,180);
@@ -868,6 +926,7 @@ function settleTaskFromModel(state,rawTask,messageId){
       evidence,
       completedAt:Date.now(),
       completedTurn:Number(state.shop?.plotTurn)||0,
+      actionTags:task.category==='daily'?taskActionTags(task):[],
     };
   }
 
@@ -1551,7 +1610,9 @@ async function handleRuntimeEvent(messageId){
 
   const raw=String(message.mes||'');
   const canonicalCards=extractCanonicalTaskMarkers(raw);
-  const canonicalTask=canonicalCards.length ? taskFromCanonicalMarker(canonicalCards[canonicalCards.length-1],state) : null;
+  const candidateCanonicalTask=canonicalCards.length ? taskFromCanonicalMarker(canonicalCards[canonicalCards.length-1],state) : null;
+  const plotFreq=plotTaskFrequency(state);
+  const canonicalTask=candidateCanonicalTask && plotFreq.canIssue ? candidateCanonicalTask : null;
   if(canonicalTask){
     purgeKnownLegacyWrongGeneratedTasks(state);
     removeFallbackTasksCompetingWithFormalCard(state,canonicalTask);
@@ -1560,6 +1621,7 @@ async function handleRuntimeEvent(messageId){
       ...state.tasks.generatedDaily.filter(old=>old.id!==canonicalTask.id),
     ].slice(0,8);
     state.tasks.lastGeneratedDailyTurn=Number(state.shop?.plotTurn)||0;
+    markPlotTaskIssued(state);
   }
 
   const allMatches=[...raw.matchAll(/<!--MEME_OS_EVENT\s+([\s\S]*?)-->/g)];
@@ -1668,20 +1730,31 @@ async function handleRuntimeEvent(messageId){
       }
 
       if(event.timeline?.dayAdvance===true){
-        state.tasks=state.tasks||{storyDay:1,active:{},generated:[],lastGeneratedDesireDay:0,completed:{},dailyCompleted:{},everCompleted:{}};
+        state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],dismissed:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
         state.tasks.storyDay=Math.max(1,(Number(state.tasks.storyDay)||1)+1);
+
+        // Daily contracts expire at a natural-day boundary. Accepted non-daily
+        // desire/special contracts may persist, but every unaccepted candidate pool refreshes.
         for(const [taskId] of Object.entries(state.tasks.active||{})){
-          const task=findTask(taskId);
-          if(task?.repeatable==='daily') delete state.tasks.active[taskId];
+          const task=findTask(taskId,state);
+          if(task?.category==='daily' || task?.repeatable==='daily') delete state.tasks.active[taskId];
         }
+        state.tasks.generatedDaily=[];
+        state.tasks.generated=(state.tasks.generated||[]).filter(task=>Boolean(state.tasks.active?.[task.id]));
+        state.tasks.lastGeneratedDesireDay=0;
+        state.tasks.lastGeneratedDailyTurn=0;
+        state.tasks.plotTaskIssuedDay=state.tasks.storyDay;
+        state.tasks.plotTaskIssuedCount=0;
+        state.tasks.lastPlotTaskTurn=-999;
+
         changed=true;
         state.history.push({
           id:`meme_story_day_${state.tasks.storyDay}_${Date.now()}`,
           type:'story_day',
           recordType:'system',
           title:`剧情进入 DAY ${String(state.tasks.storyDay).padStart(3,'0')}`,
-          summary:'新的一天开始；未完成的旧日常挂起项已清理，任务板继续按剧情滚动。',
-          text:'STORY DAY ADVANCED',
+          summary:'新的剧情自然日开始：日常/特殊/欲望候选池重新洗牌；未接取的昨日剧情候选退场，已接取的非日常长期任务保留。',
+          text:'STORY DAY ADVANCED — TASK POOLS REFRESHED',
           committedAt:Date.now(),
         });
       }
@@ -2850,25 +2923,44 @@ function taskItem(task) {
 
 function renderTaskList(category='daily') {
   const state=runtimeState();
+  const storyDay=Math.max(1,Number(state.tasks?.storyDay)||1);
+  const activeIds=new Set(Object.keys(state.tasks?.active||{}));
+
   if(category==='daily'){
     const turn=Number(state.shop?.plotTurn)||0;
-    const shouldShowDaily=task=>{
-      const done=state.tasks?.dailyCompleted?.[task.id];
-      if(!state.tasks?.everCompleted?.[task.id]) return true;
-      return Boolean(done) && Number(done.completedTurn??-1)===turn;
-    };
-    const base=TASK_DATA.daily
+    const selected=currentStaticTaskPool('daily',state);
+    const activeStatic=TASK_DATA.daily.filter(task=>activeIds.has(task.id) && !selected.some(item=>item.id===task.id));
+    const base=[...selected,...activeStatic]
       .map(task=>({...task,category:'daily'}))
-      .filter(shouldShowDaily);
+      .filter(task=>{
+        const done=state.tasks?.dailyCompleted?.[task.id];
+        if(Number(done?.day||0)!==storyDay) return true;
+        return Number(done.completedTurn??-1)===turn;
+      });
+
     const generatedDaily=(state.tasks?.generatedDaily||[])
+      .filter(task=>Number(task.createdDay||storyDay)===storyDay || activeIds.has(task.id))
       .map(task=>({...task,category:'daily',dynamicDailyTask:true}))
-      .filter(shouldShowDaily);
+      .filter(task=>{
+        const done=state.tasks?.dailyCompleted?.[task.id];
+        if(Number(done?.day||0)!==storyDay) return true;
+        return Number(done.completedTurn??-1)===turn;
+      });
+
     const all=[...base,...generatedDaily];
     return all.length
       ? all.map(task=>taskItem(task)).join('')
-      : '<div class="meme-men-empty"><small>DAILY BOARD</small><b>这轮暂时没新活</b><p>继续走剧情。下一次有值得管的事，我会往这里塞。</p></div>';
+      : '<div class="meme-men-empty"><small>DAILY BOARD</small><b>今天暂时没新活</b><p>继续走剧情；自然日变化后任务池会重新洗牌。</p></div>';
   }
-  const base=(TASK_DATA[category] || []).map(task=>({...task,category}));
+
+  const selected=currentStaticTaskPool(category,state);
+  const activeStatic=(TASK_DATA[category]||[]).filter(task=>activeIds.has(task.id) && !selected.some(item=>item.id===task.id));
+  const base=[...selected,...activeStatic]
+    .map(task=>({...task,category}))
+    .filter(task=>{
+      if(category==='desire' && state.tasks?.completed?.[task.id] && task.repeatable!=='daily') return false;
+      return true;
+    });
   const generated=category==='desire'
     ? (state.tasks?.generated||[]).map(task=>({...task,category:'desire',dynamicTask:true}))
     : [];
@@ -2888,10 +2980,10 @@ function taskMarkup() {
     <section class="meme-task-list" data-task-list>${renderTaskList('daily')}</section>
     <section class="meme-page-card meme-task-rules">
       <div class="meme-card-title"><small>MY RULES</small><h3>听清楚再接</h3></div>
-      ${labelValue('日常','滚动任务板 · 做完当轮划掉，下一轮退场；空位按当前剧情补新任务。')}
-      ${labelValue('欲望','五个基础里程碑之外，系统会随剧情继续生成新的成人任务；每个不同任务只计一次进化进度，重复采集只负责赚 SV。')}
+      ${labelValue('日常','按剧情自然日刷新候选池；当天完成的任务退出，第二天会根据新状态重新洗牌。')}
+      ${labelValue('欲望','基础里程碑只是模板；每天会结合当前男人、地点、CHARM 与剧情刷新候选，已接取的长期任务不会被强行抹掉。')}
       ${labelValue('不同任务',`${distinctEroticTaskCount(state)} 个已完成`,'重复做同一任务不重复计数')}
-      ${labelValue('特殊','我什么时候想发，什么时候才有。')}
+      ${labelValue('特殊','候选会随自然日轮换；真正的剧情放水任务不会高频出现。')}
       ${labelValue('结算','接取只登记任务，不要求立刻完成。以后剧情里什么时候真正做到，模型验收通过时扩展才发奖励并划掉任务。')}
     </section>
   `;
