@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.28';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.28';
-import { isBoundCharacter } from './src/binding.js?v=0.10.28';
+} from './src/state.js?v=0.10.29';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.29';
+import { isBoundCharacter } from './src/binding.js?v=0.10.29';
 
 /**
- * MÉMÉ OS v0.10.28
+ * MÉMÉ OS v0.10.29
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -795,6 +795,34 @@ function getDynamicShop(state=runtimeState()){
 function getLifestyleShelf(state=runtimeState()){
   if((Number(state.host?.charm)||0)<AP_CHARM_CAP) return [];
   return Array.isArray(state.shop?.lifestyleShelf) ? state.shop.lifestyleShelf.slice(0,5) : [];
+}
+
+function lifestyleShelfDisposition(state=runtimeState()){
+  const day=Math.max(1,Number(state.tasks?.storyDay)||1);
+  const turn=Math.max(0,Number(state.shop?.plotTurn)||0);
+  const roll=hashId(`lifestyle|${day}|${turn}`) % 100;
+  if(roll<40){
+    return {
+      id:'practical',
+      roll,
+      label:'正常',
+      instruction:'优先回应真实需求，但仍保留系统哥自己的审美和嘴臭。',
+    };
+  }
+  if(roll<75){
+    return {
+      id:'mischief',
+      roll,
+      label:'恶作剧',
+      instruction:'可以故意不完全满足需求、塞入让宿主无语或尴尬的偏题商品；如果改货架，至少有一格体现他的坏心眼。',
+    };
+  }
+  return {
+    id:'corrupt',
+    roll,
+    label:'恶劣黄油化',
+    instruction:'允许恶意曲解需求，把合理购物意图往更下流、更羞耻、更成人游戏化的方向偏转；如果改货架，至少两格应体现这种恶劣偏转。',
+  };
 }
 
 function sanitizeSceneIssue(raw,state=runtimeState()){
@@ -2075,6 +2103,7 @@ function installRuntimePrompt(){
   const nextEvolution=nextSystemEvolution(state);
   const plotTaskRewards=plotTaskRewardOptions(state);
   const plotTaskFreq=plotTaskFrequency(state);
+  const lifestyleDisposition=lifestyleShelfDisposition(state);
   const prompt=`[MÉMÉ OS runtime bridge]
 HOST PERSONA RULE:
 Do not define the host's name, age beyond adulthood, height, job, personality, hobbies, romantic style or personal history here. The host's identity/personality comes from the current SillyTavern Persona and the live conversation. MÉMÉ OS may define only the system-specific starting transformation condition and tracked state. Never overwrite or homogenize the user's Persona.
@@ -2257,7 +2286,7 @@ taskOffers: maximum 1 new generated erotic mission; fields title,desc,detail,sou
 tasks: max 4 completed ACTIVE task entries; fields id,status("completed"),evidence. Never include rewards; the extension calculates them.
 storyRewards: max 2 one-off plot tasks that visibly became complete without prior acceptance; fields title,evidence,source,difficulty(light|normal|hard). Never include AP/SV numbers.
 shop: maximum 2 BODY/PLOT temporary items only. Fields: title,desc,detail,currency("AP"|"SV"),ttl,icon,source,impact("minor"|"standard"|"major"),bodyAxis(optional),sourceIssueId(optional). At CHARM ${AP_CHARM_CAP} or above, body/appearance goods are forcibly repriced in SV even if you request AP. title/desc/detail/source are administrator-authored OS copy. A temporary plot item must answer something concrete in the visible story. Never use shop for ordinary lifestyle merchandise.
-lifestyleShop: dedicated 日常用品 shelf. Before CHARM ${AP_CHARM_CAP}, always leave []. At CHARM ${AP_CHARM_CAP}+, reconsider the CURRENT five-item shelf every assistant turn. If no change is useful, emit [] and the extension keeps all five unchanged. If ANY slot should change, emit EXACTLY 5 complete items representing the entire new shelf. Each item fields: title,desc,detail,icon,source,impact("minor"|"standard"|"major"),kind(skincare|food|daily|clothing|electronics|home|entertainment|service|other),consumable(boolean). Never include id, currency, price, bodyAxis or charmGain; these goods are AP-only and never change CHARM/body stats.
+lifestyleShop: dedicated 日常用品 shelf. Before CHARM ${AP_CHARM_CAP}, always leave []. At CHARM ${AP_CHARM_CAP}+, reconsider the CURRENT five-item shelf every assistant turn under the supplied lifestyleDisposition. If no change is useful, emit [] and the extension keeps all five unchanged. If ANY slot should change, emit EXACTLY 5 complete items representing the entire new shelf. Each item fields: title,desc,detail,icon,source,impact("minor"|"standard"|"major"),kind(skincare|food|daily|clothing|electronics|home|entertainment|service|other),consumable(boolean). Never include id, currency, price, bodyAxis or charmGain; these goods are AP-only and never change CHARM/body stats. Generate fresh context-specific products; do not reuse a fixed example as a template.
 feedback.issues: max 2, only direct story evidence; fields id,axis(optional),source,note,severity(low|medium|high). source/note are his OS notes: short and specific, with his personal wording allowed.
 feedback.reactions: max 2, only directly observed reactions to established state/change; fields id,axis(optional),source,note,valence(negative|neutral|positive|sexual). source/note are SYSTEM log copy.
 men: max 3 qualifying adult men updates; fields id(optional for new),name,meta,summary,relation,desire,lastContact,note,badges,present,contactDelta,qualifies. MEN is the administrator's own archive: factual identity fields may stay concise, but summary/relation/desire/lastContact/note/badges should sound like he personally wrote them, including crude, mocking or sexual wording when the established facts support it.
@@ -2270,10 +2299,27 @@ BODY/PLOT GOODS: body-changing temporary goods still arise from concrete visible
 This is ONE fixed final SHOP tab, not a shopping-app category tree. Before CHARM ${AP_CHARM_CAP}, the tab stays visibly LOCKED and lifestyleShop must remain [].
 At CHARM ${AP_CHARM_CAP}+, the shelf always contains exactly FIVE products. Current shelf: ${JSON.stringify(getLifestyleShelf(state).map(item=>({title:item.title,desc:item.desc,kind:item.kind,consumable:item.consumable,source:item.source,price:item.price})))}.
 Every assistant turn, judge whether these five still fit the host's immediate life. DO NOT rotate merely for novelty.
-Reasons to change one or more slots include: the host explicitly says she wants to eat/buy/use something; an owned thing breaks or runs out; the current or next scene creates a practical need; an outing/event suggests something useful; the administrator notices something she genuinely needs. His own tastes or petty impulse may influence a slot, but the shelf should feel responsive, not random.
+
+The administrator is NOT a helpful shopping assistant. MÉMÉ OS computes one shelf-attitude mode for this exact plot turn and the mode is authoritative:
+- practical: about 40% of turns.
+- mischief: about 35% of turns.
+- corrupt: about 25% of turns.
+Current shelf mode=${lifestyleDisposition.id} / ${lifestyleDisposition.label}; instruction=${lifestyleDisposition.instruction}
+This mode is deterministic for the plot turn, so do not soften it because of regeneration/swiping.
+
+Shelf behavior:
+- practical: he may actually stock what is useful, but copy and selection still reflect his taste and attitude.
+- mischief: he may deliberately sidestep, mock, inconvenience, embarrass or only partially satisfy a stated need. If the shelf changes, at least one changed slot should express that bad impulse.
+- corrupt: he may perversely reinterpret an ordinary need through the vulgar adult-game identity of MÉMÉ OS. If the shelf changes, at least two slots should become deliberately obscene, humiliating, sexually suggestive, adult-use, or otherwise maliciously off-target while remaining valid purchasable system merchandise.
+Do NOT copy or memorize any concrete example from the user as a recurring product pattern. Invent fresh substitutions from the present context. Avoid repeating the same joke/product structure across turns.
+Do NOT make every shelf sexual. The mode determines how much the administrator twists the shelf, and unchanged practical items may remain beside malicious ones.
+His own bad impulse is a valid reason to change a slot, but do not replace all five every turn just because the mode is mischievous/corrupt.
+
+Reasons to change one or more slots include: the host explicitly says she wants to eat/buy/use something; an owned thing breaks or runs out; the current or next scene creates a practical need; an outing/event suggests something useful; the administrator notices something she genuinely needs; or the current shelf mode gives him a sufficiently funny/mean reason to tamper with one or two slots.
+If the shelf is empty after CHARM ${AP_CHARM_CAP}, lifestyleShop MUST provide exactly 5 items on the next assistant reply.
 If nothing should change: lifestyleShop=[].
 If ANY slot changes: emit exactly 5 complete items for the whole new shelf. You may repeat 4 existing items and replace only 1. Never emit a partial patch.
-The products may be almost anything non-body: skincare, food/drinks/snacks, toiletries, household goods, clothing/accessories, electronics, furniture/decor, entertainment, tickets/subscriptions, convenience services, gifts or other ordinary goods/services.
+The products may be almost anything non-body: skincare, food/drinks/snacks, toiletries, household goods, clothing/accessories, electronics, furniture/decor, entertainment, tickets/subscriptions, convenience services, gifts, adult-use novelty goods, embarrassing system merchandise, fictional system-only consumables/services, or other non-body goods/services. They must not permanently modify body stats through this shelf.
 All five are AP-only, never raise CHARM, never modify body axes, and all title/desc/detail/source copy is personally written by the administrator in his current OS voice: ${voice.label}.
 Current inventory: ${JSON.stringify(inventoryItems(state).map(item=>({title:item.title,kind:item.kind,count:item.count,consumable:item.consumable})))}. Durable goods already owned should normally be replaced on the next shelf revision unless buying another makes sense.
 
