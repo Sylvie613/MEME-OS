@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.13.9';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.13.9';
-import { isBoundCharacter } from './src/binding.js?v=0.13.9';
+} from './src/state.js?v=0.13.10';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.13.10';
+import { isBoundCharacter } from './src/binding.js?v=0.13.10';
 
 /**
- * MÉMÉ OS v0.13.9
+ * MÉMÉ OS v0.13.10
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -1305,7 +1305,20 @@ function cleanCompletionSceneText(value=''){
     .trim();
 }
 
-function completionVerificationScene(context,messageId,currentRaw=''){
+function taskAcceptanceMessageIndex(chat=[],taskId='',beforeIndex=Infinity){
+  const id=String(taskId||'').trim();
+  if(!id) return -1;
+  const marker='TASK_ID:'+id;
+  for(let i=Math.min(Number(beforeIndex)-1,chat.length-1);i>=0;i--){
+    const message=chat[i];
+    if(!message?.is_user) continue;
+    const raw=String(message.mes||'');
+    if(raw.includes(marker) && /【MÉMÉ OS｜任务接取】/u.test(raw)) return i;
+  }
+  return -1;
+}
+
+function completionCurrentTurnScene(context,messageId,currentRaw=''){
   const chat=Array.isArray(context?.chat)?context.chat:[];
   let previousUser='';
   for(let i=Math.min(Number(messageId)-1,chat.length-1);i>=0;i--){
@@ -1315,7 +1328,56 @@ function completionVerificationScene(context,messageId,currentRaw=''){
     }
   }
   const currentVisible=cleanCompletionSceneText(currentRaw);
-  return [previousUser,currentVisible].filter(Boolean).join(' ').slice(-5000);
+  return [previousUser,currentVisible].filter(Boolean).join(' ').slice(-12000);
+}
+
+function completionVerificationScene(context,messageId,currentRaw='',taskId=''){
+  const chat=Array.isArray(context?.chat)?context.chat:[];
+  const end=Math.min(Math.max(0,Number(messageId)||0),chat.length);
+  const acceptedAt=taskAcceptanceMessageIndex(chat,taskId,end+1);
+  const start=acceptedAt>=0 ? acceptedAt+1 : Math.max(0,end-12);
+  const parts=[];
+
+  for(let i=start;i<end;i++){
+    const message=chat[i];
+    if(!message) continue;
+    const cleaned=cleanCompletionSceneText(message.mes||'');
+    if(cleaned) parts.push(cleaned);
+  }
+
+  const currentVisible=cleanCompletionSceneText(currentRaw);
+  if(currentVisible) parts.push(currentVisible);
+
+  // A task may span many turns. Keep a generous verification transcript, while
+  // progressAxes below permanently remembers already-proven required acts.
+  return parts.join(' ').slice(-60000);
+}
+
+function updateActiveTaskProgressFromScene(state,sceneText='',messageId=null){
+  const scene=cleanCompletionSceneText(sceneText);
+  if(!scene) return false;
+  let changed=false;
+  for(const [id,active] of Object.entries(state.tasks?.active||{})){
+    if(active?.category!=='desire') continue;
+    const task=findTask(id,state);
+    const settledTask={...task,...active,category:active.category||task?.category};
+    const requirement=(settledTask?.title||'')+' '+(settledTask?.desc||'')+' '+(settledTask?.detail||'');
+    const requiredAxes=DESIRE_COMPLETION_AXES.filter(axis=>axis.req.test(requirement));
+    if(!requiredAxes.length) continue;
+
+    const previous=new Set(Array.isArray(active.progressAxes)?active.progressAxes:[]);
+    for(const axis of requiredAxes){
+      if(axis.done.test(scene)) previous.add(axis.id);
+    }
+    const next=[...previous];
+    if(JSON.stringify(next)!==JSON.stringify(active.progressAxes||[])){
+      active.progressAxes=next;
+      active.lastProgressMessageId=Number.isInteger(Number(messageId))?Number(messageId):active.lastProgressMessageId||null;
+      active.progressUpdatedAt=Date.now();
+      changed=true;
+    }
+  }
+  return changed;
 }
 
 function desireTargetMatches(task,state,sceneText=''){
@@ -1348,12 +1410,16 @@ function taskCompletionEvidenceValid(task,evidence,sceneText=''){
 
   const requirement=(task?.title||'')+' '+(task?.desc||'')+' '+(task?.detail||'');
   const requiredAxes=DESIRE_COMPLETION_AXES.filter(axis=>axis.req.test(requirement));
+  const progressAxes=new Set(Array.isArray(task?.progressAxes)?task.progressAxes:[]);
   for(const axis of requiredAxes){
-    if(!axis.done.test(claim) || !axis.done.test(scene)){
-      return {ok:false,reason:'required DESIRE condition missing: '+axis.id};
+    if(!axis.done.test(claim)){
+      return {ok:false,reason:'completion evidence does not name required condition: '+axis.id};
+    }
+    if(!progressAxes.has(axis.id) && !axis.done.test(scene)){
+      return {ok:false,reason:'required DESIRE condition never appeared in visible task progress: '+axis.id};
     }
   }
-  return {ok:true,reason:'desire evidence grounded'};
+  return {ok:true,reason:'desire evidence grounded across task lifetime'};
 }
 
 function extractVisibleTaskCompletions(raw=''){
@@ -1419,7 +1485,7 @@ function findCurrentTaskByVisibleTitle(title,state=runtimeState()){
   return null;
 }
 
-function settleVisibleTaskCompletion(state,completion,messageId){
+function settleVisibleTaskCompletion(state,completion,messageId,context=null,currentRaw=''){
   const task=findCurrentTaskByVisibleTitle(completion?.title,state);
   if(!task) return false;
 
@@ -1436,9 +1502,10 @@ function settleVisibleTaskCompletion(state,completion,messageId){
     tier:Number.isFinite(Number(active.tier))?Number(active.tier):task.tier,
     targetManId:active.targetManId||task.targetManId||null,
   };
-  const targetCheck=desireTargetMatches(settledTask,state,String(completion?.context||''));
+  const taskLifetimeScene=completionVerificationScene(context,messageId,currentRaw||String(completion?.context||''),id);
+  const targetCheck=desireTargetMatches(settledTask,state,taskLifetimeScene);
   if(!targetCheck.ok) return false;
-  const verification=taskCompletionEvidenceValid(settledTask,String(completion?.context||''),String(completion?.context||''));
+  const verification=taskCompletionEvidenceValid(settledTask,taskLifetimeScene,taskLifetimeScene);
   if(!verification.ok) return false;
 
   const currentDay=Math.max(1,Number(state.tasks?.storyDay)||1);
@@ -1528,10 +1595,10 @@ function settleVisibleTaskCompletion(state,completion,messageId){
   return true;
 }
 
-function settleVisibleTaskCompletionsFromMessage(state,raw,messageId){
+function settleVisibleTaskCompletionsFromMessage(state,raw,messageId,context=null){
   let changed=false;
   for(const completion of extractVisibleTaskCompletions(raw)){
-    if(settleVisibleTaskCompletion(state,completion,messageId)) changed=true;
+    if(settleVisibleTaskCompletion(state,completion,messageId,context,raw)) changed=true;
   }
   return changed;
 }
@@ -2326,7 +2393,7 @@ async function reconcileRecentVisibleTaskCompletions(){
     const message=chat[i];
     if(!message || message.is_user) continue;
     const raw=String(message.mes||'');
-    if(settleVisibleTaskCompletionsFromMessage(state,raw,i)) changed=true;
+    if(settleVisibleTaskCompletionsFromMessage(state,raw,i,context)) changed=true;
   }
 
   if(changed){
@@ -2483,9 +2550,12 @@ async function handleRuntimeEvent(messageId){
     encounterCooldownChanged=true;
   }
 
-  const visibleCompletionChanged=settleVisibleTaskCompletionsFromMessage(state,raw,messageId);
+  const currentTurnCompletionScene=completionCurrentTurnScene(context,messageId,raw);
+  const taskProgressChanged=updateActiveTaskProgressFromScene(state,currentTurnCompletionScene,messageId);
+  const visibleCompletionChanged=settleVisibleTaskCompletionsFromMessage(state,raw,messageId,context);
   const visibleStoryRewardChanged=settleVisibleStoryRewardsFromMessage(state,raw,messageId);
   let verifiedTaskSettled=Boolean(visibleCompletionChanged);
+  if(taskProgressChanged) verifiedTaskSettled=verifiedTaskSettled || false;
 
   const canonicalCards=extractCanonicalTaskMarkers(raw);
   const canonicalTasks=canonicalCards
@@ -2547,8 +2617,8 @@ async function handleRuntimeEvent(messageId){
       }
 
       if(Array.isArray(event.tasks)){
-        const taskVerificationScene=completionVerificationScene(context,messageId,raw);
         for(const rawTask of event.tasks.slice(0,4)){
+          const taskVerificationScene=completionVerificationScene(context,messageId,raw,rawTask?.id);
           if(settleTaskFromModel(state,rawTask,messageId,taskVerificationScene)){
             changed=true;
             verifiedTaskSettled=true;
@@ -3085,7 +3155,7 @@ function installRuntimePrompt(){
     ...(state.tasks?.generated||[]).map(t=>({title:t.title,desc:t.desc,tier:t.tier,status:'open'})),
     ...Object.values(state.tasks?.completed||{}).filter(t=>t?.category==='desire').map(t=>({title:t.title,desc:t.desc,tier:t.tier,status:'completed'})),
   ].slice(-6);
-  const prompt=`[MÉMÉ OS runtime bridge · v0.13.9]
+  const prompt=`[MÉMÉ OS runtime bridge · v0.13.10]
 AUTHORITY / TONE:
 - Extension state is the only authority for AP, SV, CHARM, purchases, task settlement, MEN buckets, system access/evolution and unlocks. Never mentally add/subtract numbers or reuse stale balances.
 - The host persona comes from the active SillyTavern Persona + visible chat. Do not invent host identity/history beyond established system transformation facts.
@@ -3103,7 +3173,7 @@ Body/upgrades=${JSON.stringify(state.host?.body||{})}.
 TASK BOARD:
 Base DAILY today=${JSON.stringify(currentStaticTaskPool('daily',state).map(t=>({id:t.id,title:t.title,desc:t.desc,reward:t.reward})))}.
 Plot DAILY currently open=${JSON.stringify((state.tasks?.generatedDaily||[]).map(t=>({id:t.id,title:t.title,desc:t.desc,difficulty:t.difficulty,source:t.source,createdDay:t.createdDay,active:Boolean(state.tasks?.active?.[t.id])})))}.
-Active tasks=${JSON.stringify(Object.values(state.tasks?.active||{}).map(t=>({id:t.id,title:t.title,category:t.category,desc:t.desc||null,detail:t.detail||null,reward:t.reward||null,tier:t.tier||null,targetManId:t.targetManId||null,targetName:t.targetName||null,storyDay:t.storyDay})))}.
+Active tasks=${JSON.stringify(Object.values(state.tasks?.active||{}).map(t=>({id:t.id,title:t.title,category:t.category,desc:t.desc||null,detail:t.detail||null,reward:t.reward||null,tier:t.tier||null,targetManId:t.targetManId||null,targetName:t.targetName||null,progressAxes:t.progressAxes||[],storyDay:t.storyDay})))}.
 Completed daily action tags today=${JSON.stringify([...completedDailyActionTags(state)])}.
 Dismissed plot tasks today=${JSON.stringify((state.tasks?.dismissed||[]).filter(t=>Number(t.storyDay||0)===Number(state.tasks?.storyDay||1)).map(t=>({title:t.title,actionTags:t.actionTags})))}.
 Plot-task budget today=${plotTaskFreq.count}/${plotTaskFreq.limit||2}; current turn=${plotTaskFreq.turn}; last issued turn=${plotTaskFreq.last}; canIssue=${plotTaskFreq.canIssue}.
@@ -3172,7 +3242,7 @@ Append at most ONE invisible comment at the very end ONLY when this reply change
 Exact container: <!--MEME_OS_EVENT {"taskOffers":[],"tasks":[],"storyRewards":[],"shop":[],"lifestyleShop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{}} -->
 Do NOT add retired compatibility fields. Scene chronology is owned by the dedicated extension path.
 taskOffers: max 1 new DESIRE; fields title,desc,detail,source,targetManId. Never include task id/tier/reward. targetManId is REQUIRED for DESIRE: reuse the current/returning MEN id when known; if this reply introduces a new relevant man, include a matching men entry with a stable id and link that exact id.
-tasks: max 4 ACTIVE completions; fields id,status:"completed",evidence. Only report completed when the visible/current story actually satisfies the accepted task requirement. evidence must name the exact act/result/constraint that was achieved; vague completion labels are invalid. For DESIRE, do not report completion until the required explicit sexual act and any measurable result such as ejaculation/orgasm/SV collection have actually occurred. Extension independently validates evidence and calculates rewards.
+tasks: max 4 ACTIVE completions; fields id,status:"completed",evidence. ACTIVE tasks may span any number of turns. The extension accumulates verified progress across the task lifetime; do not reset or reissue a task merely because it takes many replies. Only report completed when every required condition has actually occurred since acceptance. evidence must name the exact act/result/constraint that was achieved; vague completion labels are invalid. For DESIRE, do not report completion until the required explicit sexual act and any measurable result such as ejaculation/orgasm/SV collection have actually occurred. Extension independently validates evidence and calculates rewards.
 storyRewards: max 1 substantial unexpected non-routine achievement; fields title,evidence,source,difficulty(light|normal|hard). If the visible reply uses the three-line retroactive reward card 【TASK｜title】/【判定：...】/【奖励：AP +N】, this hidden storyRewards entry is mandatory and must describe the same completed action.
 shop: max 2 temporary BODY/PLOT candidates; fields title,desc,detail,currency(AP|SV),ttl,icon,source,impact(minor|standard|major),bodyAxis(optional),sourceIssueId(optional). No price/charmGain.
 lifestyleShop: [] to keep shelf, or exactly 5 full items after unlock; fields title,desc,detail,icon,source,impact,kind,consumable. No price/currency/charmGain.
@@ -4738,7 +4808,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
-        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.13.9</small>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.13.10/small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
