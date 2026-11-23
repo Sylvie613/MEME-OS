@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.10.21",
+  "version": "0.10.22",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS: low-engagement foul-mouthed administrator at early stages, administrator-authored OS copy, rotating tasks, adaptive economy, correction controls, and swipe-safe state.",
-  "js": "index.js?v=0.10.21",
-  "css": "style.css?v=0.10.21",
+  "description": "MÉMÉ OS: stronger early erotic-game atmosphere before DESIRE unlocks, low-engagement foul-mouthed administrator, administrator-authored OS copy, rotating tasks, adaptive economy, correction controls and swipe-safe state.",
+  "js": "index.js?v=0.10.22",
+  "css": "style.css?v=0.10.22",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
