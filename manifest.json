@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.10.34",
+  "version": "0.10.36",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS: tiered CHARM gains with one-time pre-30 save migration, shared plot-favor AP budget, automatic background MEMORY sync, summer STATUS calendar, five-slot malicious daily-goods shelf and AP/SV economy.",
-  "js": "index.js?v=0.10.34",
-  "css": "style.css?v=0.10.34",
+  "description": "MÉMÉ OS: complete 0-100 CHARM curve with 93+ final seal, full AP threshold crossing, 15-SHORT/10-LONG/PERMANENT rolling memory, background memory sync, summer STATUS, malicious five-slot daily-goods shelf and AP/SV economy.",
+  "js": "index.js?v=0.10.36",
+  "css": "style.css?v=0.10.36",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
