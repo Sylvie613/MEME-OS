@@ -1294,6 +1294,19 @@ function cleanCompletionSceneText(value=''){
     .trim();
 }
 
+function completionVerificationScene(context,messageId,currentRaw=''){
+  const chat=Array.isArray(context?.chat)?context.chat:[];
+  let previousUser='';
+  for(let i=Math.min(Number(messageId)-1,chat.length-1);i>=0;i--){
+    if(chat[i]?.is_user){
+      previousUser=cleanCompletionSceneText(chat[i].mes||'');
+      break;
+    }
+  }
+  const currentVisible=cleanCompletionSceneText(currentRaw);
+  return [previousUser,currentVisible].filter(Boolean).join(' ').slice(-5000);
+}
+
 function taskCompletionEvidenceValid(task,evidence,sceneText=''){
   const claim=String(evidence||'').replace(/\s+/g,' ').trim();
   const scene=cleanCompletionSceneText(sceneText);
@@ -1592,10 +1605,18 @@ function settleTaskFromModel(state,rawTask,messageId,sceneText=''){
   const task=findTask(id,state);
   const active=state.tasks?.active?.[id];
   if(!task || !active) return false;
+  const settledTask={
+    ...task,
+    ...active,
+    category:active.category||task.category,
+    reward:active.reward||task.reward,
+    tier:Number.isFinite(Number(active.tier))?Number(active.tier):task.tier,
+    targetManId:active.targetManId||task.targetManId||null,
+  };
 
   const currentDay=Math.max(1,Number(state.tasks?.storyDay)||1);
-  const repeatable=task.repeatable==='daily';
-  const isRollingDaily=task.category==='daily';
+  const repeatable=settledTask.repeatable==='daily';
+  const isRollingDaily=settledTask.category==='daily';
   const dailyLike=isRollingDaily || repeatable;
   if(repeatable && Number(active.storyDay||0)!==currentDay) return false;
   if(repeatable && Number(state.tasks?.dailyCompleted?.[id]?.day||0)===currentDay) return false;
@@ -1604,7 +1625,7 @@ function settleTaskFromModel(state,rawTask,messageId,sceneText=''){
 
   const evidence=String(rawTask.evidence||'').replace(/\s+/g,' ').trim().slice(0,240);
   if(!evidence) return false;
-  const verification=taskCompletionEvidenceValid(task,evidence,sceneText);
+  const verification=taskCompletionEvidenceValid(settledTask,evidence,sceneText);
   if(!verification.ok){
     console.warn('[MÉMÉ OS] rejected task completion evidence',{id,reason:verification.reason,evidence});
     return false;
@@ -1614,8 +1635,8 @@ function settleTaskFromModel(state,rawTask,messageId,sceneText=''){
   if((state.history||[]).some(entry=>entry.id===historyId)) return false;
 
   const wasEverCompleted=Boolean(state.tasks?.everCompleted?.[id]);
-  const reward=taskReward(task,state);
-  const title=active.title || taskVoiceName(task,state);
+  const reward=taskReward(settledTask,state);
+  const title=active.title || taskVoiceName(settledTask,state);
 
   state.resources.ap=Math.max(0,Number(state.resources.ap||0)+reward.ap);
   state.resources.sv=Math.max(0,Number(state.resources.sv||0)+reward.sv);
@@ -1626,24 +1647,24 @@ function settleTaskFromModel(state,rawTask,messageId,sceneText=''){
     state.tasks.dailyCompleted[id]={
       id,
       title,
-      category:task.category,
+      category:settledTask.category,
       day:currentDay,
       count:Math.max(0,Number(previous.count)||0)+1,
       evidence,
       completedAt:Date.now(),
       completedTurn:Number(state.shop?.plotTurn)||0,
-      actionTags:task.category==='daily'?taskActionTags(task):[],
+      actionTags:settledTask.category==='daily'?taskActionTags(settledTask):[],
     };
   }
 
-  if(task.category!=='daily' && !wasEverCompleted){
+  if(settledTask.category!=='daily' && !wasEverCompleted){
     state.tasks.completed[id]={
       id,
       title,
-      category:task.category,
+      category:settledTask.category,
       evidence,
       reward:{ap:reward.ap,sv:reward.sv},
-      tier:Number(task.tier)||null,
+      tier:Number(settledTask.tier)||null,
       completedAt:Date.now(),
     };
   }
@@ -1651,17 +1672,17 @@ function settleTaskFromModel(state,rawTask,messageId,sceneText=''){
   state.tasks.everCompleted[id]={
     id,
     title,
-    category:task.category,
-    actionTags:task.category==='daily' ? taskActionTags(task) : (state.tasks.everCompleted?.[id]?.actionTags||[]),
+    category:settledTask.category,
+    actionTags:settledTask.category==='daily' ? taskActionTags(settledTask) : (state.tasks.everCompleted?.[id]?.actionTags||[]),
     firstCompletedAt:state.tasks.everCompleted?.[id]?.firstCompletedAt||Date.now(),
     reward:{ap:reward.ap,sv:reward.sv},
-    tier:Number(task.tier)||null,
+    tier:Number(settledTask.tier)||null,
   };
 
-  if(task.dynamicDailyTask){
+  if(settledTask.dynamicDailyTask){
     state.tasks.generatedDaily=(state.tasks.generatedDaily||[]).filter(task=>task.id!==id);
   }
-  if(task.dynamicTask){
+  if(settledTask.dynamicTask){
     state.tasks.generated=(state.tasks.generated||[]).filter(task=>task.id!==id);
   }
 
@@ -1681,7 +1702,7 @@ function settleTaskFromModel(state,rawTask,messageId,sceneText=''){
     summary:`我验过了。「${title}」算完成；${rewardText}。你干了什么我记着：${evidence}`,
     text:`TASK VERIFIED AND SETTLED: ${id}`,
     reward:{ap:reward.ap,sv:reward.sv},
-    tier:Number(task.tier)||null,
+    tier:Number(settledTask.tier)||null,
     committedAt:Date.now(),
   });
   if(state.history.length>240) state.history=state.history.slice(-240);
@@ -2482,7 +2503,7 @@ async function handleRuntimeEvent(messageId){
       }
 
       if(Array.isArray(event.tasks)){
-        const taskVerificationScene=recentSceneText(Array.isArray(context.chat)?context.chat:[],4);
+        const taskVerificationScene=completionVerificationScene(context,messageId,raw);
         for(const rawTask of event.tasks.slice(0,4)){
           if(settleTaskFromModel(state,rawTask,messageId,taskVerificationScene)){
             changed=true;
