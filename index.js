@@ -2785,33 +2785,41 @@ function recentSceneText(chat=[],limit=4){
     .join(' ');
 }
 
+function classifyNpcEncounterSource(source=''){
+  const text=String(source||'').toLowerCase();
+  if(/(交友软件|约会软件|相亲软件|交友平台|约会平台|探探|陌陌|tinder|bumble|hinge|grindr|soul|附近的人|滑卡|右滑|左滑|匹配.{0,8}(?:男人|男性|男生)|刷.{0,8}(?:男人|男性|男生))/iu.test(text)){
+    return {id:'dating',label:'线上交友',multiplier:1.45};
+  }
+  if(/(酒吧|夜店|club|派对|聚会|联谊|ktv|livehouse|酒会|舞会|相亲局|社交局|朋友局|聚餐|蹦迪)/iu.test(text)){
+    return {id:'social',label:'主动社交场',multiplier:1.25};
+  }
+  if(/(街上|街边|路上|人行道|公园|广场|步行街|景区|户外|室外|河边|江边|海边|商圈|夜市|菜市场|小吃街|校园里|操场)/iu.test(text)){
+    return {id:'outdoor',label:'户外公共场景',multiplier:1.00};
+  }
+  if(/(商场|超市|便利店|咖啡店|咖啡馆|餐厅|饭店|电影院|健身房|图书馆|医院|诊所|学校|教室|公司|办公室|写字楼|地铁|公交|车站|机场|高铁|火车|酒店大堂|前台|理发店|美发店|美甲店|店里|门店)/iu.test(text)){
+    return {id:'public_indoor',label:'室内公共场景',multiplier:0.90};
+  }
+  if(/(小区|楼道|走廊|电梯|楼下|门口|快递柜|物业|停车场|地下车库|公寓公共区|宿舍楼)/iu.test(text)){
+    return {id:'residential',label:'住宅公共区',multiplier:0.55};
+  }
+  if(/(家里|家中|卧室|客厅|厨房|浴室|卫生间|阳台|床上|房间里|宿舍里|公寓里|在家)/iu.test(text)){
+    return {id:'home',label:'私人住宅',multiplier:0.35};
+  }
+  return null;
+}
+
 function classifyNpcEncounterScene(context,state=runtimeState()){
   const chat=Array.isArray(context?.chat)?context.chat:[];
   const user=latestUserTurnSeed(chat);
   const status=latestVisibleSceneStatus(chat);
-  const location=String(status?.location||'').trim();
-  const recent=recentSceneText(chat,4);
-  const source=(location+' '+user.text+' '+recent).toLowerCase();
+  const explicit=classifyNpcEncounterSource(user.text);
+  if(explicit) return explicit;
 
-  if(/(交友软件|约会软件|相亲软件|交友平台|约会平台|探探|陌陌|tinder|bumble|hinge|grindr|soul|附近的人|滑卡|右滑|左滑|匹配.{0,8}(?:男人|男性|男生)|刷.{0,8}(?:男人|男性|男生))/iu.test(source)){
-    return {id:'dating',label:'线上交友',multiplier:1.45};
-  }
-  if(/(酒吧|夜店|club|派对|聚会|联谊|ktv|livehouse|酒会|舞会|相亲局|社交局|朋友局|聚餐|蹦迪)/iu.test(source)){
-    return {id:'social',label:'主动社交场',multiplier:1.25};
-  }
-  if(/(街上|街边|路上|人行道|公园|广场|步行街|景区|户外|室外|河边|江边|海边|商圈|夜市|菜市场|小吃街|校园里|操场)/iu.test(source)){
-    return {id:'outdoor',label:'户外公共场景',multiplier:1.00};
-  }
-  if(/(商场|超市|便利店|咖啡店|咖啡馆|餐厅|饭店|电影院|健身房|图书馆|医院|诊所|学校|教室|公司|办公室|写字楼|地铁|公交|车站|机场|高铁|火车|酒店大堂|前台|理发店|美发店|美甲店|店里|门店)/iu.test(source)){
-    return {id:'public_indoor',label:'室内公共场景',multiplier:0.90};
-  }
-  if(/(小区|楼道|走廊|电梯|楼下|门口|快递柜|物业|停车场|地下车库|公寓公共区|宿舍楼)/iu.test(source)){
-    return {id:'residential',label:'住宅公共区',multiplier:0.55};
-  }
-  if(/(家里|家中|卧室|客厅|厨房|浴室|卫生间|阳台|床上|房间里|宿舍里|公寓里|在家)/iu.test(source)){
-    return {id:'home',label:'私人住宅',multiplier:0.35};
-  }
-  return {id:'unknown',label:'一般剧情场景',multiplier:0.65};
+  const fromLocation=classifyNpcEncounterSource(status?.location||'');
+  if(fromLocation) return fromLocation;
+
+  const recent=classifyNpcEncounterSource(recentSceneText(chat,3));
+  return recent || {id:'unknown',label:'一般剧情场景',multiplier:0.65};
 }
 
 function npcCharmReactionGuide(charm){
@@ -2846,41 +2854,52 @@ function userExplicitlyInvitesNewMaleInteraction(context){
 
 function currentMaleSceneFocus(context,state=runtimeState()){
   const chat=Array.isArray(context?.chat)?context.chat:[];
-  const recent=recentSceneText(chat,6);
+  const recent=recentSceneText(chat,3);
   const user=latestUserTurnSeed(chat);
+  const userText=String(user.text||'');
   const currentMen=Array.isArray(state.men?.current)?state.men.current:[];
   const explicitNew=userExplicitlyInvitesNewMaleInteraction(context);
+  const currentTurn=Math.max(0,Number(state.shop?.plotTurn)||0);
 
-  const intimacy=/(接吻|亲吻|拥吻|上床|做爱|性交|插入|抽插|口交|手交|足交|乳交|后庭|肛交|自慰|高潮|射精|精液|阴茎|肉棒|鸡巴|鸡巴|阴道|小穴|乳房|奶头|脱.{0,4}衣|赤裸|裸体|前戏|爱抚|抚摸.{0,8}(?:胸|腿|腰|臀|阴部|下体)|骑乘|体位|床上.{0,12}(?:他|男人|男性)|酒店房间|开房|亲密行为|性行为)/iu.test(recent);
+  const exitCue=/(他走了|他离开了|送走他|和他告别|跟他告别|目送他离开|我离开他|我先走了|我回家了|我一个人回家|结束约会|结束见面|各自回去|分开了|散场了|挂断.{0,6}(?:电话|视频)|退出.{0,6}(?:聊天|通话))/iu.test(userText);
+
+  const intimacy=/(接吻|亲吻|拥吻|上床|做爱|性交|插入|抽插|口交|手交|足交|乳交|后庭|肛交|自慰|高潮|射精|精液|阴茎|肉棒|鸡巴|阴道|小穴|乳房|奶头|脱.{0,4}衣|赤裸|裸体|前戏|爱抚|抚摸.{0,8}(?:胸|腿|腰|臀|阴部|下体)|骑乘|体位|亲密行为|性行为)/iu.test(recent);
 
   const datingFocus=/(约会|单独吃饭|一起吃饭|一起喝酒|一起散步|一起回家|送你回家|送我回家|单独相处|陪着你|陪着我|两个人|二人世界)/iu.test(recent);
 
-  const activeNames=currentMen
-    .map(person=>String(person?.name||'').trim())
-    .filter(Boolean);
-  const namedPresent=activeNames.some(name=>recent.includes(name));
+  const pronounInteraction=/(?:我|你).{0,10}(?:看|问|抱|亲|摸|拉|推|靠|贴|坐到|走向|跟着|回应|笑着对|转向).{0,8}(?:他|男人|对方)|(?:他|男人|对方).{0,10}(?:看|问|抱|亲|摸|拉|推|靠|贴|跟|对着|回应).{0,8}(?:我|你)/iu.test(recent);
 
-  const activeCurrent= currentMen.length>0;
-  const hardLock=(intimacy && activeCurrent);
-  const softLock=(activeCurrent && (namedPresent || datingFocus || !explicitNew));
+  const activeNames=currentMen.map(person=>String(person?.name||'').trim()).filter(Boolean);
+  const namedPresent=activeNames.some(name=>recent.includes(name));
+  const heartbeat=currentMen.some(person=>{
+    const last=Number(person?.lastSeenTurn);
+    return Number.isFinite(last) && last>=currentTurn;
+  });
+
+  const activeCurrent=currentMen.length>0;
+  const hardLock=!exitCue && activeCurrent && intimacy;
+  const softLock=!exitCue && activeCurrent && (heartbeat || namedPresent || datingFocus || pronounInteraction);
   const locked=!explicitNew && (hardLock || softLock);
 
   return {
     locked,
     hardLock,
     explicitNew,
+    exitCue,
     intimacy,
     datingFocus,
+    pronounInteraction,
     namedPresent,
+    heartbeat,
     activeCurrent,
     currentMen:currentMen.map(person=>({id:person.id,name:person.name||'未命名对象'})),
     reason:locked
-      ? (hardLock
-          ? '当前已有男性NPC参与亲密/色情场景，剧情焦点锁定'
-          : '当前已有男性NPC持续占用剧情焦点')
+      ? (hardLock ? '当前男性NPC处于亲密/色情场景，焦点硬锁' : '当前男性NPC仍被本回合确认在场')
       : explicitNew
-        ? '宿主明确主动要求引入新男性/新社交对象'
-        : '无当前男性剧情焦点',
+        ? '宿主主动要求引入新男性/新社交对象'
+        : exitCue
+          ? '宿主明确结束当前男性场景'
+          : '无可靠当前男性焦点',
   };
 }
 
@@ -2892,7 +2911,7 @@ function npcEncounterWheel(context,state=runtimeState()){
   const user=latestUserTurnSeed(context?.chat);
   const day=Math.max(1,Number(state.tasks?.storyDay)||1);
   const nextTurn=Math.max(1,(Number(state.shop?.plotTurn)||0)+1);
-  const roll=(hashId('npc-wheel-v2|'+day+'|'+user.seed)%10000)/100;
+  const roll=(hashId('npc-wheel-v3|'+day+'|'+user.seed)%10000)/100;
   const lastNewTurn=latestNewManTurn(state);
   const blockedByCooldown=lastNewTurn>-999 && nextTurn-lastNewTurn<=2;
   const cooldownRemaining=blockedByCooldown ? Math.max(0,3-(nextTurn-lastNewTurn)) : 0;
