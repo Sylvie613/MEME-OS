@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.30';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.30';
-import { isBoundCharacter } from './src/binding.js?v=0.10.30';
+} from './src/state.js?v=0.10.31';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.31';
+import { isBoundCharacter } from './src/binding.js?v=0.10.31';
 
 /**
- * MÉMÉ OS v0.10.30
+ * MÉMÉ OS v0.10.31
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -1970,9 +1970,18 @@ async function handleRuntimeEvent(messageId){
         }
       }
 
+      if(applyStoryStatusEvent(state,event.status)) changed=true;
+      if(applyMemoryEvent(state,event.memory,visibleChatTurns)) changed=true;
+
       if(event.timeline?.dayAdvance===true){
         state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],dismissed:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
         state.tasks.storyDay=Math.max(1,(Number(state.tasks.storyDay)||1)+1);
+        state.storyStatus=state.storyStatus||{initialized:false,date:'',time:'',weather:'',location:'',people:[],note:'',updatedTurn:0};
+        if(!event.status?.date || /^DAY\s+\d+/i.test(String(state.storyStatus.date||''))){
+          state.storyStatus.date=`DAY ${String(state.tasks.storyDay).padStart(3,'0')}`;
+          state.storyStatus.initialized=true;
+          state.storyStatus.updatedTurn=Math.max(0,Number(state.shop?.plotTurn)||0);
+        }
 
         // Daily contracts expire at a natural-day boundary. Accepted non-daily
         // desire/special contracts may persist, but every unaccepted candidate pool refreshes.
@@ -2217,6 +2226,8 @@ function installRuntimePrompt(){
   const plotTaskRewards=plotTaskRewardOptions(state);
   const plotTaskFreq=plotTaskFrequency(state);
   const lifestyleDisposition=lifestyleShelfDisposition(state);
+  const visibleChatTurns=Array.isArray(context?.chat)?context.chat.length:0;
+  const memoryNeedsBootstrap=!Boolean(state.memory?.initialized);
   const prompt=`[MÉMÉ OS runtime bridge]
 HOST PERSONA RULE:
 Do not define the host's name, age beyond adulthood, height, job, personality, hobbies, romantic style or personal history here. The host's identity/personality comes from the current SillyTavern Persona and the live conversation. MÉMÉ OS may define only the system-specific starting transformation condition and tracked state. Never overwrite or homogenize the user's Persona.
@@ -2270,6 +2281,32 @@ He has NO fixed personal name. A host is allowed to name him, but he deliberatel
 The naming right is intimate and relationship-gated, not a system-level reward. It may only be offered after adminLove has already been genuinely established in a previous turn. Once love already exists, at the first fitting private or quiet emotional moment, he should eventually make a visible late-stage confession that he never had a fixed name and is giving the host the right to name him; in that same reply append identity.offerNaming=true. This event is titled “来自他的坦白”.
 After namingRightOffered=true, when the host clearly chooses a name for him, accept it only if he accepts the naming in visible prose, then append identity.name with exactly the chosen name. Once stored, use that name naturally thereafter. Never retroactively claim he had that name before the host gave it.
 Current namingRightOffered=${Boolean(state.system?.namingRightOffered)}; current assigned name=${state.system?.name||'NONE'}.
+
+STORY STATUS + MEMORY:
+MÉMÉ OS owns a compact persistent story-status bar and a three-layer memory area.
+
+STATUS fields: date, time, weather, location, people. They describe IN-STORY reality, never the user's real-world clock/weather/location. Update only from facts actually supported by the visible story. If an exact calendar date is not established, use the current story-day label such as DAY ${String(Math.max(1,Number(state.tasks?.storyDay)||1)).padStart(3,'0')} instead of inventing a date. If weather has never been established, leave it blank rather than making one up. Time may be approximate only when the story supports an approximation.
+Current stored story status=${JSON.stringify(state.storyStatus||{})}.
+
+MEMORY has three layers:
+- short: at most 10 concise recent facts, each about 30 Chinese characters or less.
+- long: at most 5 stage summaries, each roughly 120-240 Chinese characters.
+- core: at most 5 durable summaries, each roughly 180-320 Chinese characters, reserved for major lasting facts/turning points/relationships/permanent changes.
+Do not store trivial movement, prose flourishes, repeated facts, numeric balances already owned by the extension, or guesses. Memory should preserve facts that will materially change future continuity.
+
+IMPORTANT BOOTSTRAP:
+memoryNeedsBootstrap=${memoryNeedsBootstrap}; visible chat message count=${visibleChatTurns}.
+If memoryNeedsBootstrap=true, on THIS reply you MUST review the entire visible chat history currently available to you, not only the latest turn, and append memory.bootstrap=true with a one-time reconstructed snapshot. Fill memory.short, memory.long and memory.core only with facts actually supported by prior visible conversation. It is valid for long/core to contain fewer entries when the history does not justify more.
+At the same time, reconstruct the latest supported STATUS snapshot from the prior visible story and include status.initialized=true. This bootstrap may happen no matter how many turns were already played before MEMORY was installed.
+Once memory is initialized, NEVER rescan/summarize the whole old chat every turn. Update incrementally only when something worth remembering changes.
+After bootstrap, normally add at most 1 short memory in a turn. When short has accumulated about 10 useful entries, you may summarize them into one long entry and set compactShort=true. When long has accumulated about 5 useful stage summaries, you may compress them into one core entry and set compactLong=true. Never compact merely because of turn count; preserve useful distinctions.
+
+Current memory snapshot=${JSON.stringify({
+  initialized:Boolean(state.memory?.initialized),
+  short:state.memory?.short||[],
+  long:state.memory?.long||[],
+  core:state.memory?.core||[],
+})}.
 
 RESOURCE SNAPSHOT — EXTENSION IS THE ONLY AUTHORITY:
 Current real AP=${Number(state.resources?.ap)||0}; current real SV=${Number(state.resources?.sv)||0}; current real CHARM=${Number(state.host?.charm)||0}.
@@ -2393,7 +2430,7 @@ Do not emit a new relationship signal merely because a previous feeling continue
 Current CHARM=${state.host.charm}; desire allowed by appearance=${desireAllowed}; adminLove=${loveState}.
 
 Only when the current story creates a genuinely relevant MÉMÉ OS state update — tasks, shop, feedback, MEN, evolution, permission, identity, or timeline — append ONE invisible HTML comment at the very end of the assistant reply.
-Format exactly: <!--MEME_OS_EVENT {"dailyTaskOffers":[],"taskOffers":[],"tasks":[],"storyRewards":[],"shop":[],"lifestyleShop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{},"timeline":{}} -->
+Format exactly: <!--MEME_OS_EVENT {"dailyTaskOffers":[],"taskOffers":[],"tasks":[],"storyRewards":[],"shop":[],"lifestyleShop":[],"status":{},"memory":{"bootstrap":false,"short":[],"long":[],"core":[],"compactShort":false,"compactLong":false},"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{},"timeline":{}} -->
 Do not emit the comment when nothing relevant changed.
 dailyTaskOffers: deprecated compatibility field; normally leave [] for new daily/story tasks because visible [TASK｜任务名｜任务要求] is the canonical source.
 taskOffers: maximum 1 new generated erotic mission; fields title,desc,detail,source. title/desc/detail/source are written in the administrator's current OS voice and may be personal, rude, obscene or judgmental when appropriate. Never include tier, id or rewards.
@@ -2401,6 +2438,8 @@ tasks: max 4 completed ACTIVE task entries; fields id,status("completed"),eviden
 storyRewards: max 2 one-off plot tasks that visibly became complete without prior acceptance; fields title,evidence,source,difficulty(light|normal|hard). Never include AP/SV numbers.
 shop: maximum 2 BODY/PLOT temporary items only. Fields: title,desc,detail,currency("AP"|"SV"),ttl,icon,source,impact("minor"|"standard"|"major"),bodyAxis(optional),sourceIssueId(optional). At CHARM ${AP_CHARM_CAP} or above, body/appearance goods are forcibly repriced in SV even if you request AP. title/desc/detail/source are administrator-authored OS copy. A temporary plot item must answer something concrete in the visible story. Never use shop for ordinary lifestyle merchandise.
 lifestyleShop: dedicated 日常用品 shelf. Before CHARM ${AP_CHARM_CAP}, always leave []. At CHARM ${AP_CHARM_CAP}+, reconsider the CURRENT five-item shelf every assistant turn under the supplied lifestyleDisposition. If no change is useful, emit [] and the extension keeps all five unchanged. If ANY slot should change, emit EXACTLY 5 complete items representing the entire new shelf. Each item fields: title,desc,detail,icon,source,impact("minor"|"standard"|"major"),kind(skincare|food|daily|clothing|electronics|home|entertainment|service|other),consumable(boolean). Never include id, currency, price, bodyAxis or charmGain; these goods are AP-only and never change CHARM/body stats. Generate fresh context-specific products; do not reuse a fixed example as a template.
+status: optional story-status update with fields initialized(boolean),date,time,weather,location,people(array of names/labels),note. Only include supported in-story facts; omitted fields keep their stored value.
+memory: memory bootstrap/increment object. During first bootstrap use {bootstrap:true,short:[...],long:[...],core:[...]}. After initialization use bootstrap:false and only add durable new facts. short max 2 new items/turn, long max 2, core max 1. compactShort=true only when a new long summary genuinely replaces the accumulated short layer; compactLong=true only when a new core summary genuinely replaces the accumulated long layer.
 feedback.issues: max 2, only direct story evidence; fields id,axis(optional),source,note,severity(low|medium|high). source/note are his OS notes: short and specific, with his personal wording allowed.
 feedback.reactions: max 2, only directly observed reactions to established state/change; fields id,axis(optional),source,note,valence(negative|neutral|positive|sexual). source/note are SYSTEM log copy.
 men: max 3 qualifying adult men updates; fields id(optional for new),name,meta,summary,relation,desire,lastContact,note,badges,present,contactDelta,qualifies. MEN is the administrator's own archive: factual identity fields may stay concise, but summary/relation/desire/lastContact/note/badges should sound like he personally wrote them, including crude, mocking or sexual wording when the established facts support it.
