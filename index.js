@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.39';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.39';
-import { isBoundCharacter } from './src/binding.js?v=0.10.39';
+} from './src/state.js?v=0.10.40';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.40';
+import { isBoundCharacter } from './src/binding.js?v=0.10.40';
 
 /**
- * MÉMÉ OS v0.10.39
+ * MÉMÉ OS v0.10.40
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -1941,32 +1941,42 @@ async function reconcileRecentVisibleTaskOffers(){
     const message=chat[i];
     if(!message || message.is_user) continue;
     const raw=String(message.mes||'');
-    let task=inferVisibleDailyTaskOffer(raw,state);
-    if(!task){
+
+    const canonicalCards=extractCanonicalTaskMarkers(raw);
+    let tasks=canonicalCards
+      .map(card=>taskFromCanonicalMarker(card,state))
+      .filter(Boolean);
+
+    if(!tasks.length){
       const legacy=extractLegacyDailyCardsForMigration(raw);
-      if(legacy.length) task=taskFromLegacyDailyCard(legacy[legacy.length-1],state);
+      if(legacy.length){
+        const migrated=taskFromLegacyDailyCard(legacy[legacy.length-1],state);
+        if(migrated) tasks=[migrated];
+      }
     }
-    if(!task) continue;
-    if((task.canonicalMarker || task.legacyMigrated) && removeFallbackTasksCompetingWithFormalCard(state,task)) changed=true;
-    const historyId=`meme_visible_task_reconcile_${i}_${task.id}`;
-    if((state.history||[]).some(entry=>entry.id===historyId)) continue;
-    if(state.tasks.everCompleted?.[task.id] || state.tasks.active?.[task.id] || state.tasks.generatedDaily.some(old=>old.id===task.id)){
+
+    for(const task of tasks){
+      if((task.canonicalMarker || task.legacyMigrated) && removeFallbackTasksCompetingWithFormalCard(state,task)) changed=true;
+      const historyId=`meme_visible_task_reconcile_${i}_${task.id}`;
+      if((state.history||[]).some(entry=>entry.id===historyId)) continue;
+      if(state.tasks.everCompleted?.[task.id] || state.tasks.active?.[task.id] || state.tasks.generatedDaily.some(old=>old.id===task.id)){
+        state.history.push({
+          id:historyId,type:'visible_task_reconcile_seen',recordType:'task',
+          title:`我早记过了：${task.title}`,summary:'这张任务卡已经在 TASK 里，别重复塞第二份。',
+          text:`VISIBLE TASK ALREADY PRESENT: ${task.id}`,committedAt:Date.now(),
+        });
+        changed=true;
+        continue;
+      }
+      state.tasks.generatedDaily=[task,...state.tasks.generatedDaily].slice(0,8);
       state.history.push({
-        id:historyId,type:'visible_task_reconcile_seen',recordType:'task',
-        title:`我早记过了：${task.title}`,summary:'这张任务卡已经在 TASK 里，别重复塞第二份。',
-        text:`VISIBLE TASK ALREADY PRESENT: ${task.id}`,committedAt:Date.now(),
+        id:historyId,type:'visible_task_reconcile',recordType:'task',
+        title:`漏的我给你补上了：${task.title}`,
+        summary:'正文里已经发过这张任务卡，TASK 当时没吃到。我现在把它补回去。',
+        text:`VISIBLE TASK RECONCILED: ${task.id}`,committedAt:Date.now(),
       });
       changed=true;
-      continue;
     }
-    state.tasks.generatedDaily=[task,...state.tasks.generatedDaily].slice(0,8);
-    state.history.push({
-      id:historyId,type:'visible_task_reconcile',recordType:'task',
-      title:`漏的我给你补上了：${task.title}`,
-      summary:'正文里已经发过这张任务卡，TASK 当时没吃到。我现在把它补回去。',
-      text:`VISIBLE TASK RECONCILED: ${task.id}`,committedAt:Date.now(),
-    });
-    changed=true;
   }
 
   if(changed){
