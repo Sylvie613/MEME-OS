@@ -845,7 +845,7 @@ html.meme-os-open body{
 .meme-shop-card{
   display:grid;
   grid-template-columns:34px 1fr auto;
-  gap:9px;
+  gap:8px;
   align-items:center;
   padding:11px;
   border:1px solid rgba(231,114,169,.14);
@@ -1173,7 +1173,7 @@ html.meme-os-open body{
 .meme-men-person-head{
   width:100%;
   display:grid;
-  grid-template-columns:35px 1fr 16px;
+  grid-template-columns:1fr 16px;
   gap:9px;
   align-items:center;
   padding:9px 10px;
@@ -1181,17 +1181,6 @@ html.meme-os-open body{
   background:transparent;
   color:inherit;
   text-align:left;
-}
-.meme-men-avatar{
-  width:35px;
-  height:35px;
-  display:grid;
-  place-items:center;
-  border:1px solid rgba(236,123,174,.16);
-  border-radius:50%;
-  background:rgba(239,98,160,.055);
-  color:#e98ab2;
-  font-size:16px;
 }
 .meme-men-main{
   min-width:0;
