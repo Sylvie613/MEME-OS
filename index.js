@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.12.2';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.12.2';
-import { isBoundCharacter } from './src/binding.js?v=0.12.2';
+} from './src/state.js?v=0.12.3';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.12.3';
+import { isBoundCharacter } from './src/binding.js?v=0.12.3';
 
 /**
- * MÉMÉ OS v0.12.2
+ * MÉMÉ OS v0.12.3
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -961,7 +961,7 @@ function applyMemoryEvent(state,raw,visibleTurns=0){
 }
 
 function applyStoryStatusEvent(){
-  // Retired in v0.12.2. Scene date/time/weather/location live in visible prose only.
+  // Retired in v0.12.3. Scene date/time/weather/location live in visible prose only.
   return false;
 }
 
@@ -4372,7 +4372,6 @@ function menPersonCard(person) {
   return `
     <article class="meme-men-person" data-men-person="${id}">
       <button type="button" class="meme-men-person-head" data-men-person-toggle>
-        <span class="meme-men-avatar">${person.avatar || '♂'}</span>
         <span class="meme-men-main">
           <small>${person.meta || 'ADULT · NPC'}</small>
           <b>${person.name || '未命名对象'}</b>
@@ -4714,7 +4713,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
-        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.12.2</small>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.12.3</small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
