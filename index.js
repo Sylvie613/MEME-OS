@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.41';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.41';
-import { isBoundCharacter } from './src/binding.js?v=0.10.41';
+} from './src/state.js?v=0.10.42';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.42';
+import { isBoundCharacter } from './src/binding.js?v=0.10.42';
 
 /**
- * MÉMÉ OS v0.10.41
+ * MÉMÉ OS v0.10.42
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -1968,7 +1968,7 @@ async function reconcileRecentVisibleTaskOffers(){
     if(syncStoryDayTo(state,latestVisibleDay,{source:'reconcile'})) changed=true;
   }
 
-  let latestUnseenNaturalBoundary=null;
+  const unseenNaturalBoundaries=[];
   for(let i=start;i<chat.length;i++){
     const message=chat[i];
     if(!message || message.is_user) continue;
@@ -1977,15 +1977,21 @@ async function reconcileRecentVisibleTaskOffers(){
     if(!boundary) continue;
     const key=naturalDayBoundaryKey(raw);
     if(naturalDayBoundarySeen(state,key)) continue;
-    latestUnseenNaturalBoundary={i,key,boundary};
+    unseenNaturalBoundaries.push({i,key,boundary});
   }
+  const latestUnseenNaturalBoundary=unseenNaturalBoundaries.at(-1)||null;
   if(
     latestUnseenNaturalBoundary
     && latestVisibleDay<=Math.max(1,Number(state.tasks?.storyDay)||1)
   ){
     const target=Math.max(1,Number(state.tasks?.storyDay)||1)+1;
     if(syncStoryDayTo(state,target,{source:`reconcile-${latestUnseenNaturalBoundary.boundary.kind}`})){
-      markNaturalDayBoundarySeen(state,latestUnseenNaturalBoundary.key,Number(state.shop?.plotTurn)||0);
+      // The current OS day already represents earlier historical boundaries.
+      // When repairing one missed newest boundary, mark every older visible
+      // boundary in the scan window as accounted for so refresh cannot add days again.
+      for(const item of unseenNaturalBoundaries){
+        markNaturalDayBoundarySeen(state,item.key,Number(state.shop?.plotTurn)||0);
+      }
       changed=true;
       latestVisibleDay=target;
       latestVisibleDayStart=latestUnseenNaturalBoundary.i;
