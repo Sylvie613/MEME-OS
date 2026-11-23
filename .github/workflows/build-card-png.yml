@@ -1,39 +1,52 @@
-name: Build character card PNG
+name: Build canonical character card PNG
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths:
-      - "cards/MEME-OS-alpha.json"
-      - "cards/MEME-OS-avatar.b64"
+      - "cards/meme_os_card_v0.4.0-alpha.json"
+      - "cards/meme_os_card_v0.4.0-alpha.png"
       - "scripts/build_card_png.py"
       - "index.js"
       - "src/state.js"
+      - "src/input.js"
+      - "src/binding.js"
       - ".github/workflows/build-card-png.yml"
 
 permissions:
   contents: write
 
 jobs:
-  build:
+  validate-and-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Check extension JavaScript syntax
         run: |
           node --check index.js
           node --check src/state.js
-      - name: Build PNG character card
+          node --check src/input.js
+          node --check src/binding.js
+
+      - name: Validate JSON
+        run: |
+          python3 -m json.tool manifest.json >/dev/null
+          python3 -m json.tool cards/meme_os_card_v0.4.0-alpha.json >/dev/null
+          python3 -m json.tool presets/MEME-OS_Gemini3.1Pro_Momo_LongReply_v1.json >/dev/null
+
+      - name: Build canonical PNG character card
         run: python3 scripts/build_card_png.py
+
       - name: Commit generated PNG
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add cards/MEME-OS-alpha.png
+          git add cards/meme_os_card_v0.4.0-alpha.png
           if git diff --cached --quiet; then
             echo "PNG already up to date."
           else
-            git commit -m "build: refresh MEME OS character card PNG"
+            git commit -m "build: refresh canonical MÉMÉ OS character card PNG"
             git push
           fi
