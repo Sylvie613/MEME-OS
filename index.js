@@ -1283,21 +1283,35 @@ const DESIRE_COMPLETION_AXES = [
   {id:'orgasm',req:/(高潮|潮吹)/iu,done:/(高潮|潮吹)/iu}
 ];
 
+function cleanCompletionSceneText(value=''){
+  return String(value||'')
+    .replace(/<!--MEME_OS_EVENT[\s\S]*?-->/g,' ')
+    .replace(/【MÉMÉ OS｜任务接取】[^\n]*/g,' ')
+    .replace(/^(?:任务要求|验收条件)\s*[:：].*$/gmu,' ')
+    .replace(/^\s*\[TASK｜[^\n]*$/gmu,' ')
+    .replace(/^\s*【(?:TASK|奖励|判定)[^】]*】\s*$/gmu,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+
 function taskCompletionEvidenceValid(task,evidence,sceneText=''){
   const claim=String(evidence||'').replace(/\s+/g,' ').trim();
-  const scene=String(sceneText||'').replace(/\s+/g,' ').trim();
+  const scene=cleanCompletionSceneText(sceneText);
   if(claim.length<8) return {ok:false,reason:'evidence too short'};
   if(/^(?:完成|做完|达成|成功|已完成|任务完成|done)[。.!！ ]*$/iu.test(claim)) return {ok:false,reason:'evidence is only a completion label'};
   if(task?.category!=='desire') return {ok:true,reason:'non-desire concrete evidence'};
 
-  const combined=claim+' '+scene;
-  if(!desireSexualityGate({desc:claim,detail:scene})) return {ok:false,reason:'no explicit sexual completion evidence in visible/current scene'};
+  if(!desireSexualityGate({desc:claim})) return {ok:false,reason:'evidence itself is not explicit enough'};
+  if(!desireSexualityGate({desc:scene})) return {ok:false,reason:'visible story does not contain explicit completion evidence'};
 
   const requirement=(task?.title||'')+' '+(task?.desc||'')+' '+(task?.detail||'');
   const requiredAxes=DESIRE_COMPLETION_AXES.filter(axis=>axis.req.test(requirement));
-  if(requiredAxes.length && !requiredAxes.some(axis=>axis.done.test(combined))) return {ok:false,reason:'completion evidence does not match required sexual act'};
+  if(requiredAxes.length){
+    const grounded=requiredAxes.filter(axis=>axis.done.test(claim) && axis.done.test(scene));
+    if(!grounded.length) return {ok:false,reason:'evidence and visible story do not match the required sexual act'};
+  }
   for(const axis of requiredAxes.filter(axis=>axis.id==='ejaculation'||axis.id==='orgasm')){
-    if(!axis.done.test(combined)) return {ok:false,reason:'required measurable sexual outcome missing'};
+    if(!axis.done.test(claim) || !axis.done.test(scene)) return {ok:false,reason:'required measurable sexual outcome missing from evidence or visible story'};
   }
   return {ok:true,reason:'desire evidence grounded'};
 }
@@ -1374,7 +1388,7 @@ function settleVisibleTaskCompletion(state,completion,messageId){
 
   const active=state.tasks?.active?.[id];
   if(!active) return false;
-  const verification=taskCompletionEvidenceValid(task,'正文明确标记「'+String(completion?.title||'')+'」'+String(completion?.marker||'完成')+'。',String(completion?.context||''));
+  const verification=taskCompletionEvidenceValid(task,String(completion?.context||''),String(completion?.context||''));
   if(!verification.ok) return false;
 
   const currentDay=Math.max(1,Number(state.tasks?.storyDay)||1);
