@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.36';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.36';
-import { isBoundCharacter } from './src/binding.js?v=0.10.36';
+} from './src/state.js?v=0.10.37';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.37';
+import { isBoundCharacter } from './src/binding.js?v=0.10.37';
 
 /**
- * MÉMÉ OS v0.10.36
+ * MÉMÉ OS v0.10.37
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
