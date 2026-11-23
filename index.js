@@ -1961,7 +1961,7 @@ function markRuntimeMessageProcessed(state,messageKey){
 }
 
 const TURN_SNAPSHOT_KEYS=[
-  'resources','host','system','permission','shop','inventory','storyStatus','memory','reactivity','upgrades','tasks','men','history',
+  'resources','host','system','permission','shop','inventory','memory','reactivity','upgrades','tasks','men','history',
 ];
 
 function cloneTurnValue(value){
@@ -3041,7 +3041,7 @@ Relationship signals are sparse state changes, not running mood captions. Intere
 HIDDEN EVENT:
 Append at most ONE invisible comment at the very end ONLY when this reply changes structured MÉMÉ OS state, or when a MEN presence heartbeat/exit is required.
 Exact container: <!--MEME_OS_EVENT {"taskOffers":[],"tasks":[],"storyRewards":[],"shop":[],"lifestyleShop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{}} -->
-Do NOT include memory, status, timeline or dailyTaskOffers fields; those are retired/separately owned.
+Do NOT add retired compatibility fields. MEMORY and scene chronology are owned by separate extension paths.
 taskOffers: max 1 new DESIRE; fields title,desc,detail,source,targetManId(optional). Never include id/tier/reward. If it introduces a new relevant man, include matching men entry and link targetManId.
 tasks: max 4 ACTIVE completions; fields id,status:"completed",evidence. Extension calculates rewards.
 storyRewards: max 1 substantial unexpected non-routine achievement; fields title,evidence,source,difficulty(light|normal|hard).
