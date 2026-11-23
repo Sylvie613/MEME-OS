@@ -92,7 +92,14 @@
           "flirt_only_invalid": true,
           "teasing_only_invalid": true,
           "mild_exposure_only_invalid": true,
-          "extension_rejects_below_threshold": true
+          "extension_rejects_below_threshold": true,
+          "completion_requires_active_acceptance": true,
+          "completion_evidence_must_match_visible_scene": true,
+          "completion_uses_frozen_acceptance_snapshot": true,
+          "atomic_completion_contract": true,
+          "all_listed_conditions_required": true,
+          "duplicate_payout_blocked": true,
+          "swipe_safe_settlement": true
         },
         "system_progression": {
           "lv1": "consciousness_only",
