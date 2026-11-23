@@ -1914,17 +1914,27 @@ async function reconcileRecentVisibleTaskOffers(){
 
   const start=Math.max(0,chat.length-16);
   let latestVisibleDay=Math.max(1,Number(state.tasks?.storyDay)||1);
+  let latestVisibleDayStart=-1;
   for(let i=start;i<chat.length;i++){
     const message=chat[i];
     if(!message || message.is_user) continue;
     const visibleDay=extractVisibleStoryDay(String(message.mes||''));
-    if(visibleDay && visibleDay>latestVisibleDay) latestVisibleDay=visibleDay;
+    if(visibleDay && visibleDay>latestVisibleDay){
+      latestVisibleDay=visibleDay;
+      latestVisibleDayStart=i;
+    }else if(visibleDay && visibleDay===latestVisibleDay){
+      latestVisibleDayStart=i;
+    }
   }
   if(latestVisibleDay>Math.max(1,Number(state.tasks?.storyDay)||1)){
     if(syncStoryDayTo(state,latestVisibleDay,{source:'reconcile'})) changed=true;
   }
 
-  for(let i=start;i<chat.length;i++){
+  // Never resurrect plot-generated DAILY cards from an older story day.
+  // If the newest day marker is visible in the recent window, only reconcile
+  // task cards from that marker onward.
+  const taskReconcileStart=latestVisibleDayStart>=0?latestVisibleDayStart:start;
+  for(let i=taskReconcileStart;i<chat.length;i++){
     const message=chat[i];
     if(!message || message.is_user) continue;
     const raw=String(message.mes||'');
