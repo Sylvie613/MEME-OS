@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.13.5';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.13.5';
-import { isBoundCharacter } from './src/binding.js?v=0.13.5';
+} from './src/state.js?v=0.13.6';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.13.6';
+import { isBoundCharacter } from './src/binding.js?v=0.13.6';
 
 /**
- * MÉMÉ OS v0.13.5
+ * MÉMÉ OS v0.13.6
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -2915,7 +2915,13 @@ function installRuntimePrompt(){
   const desireTargetText=desireTargets.length
     ? JSON.stringify(desireTargets)
     : (npcWheel.hit?'NEW_ADULT_MALE_FROM_THIS_TURN':'NONE');
-  const prompt=`[MÉMÉ OS runtime bridge · v0.13.5]
+  const desireSceneText=recentSceneText(chatThroughLatestUser(context?.chat),4).slice(-1800);
+  const desireSceneLabel=npcWheel.scene?.label||'一般剧情场景';
+  const desireRecentHistory=[
+    ...(state.tasks?.generated||[]).map(t=>({title:t.title,desc:t.desc,tier:t.tier,status:'open'})),
+    ...Object.values(state.tasks?.completed||{}).filter(t=>t?.category==='desire').map(t=>({title:t.title,desc:t.desc,tier:t.tier,status:'completed'})),
+  ].slice(-6);
+  const prompt=`[MÉMÉ OS runtime bridge · v0.13.6]
 AUTHORITY / TONE:
 - Extension state is the only authority for AP, SV, CHARM, purchases, task settlement, MEN buckets, system access/evolution and unlocks. Never mentally add/subtract numbers or reuse stale balances.
 - The host persona comes from the active SillyTavern Persona + visible chat. Do not invent host identity/history beyond established system transformation facts.
@@ -2950,12 +2956,26 @@ DESIRE:
 CHARM < 8 => DESIRE is fully SEALED. Do not reveal task names, targets, acts, rewards or future conditions.
 Current DESIRE tier=${desireTier}; generated/open=${desireOpen}; last generated story day=${Number(state.tasks?.lastGeneratedDesireDay)||0}; already generated today=${desireAlreadyToday}.
 Current eligible adult target context=${desireTargetText}.
+Current scene class=${desireSceneLabel}.
+Recent visible scene=${JSON.stringify(desireSceneText)}.
+Recent DESIRE history=${JSON.stringify(desireRecentHistory)}.
 DESIRE_TRIGGER_REQUIRED_THIS_REPLY=${desireRequired}.
 At CHARM 8+, DESIRE uses no fixed daily pool. The extension, not the model, decides whether an offer is required this reply.
-When DESIRE_TRIGGER_REQUIRED_THIS_REPLY=true, you MUST include exactly one new taskOffers entry in the hidden MEME_OS_EVENT. You are not allowed to omit it merely because the scene is not sexual yet. The task may be an objective that develops across later turns, but it must be a genuine adult sexual/eroge objective tied to the current adult male and current scene—not dating, compliments, ordinary flirting, affection farming, or exchanging contact info.
+When DESIRE_TRIGGER_REQUIRED_THIS_REPLY=true, you MUST include exactly one new taskOffers entry in the hidden MEME_OS_EVENT. You are not allowed to omit it merely because the scene is not sexual yet.
+
+SCENE-FIT IS HARD:
+- The task must visibly grow out of the CURRENT adult male + CURRENT place + the last few concrete actions/reactions. It cannot be a generic erotic prompt that would work unchanged with any man in any location.
+- Build from at least TWO current anchors, preferably three: target identity/role, exact location or available object, immediately preceding action/dialogue/body state, his observable attitude/reaction, host clothing/body condition, or a live opportunity created by the scene.
+- source must name the concrete trigger from this scene; detail must explain the specific circumstance or constraint that makes this task belong HERE.
+- If replacing the current man's name/location with another would leave the task equally valid, the task is too generic and must be rewritten.
+- Do not recycle the same sexual template from Recent DESIRE history by merely changing the man's name or one verb. Vary act, body focus, constraint, setting use, risk/exposure, collection/SV condition, power dynamic, timing, and completion condition.
+- Prefer the most provocative opportunity that is plausible RIGHT NOW. The system is an abrasive eroge system: it should exploit embarrassment, proximity, temptation, awkward logistics, public/private contrast, or a man's specific personality/position when those are actually present.
+- Still preserve story continuity: never teleport props, invent access the scene does not provide, or declare the man consented/acted when that has not happened.
+
+The task may develop across later turns, but it must be a genuine adult sexual/eroge objective tied to this adult man and this scene—not dating, compliments, ordinary flirting, affection farming, or exchanging contact info.
 When DESIRE_TRIGGER_REQUIRED_THIS_REPLY=false, do not invent a new DESIRE unless another explicit runtime rule says so.
-Mission formula: target man × current scene × CHARM tier × unlocked host capability × sexual act/body part × constraint/control/presentation/risk × measurable completion/SV goal.
-Tier 1 (CHARM 8–17) stays comparatively low-entry but still genuinely sexual; Tier 2/3/4 may escalate in explicitness, difficulty, exposure, control, collection/SV goals and complexity. Do not flatten every tier into the same task.
+Mission formula: target man × current scene anchors × CHARM tier × unlocked host capability × sexual act/body part × constraint/control/presentation/risk × measurable completion/SV goal.
+Tier 1 (CHARM 8–17) is lower-entry but still clearly sexual and scene-specific; Tier 2/3/4 escalate explicitness, difficulty, exposure, control, collection/SV goals and complexity. Do not flatten every tier into the same task.
 Target men may be any adult archetype; public persona and private XP are independent axes.
 
 SHOP / REACTIVITY:
@@ -3058,6 +3078,9 @@ HARD RULES:
 CHARM=${Number(state.host?.charm)||0}; DESIRE tier=${desireTier}; story day=${desireDay}.
 Open DESIRE count=${desireOpen}; already generated today=${desireAlreadyToday}.
 Current adult male target context=${desireTargetText}.
+Current scene class=${desireSceneLabel}.
+Recent scene facts=${JSON.stringify(desireSceneText)}.
+Recent DESIRE history=${JSON.stringify(desireRecentHistory)}.
 REQUIRED=${desireRequired}.
 
 HARD EXECUTION:
@@ -3065,6 +3088,10 @@ HARD EXECUTION:
 - Do not wait for CHARM 30. DESIRE unlock begins at CHARM 8.
 - Do not suppress the task merely because the current interaction has not become sexual yet. The task can set a sexual objective to be completed later while remaining grounded in the current adult male/scene.
 - It must be genuinely adult/sexual, not a disguised romance or social task. No “get his number”, “make him compliment you”, “go on a date”, or generic affection farming.
+- SCENE LOCK: task content must use at least two concrete facts from the recent visible scene (current man/role, exact place/object, immediate action/dialogue/body state, his observable reaction, clothing/position/opportunity). A task that could be copied unchanged into another scene is invalid.
+- NOVELTY LOCK: compare Recent DESIRE history. Do not repeat the same act + constraint + completion pattern with cosmetic wording changes.
+- STIMULATION LOCK: choose a provocative but scene-plausible angle that exploits what is actually happening now—proximity, embarrassment, a usable object/place, public/private tension, his specific role/personality, or an immediate physical opportunity. Do not invent nonexistent props/access or force unestablished actions.
+- source must identify the exact scene trigger; detail must preserve the concrete location/opportunity/constraint so the task remains auditable.
 - Use the current man when one is already present. If this turn's newcomer wheel HIT is the target opportunity, create the matching men event and use/link that adult man.
 - taskOffers fields: title, desc, detail, source, targetManId(optional). Never include id/tier/reward; the extension owns those.
 - If REQUIRED=false, do not create a new DESIRE solely from this gate.
@@ -4537,7 +4564,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
-        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.13.5</small>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.13.6</small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
