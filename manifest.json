@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.11.9",
+  "version": "0.12.0",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS 0.11.9: scene clock moved to a dedicated depth-0 system injection; exact M月D日 + 24h HH:MM header now overrides legacy vague date/time headers.",
-  "js": "index-v0.11.9.js",
-  "css": "style.css?v=0.11.9",
+  "description": "MÉMÉ OS 0.12.0: daily AP overhaul — 15-task base pool, exactly 3 rotating base dailies per story day, no repeats from the previous two days when possible; plot TASK cards remain additive.",
+  "js": "index-v0.12.0.js",
+  "css": "style.css?v=0.12.0",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
