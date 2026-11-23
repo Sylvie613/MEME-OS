@@ -1628,6 +1628,8 @@ function settleTaskFromModel(state,rawTask,messageId,sceneText=''){
       title,
       category:task.category,
       evidence,
+      reward:{ap:reward.ap,sv:reward.sv},
+      tier:Number(task.tier)||null,
       completedAt:Date.now(),
     };
   }
@@ -1638,6 +1640,8 @@ function settleTaskFromModel(state,rawTask,messageId,sceneText=''){
     category:task.category,
     actionTags:task.category==='daily' ? taskActionTags(task) : (state.tasks.everCompleted?.[id]?.actionTags||[]),
     firstCompletedAt:state.tasks.everCompleted?.[id]?.firstCompletedAt||Date.now(),
+    reward:{ap:reward.ap,sv:reward.sv},
+    tier:Number(task.tier)||null,
   };
 
   if(task.dynamicDailyTask){
