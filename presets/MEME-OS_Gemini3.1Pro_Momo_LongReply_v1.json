@@ -406,8 +406,7 @@
       "task_rule": "3 base daily tasks; plot tasks 0-1/day normally, max2 with >=8-turn gap; dedupe and day refresh",
       "header_rule": "every RP reply begins with in-story date|time|weather; continuity-preserving; prose indentation starts after header",
       "prompt_order_fix": "restored character_id 100001 custom prompt chain including mechanics and header blocks",
-      "minimum_extension_version": "0.13.2",
-      "memory_policy": "disabled; use real chat history + extension structured state"
+      "minimum_extension_version": "0.13.2"
     }
   }
 }
