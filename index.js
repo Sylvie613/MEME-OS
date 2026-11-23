@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.34';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.34';
-import { isBoundCharacter } from './src/binding.js?v=0.10.34';
+} from './src/state.js?v=0.10.35';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.35';
+import { isBoundCharacter } from './src/binding.js?v=0.10.35';
 
 /**
- * MÉMÉ OS v0.10.34
+ * MÉMÉ OS v0.10.35
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -191,7 +191,7 @@ const SHOP_DATA = {
     {id:'recovery1',icon:'↺',title:'亲密恢复Ⅰ',desc:'缩短成人性活动后的疲惫恢复时间。',price:90,currency:'SV',level:'LV.1',req:'CHARM 20',detail:'仅用于虚构剧情数值，不对应现实医学效果。'},
   ],
   special: [
-    {id:'charmseal',icon:'♛',title:'魅魔印记',desc:'在高阶阶段解锁专属系统印记与视觉反馈。',price:250,currency:'SV',level:'RARE',req:'CHARM 30',detail:'外观性系统标记，不强制公开给剧情 NPC。'},
+    {id:'charmseal',icon:'♛',title:'魅魔印记',desc:'最终魅力完成改造。只有常规精修已经走到近完成体才开放。',price:250,currency:'SV',level:'FINAL',req:'CHARM 93',detail:'购买后将当前 CHARM 直接补足至 100，并解锁完成体视觉反馈；不是普通阶梯改造。'},
   ],
 };
 
@@ -204,66 +204,44 @@ const RECORD_DATA = [
 
 const VOICE_STAGES = [
   {
-    id:'disgust', min:0, max:14, label:'纯嫌弃期', code:'VENOM',
-    rule:'低互动欲 + 高嘴臭度。此阶段他是真的嫌弃宿主，也真的懒得在宿主身上浪费口舌；没有夸奖、嘴硬心软或隐藏喜欢。平常能一句说完绝不讲三段，常见反应是短促脏话、半句打住、懒得解释、直接不接话。开口时可以很粗俗、难听、恶俗，脏话自然出现，但不要每句话都像精心设计的毒舌金句。只有被惹火、被逗笑、遇到真正意外或必须说明系统规则时才会突然多说一点。',
-    home:[
-      '“……又怎么了。”',
-      '“操。任务自己看。”',
-      '“少烦我。先把你自己收拾明白。”',
-      '“你他妈先把头吹干。”',
-      '“行。随你。别一会儿又来哭。”',
-      '“啧。”'
-    ],
+    id:'disgust', min:0, max:9, label:'纯嫌弃期', code:'VENOM',
+    rule:'低互动欲 + 高嘴臭度。此阶段他是真的嫌弃宿主，也真的懒得在宿主身上浪费口舌；没有夸奖、嘴硬心软或隐藏喜欢。平常能一句说完绝不讲三段，常见反应是短促脏话、半句打住、懒得解释、直接不接话。',
+    home:['“……又怎么了。”','“操。任务自己看。”','“少烦我。先把你自己收拾明白。”','“啧。”'],
   },
   {
-    id:'repair', min:15, max:34, label:'抢救期', code:'REPAIR',
-    rule:'承认改造有效，但嘴仍然脏而刻薄。最多算“从灾难修到能看”，不许温柔；可以拿她终于有点像个会勾人的成年女人来损，但不能提前产生真实欲望。',
-    home:[
-      '“至少现在没刚绑定时那么灾难。”',
-      '“别笑。‘有改善’和‘好看’中间隔着一整条银河。”',
-      '“勉强算你没白折腾。就勉强。”',
-      '“现在能看两眼了。第三眼再说。”'
-    ],
+    id:'repair', min:10, max:29, label:'抢救期', code:'REPAIR',
+    rule:'承认改造开始有效，但整体仍处于抢救。可以说“至少没刚绑定时那么灾难”，不能提前把宿主描述成漂亮或真正像样。',
+    home:['“至少现在没刚绑定时那么灾难。”','“有改善。别急着得意。”','“继续修。还没到能吹的时候。”','“总算不是完全没救。”'],
   },
   {
-    id:'acceptable', min:35, max:54, label:'顺眼期', code:'ACCEPT',
-    rule:'开始承认宿主像样甚至好看，但仍吝啬夸奖。恶俗嘴不收，会拿男人视线、骚气、身体观感做下流评价，但仍没有针对宿主的真实性欲。',
-    home:[
-      '“……这次确实顺眼。你最好别逼我重复。”',
-      '“别得意，我说的是‘不难看’，不是‘漂亮得让我失智’。”',
-      '“总算不用每次看数据都想申请工伤。”',
-      '“嗯。今天这张脸没什么特别值得骂的。”'
-    ],
+    id:'acceptable', min:30, max:54, label:'顺眼期', code:'ACCEPT',
+    rule:'宿主已经跨过普通人线：不再丑得扎眼，整体顺眼，认真收拾时足以让成年男人产生普通性兴趣；但离真正漂亮仍有明显距离。',
+    home:['“行。现在至少算顺眼。”','“普通人线过了，别把自己当美女。”','“现在有人愿意多看两眼，我不意外。”','“能看了。离漂亮还早。”'],
   },
   {
     id:'pretty', min:55, max:69, label:'漂亮期', code:'PRETTY',
-    rule:'客观上明显漂亮。他会承认“漂亮”，但嘴依旧脏，常把夸奖说成下流评价或挑刺；漂亮不等于他本人想操/想睡，更不等于温柔。',
-    home:[
-      '“行，漂亮。满意了？别让我说第二遍。”',
-      '“现在确实有人会回头看你。你先把那副得意样收一收。”',
-      '“脸是好看了，性格还是烦。”',
-      '“我承认你现在漂亮。只代表我的眼睛没坏，不代表别的。”'
-    ],
+    rule:'客观上明显漂亮。他会承认“漂亮”，但嘴依旧脏；漂亮不等于他本人想操/想睡，更不等于温柔。',
+    home:['“行，漂亮。满意了？”','“现在确实有人会回头看你。”','“脸是好看了，性格还是烦。”','“我承认你现在漂亮。只代表我的眼睛没坏。”'],
   },
   {
     id:'beauty', min:70, max:84, label:'美女期', code:'BEAUTY',
-    rule:'真正跨过他的美女审美门槛。只有从这里开始，具体剧情才可能让他出现“想睡/想碰/想操”的真实性欲；没有欲望信号时仍只是一个嘴很脏的审美评价者。',
-    home:[
-      '“……现在倒是真的配得上‘美女’两个字了。”',
-      '“别靠那么近。我只是在确认改造结果。”',
-      '“长成这样以后，你倒是终于有资格让我挑得更细了。”',
-      '“漂亮是漂亮。别擅自把这句话理解成我喜欢你。”'
-    ],
+    rule:'真正跨过美女审美门槛。只有从这里开始，具体剧情才可能让他出现更直接的真实性欲；没有欲望信号时仍只是嘴很脏的审美评价者。',
+    home:['“……现在倒是真的配得上美女两个字了。”','“漂亮是漂亮。别擅自理解成我喜欢你。”','“现在别人盯你，我能理解。”','“行，这次没什么值得挑的大毛病。”'],
   },
   {
-    id:'stunning', min:85, max:999, label:'高魅力美女期', code:'STUNNING',
-    rule:'外貌高度符合他的审美。若欲望线已产生，他会明显更黄、更露骨、更敢直接说想怎么碰、怎么睡，但仍不等于爱。真正温柔只允许LOVE成立后偶尔出现，恶俗嘴不会被洗白。',
-    home:[
-      '“这张脸现在确实很合我胃口。可惜嘴还是一样会惹我烦。”',
-      '“别晃。让我多看两秒。”',
-      '“现在别人盯你，我至少能理解他们眼睛为什么不肯挪开。”',
-      '“长成这样是你的本事。让我喜欢你，是另一回事。”'
-    ],
+    id:'stunning', min:85, max:92, label:'高魅力美女期', code:'STUNNING',
+    rule:'外貌高度出众，已经明显超出普通美女。若欲望线已产生，他会更露骨、更敢直接表达身体吸引，但仍不等于爱。',
+    home:['“这张脸现在确实很合我胃口。”','“别晃。让我多看两秒。”','“现在这副样子，确实够惹眼。”','“长成这样是你的本事。让我喜欢你是另一回事。”'],
+  },
+  {
+    id:'near_complete', min:93, max:99, label:'近完成体', code:'NEAR',
+    rule:'固定常规改造已经接近系统上限，只差最终完成机制。系统哥会承认这是极高完成度，但仍把100视为单独的最终节点。',
+    home:['“差最后一点。别现在掉链子。”','“已经很接近了。最后那格不是白送的。”','“现在挑毛病都得挑得很细。”','“九十多分了，别急着替自己封神。”'],
+  },
+  {
+    id:'complete', min:100, max:999, label:'魅力完成体', code:'COMPLETE',
+    rule:'CHARM 100。外貌与系统魅力改造达到完整终点。后续成长应转向剧情、关系、能力、欲望玩法与特殊商品，而不是继续无意义堆CHARM。',
+    home:['“一百。行，这次没得赖。”','“完成体。总算让我把这栏关了。”','“别再问还能不能更漂亮。数值已经到头。”','“这回是真毕业了。”'],
   },
 ];
 
@@ -2519,9 +2497,10 @@ Current in-world story day=${Number(state.tasks?.storyDay)||1}. A natural-day ad
 
 Current SHOP phase=${currentShopPhase(state).label} (${currentShopPhase(state).code}); appearance/presentation shop progress levels=${shopProgressLevels(state)}. Adult-response upgrades do not advance beauty-shelf phases.
 TWO-STAGE BODY ECONOMY — HARD RULE:
-AP is the rescue currency. Daily/mundane tasks may generate AP, and AP-funded appearance/body/sensory upgrades can improve the host only up to CHARM ${AP_CHARM_CAP}. They represent hygiene, presentation, posture, basic repair and enough structural rescue to stop looking alarmingly unattractive.
-At CHARM ${AP_CHARM_CAP}, AP can no longer finance further outward appearance/body improvement. Existing AP appearance/body items automatically switch their next refinement purchase to SV. From that point onward, becoming genuinely prettier, more sexually striking or more refined requires SV gathered through the adult/sexual gameplay loop.
+AP is the rescue currency. Daily/mundane tasks may generate AP, and AP-funded appearance/body/sensory upgrades are available only while the host is BELOW CHARM ${AP_CHARM_CAP}. They represent hygiene, presentation, posture, basic repair and enough structural rescue to stop looking alarmingly unattractive. If an AP purchase begins below 30 and its full CHARM gain crosses 30, keep the full gain; do not truncate the purchase at exactly 30.
+Once the resulting CHARM is ${AP_CHARM_CAP} or higher, AP can no longer finance the NEXT outward appearance/body improvement. Existing AP appearance/body items automatically switch their next refinement purchase to SV. From that point onward, becoming genuinely prettier, more sexually striking or more refined requires SV gathered through the adult/sexual gameplay loop.
 CHARM gains are deliberately laddered by upgrade level rather than flat. Early rescue-level cosmetic cleanup produces only small overall CHARM movement; later II/III/IV refinements produce progressively larger CHARM gains because refinement has more leverage once the host has a normal base. Do not describe a tiny first-stage repair as a dramatic attractiveness jump.
+FINAL CHARM CLOSURE: normal fixed appearance/body refinements are designed to carry the host into the low 90s, not exactly 100. At CHARM 93+, the special item 魅魔印记 becomes the stable final-completion purchase. It fills CHARM to exactly 100 regardless of the current 93-99 value. Do not invent another routine way to push fixed CHARM past 100.
 Never describe ordinary chores, walking, hygiene or AP farming as sufficient to carry the host beyond CHARM ${AP_CHARM_CAP}. AP may still exist for non-beauty utility/plot uses, but it cannot bypass the SV gate for body/appearance progression.
 Dynamic plot goods must respect the current SHOP phase. They may solve a concrete problem exposed by the just-written plot, but each purchase is only one incremental body-axis step and may not claim a sudden makeover, perfect body, instant beauty, or any effect far beyond the host's current progression.
 
@@ -2670,7 +2649,7 @@ const CHARM_GAIN_CLASS = {
   // later refinement matters much more once the base is no longer disastrous.
   lip1:'polish', hair1:'polish', skin1:'polish', posture1:'polish', leg1:'polish', neck1:'polish',
   scent1:'polish', breath1:'polish', voice1:'polish', touch1:'polish', scent2:'polish',
-  charmseal:'polish',
+  charmseal:'none',
 
   // Structural/proportion changes have more visual leverage at every level.
   face1:'structural', eye1:'structural', face2:'structural', bodyfat1:'structural',
@@ -3699,7 +3678,7 @@ function shopItem(item,category) {
         <div class="meme-shop-detail">${item.detail}</div>
       </div>
       <div class="meme-shop-buy">
-        <strong>${payment.currency==='LOCK'?'—':payment.price}</strong><em>${payment.currency}${!item.dynamic && staticCharmGain(item,state,view)>0 ? ` · CHARM +${staticCharmGain(item,state,view)}` : ''}</em>
+        <strong>${payment.currency==='LOCK'?'—':payment.price}</strong><em>${payment.currency}${item.id==='charmseal' ? ' · CHARM → 100' : (!item.dynamic && staticCharmGain(item,state,view)>0 ? ` · CHARM +${staticCharmGain(item,state,view)}` : '')}</em>
         <button type="button" data-shop-action="${item.id}" ${(soldOut||pending||!req.ok||!enough)?'disabled':''}>${button}</button>
       </div>
     </article>
@@ -3939,7 +3918,7 @@ function systemMarkup() {
   const openSections=rank>=2 ? `
     <section class="meme-system-meters">
       <article><small>综合魅力</small><b>${state.host.charm}</b><span><i style="width:${Math.min(100,state.host.charm)}%"></i></span></article>
-      <article><small>当前态度</small><b>${voice.code}</b><span><i style="width:${(toneIndex(state)+1)*20}%"></i></span></article>
+      <article><small>当前态度</small><b>${voice.code}</b><span><i style="width:${Math.min(100,((toneIndex(state)+1)/VOICE_STAGES.length)*100)}%"></i></span></article>
       <article><small>系统等级</small><b>${state.system.level} / 4</b><span><i style="width:${state.system.level*25}%"></i></span></article>
     </section>
 
@@ -4194,11 +4173,16 @@ async function handleShopAction(id){
     ? adminCopyText(item.title,item.category==='dailygoods'?'日常用品':'临时改造',40)
     : levelledShopTitle(item,state);
   const lifestyle=item.category==='dailygoods';
-  const baseCharmGain=lifestyle ? 0 : Number(item.dynamic ? item.charmGain : staticCharmGain(item,state,view));
   const currentCharm=Math.max(0,Number(state.host?.charm)||0);
-  const charmGain=payment.currency==='AP' && baseCharmGain>0
-    ? Math.max(0,Math.min(baseCharmGain,AP_CHARM_CAP-currentCharm))
-    : baseCharmGain;
+  const baseCharmGain=lifestyle
+    ? 0
+    : (item.id==='charmseal'
+        ? Math.max(0,100-currentCharm)
+        : Number(item.dynamic ? item.charmGain : staticCharmGain(item,state,view)));
+  // The AP/SV gate is checked BEFORE purchase. If the host is still below 30,
+  // the final AP-funded rescue upgrade receives its full CHARM gain even when
+  // that purchase crosses 30. Only subsequent appearance purchases switch to SV.
+  const charmGain=baseCharmGain;
   const bodyDelta=lifestyle
     ? {}
     : (item.dynamic ? (item.bodyAxis ? {[item.bodyAxis]:1} : {}) : (BODY_EFFECTS[item.id] || {}));
