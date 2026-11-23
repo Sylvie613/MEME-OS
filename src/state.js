@@ -553,6 +553,13 @@ function applyEffect(state, effect) {
             id: task.id,
             title: task.title,
             category: task.category,
+            desc: String(task.desc || ''),
+            detail: String(task.detail || ''),
+            reward: String(task.reward || ''),
+            tier: Number.isFinite(Number(task.tier)) ? Number(task.tier) : null,
+            targetManId: task.targetManId ? String(task.targetManId) : null,
+            dynamicTask: Boolean(task.dynamicTask),
+            dynamicDailyTask: Boolean(task.dynamicDailyTask),
             storyDay: Number(state.tasks.storyDay) || 1,
             acceptedAt: Date.now(),
         };
