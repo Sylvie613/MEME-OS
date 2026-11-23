@@ -1230,14 +1230,15 @@ function purgeKnownLegacyWrongGeneratedTasks(state=runtimeState()){
   const badTitle=/(先把自己收拾干净|现在先把头洗了|先把头洗了)/;
   let changed=false;
   state.tasks.generatedDaily=state.tasks.generatedDaily.filter(task=>{
-    if(state.tasks?.active?.[task.id]) return true;
     if(badTitle.test(String(task.title||''))){
+      if(state.tasks?.active?.[task.id]) delete state.tasks.active[task.id];
       changed=true;
       return false;
     }
     // All pre-canonical dialogue/fallback guesses are retired once 0.10.16 loads.
     const source=String(task.source||'');
     if(/可见剧情任务卡兜底|当前可见剧情直接触发/.test(source)){
+      if(state.tasks?.active?.[task.id]) delete state.tasks.active[task.id];
       changed=true;
       return false;
     }
