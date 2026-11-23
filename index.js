@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.12.4';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.12.4';
-import { isBoundCharacter } from './src/binding.js?v=0.12.4';
+} from './src/state.js?v=0.12.5';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.12.5';
+import { isBoundCharacter } from './src/binding.js?v=0.12.5';
 
 /**
- * MÉMÉ OS v0.12.4
+ * MÉMÉ OS v0.12.5
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -962,7 +962,7 @@ function applyMemoryEvent(state,raw,visibleTurns=0){
 }
 
 function applyStoryStatusEvent(){
-  // Retired in v0.12.4. Scene date/time/weather/location live in visible prose only.
+  // Retired in v0.12.5. Scene date/time/weather/location live in visible prose only.
   return false;
 }
 
@@ -2903,6 +2903,54 @@ function latestNewManTurn(state=runtimeState()){
   return latest;
 }
 
+
+function userExplicitlyInvitesNewMaleInteraction(context){
+  const chat=Array.isArray(context?.chat)?context.chat:[];
+  const user=latestUserTurnSeed(chat);
+  const text=String(user.text||'');
+  return /(想认识.{0,8}(?:新|别的|其他).{0,6}(?:男人|男的|男性|男生)|想找.{0,8}(?:男人|男的|男性|男生)|找个.{0,8}(?:男人|男的|男性|男生)|刷.{0,6}(?:交友|约会|男人|男的|男性|男生)|打开.{0,6}(?:交友|约会).{0,6}(?:软件|app|应用)|去.{0,6}(?:联谊|相亲|酒吧|夜店|聚会|派对)|想要.{0,8}(?:第三个|第三人|另一个|再来一个|多人)|叫.{0,8}(?:别人|另一个男人|其他男人).{0,8}(?:来|过来)|邀请.{0,8}(?:另一个|其他).{0,6}(?:男人|男性|男生))/iu.test(text);
+}
+
+function currentMaleSceneFocus(context,state=runtimeState()){
+  const chat=Array.isArray(context?.chat)?context.chat:[];
+  const recent=recentSceneText(chat,6);
+  const user=latestUserTurnSeed(chat);
+  const currentMen=Array.isArray(state.men?.current)?state.men.current:[];
+  const explicitNew=userExplicitlyInvitesNewMaleInteraction(context);
+
+  const intimacy=/(接吻|亲吻|拥吻|上床|做爱|性交|插入|抽插|口交|手交|足交|乳交|后庭|肛交|自慰|高潮|射精|精液|阴茎|肉棒|鸡巴|鸡巴|阴道|小穴|乳房|奶头|脱.{0,4}衣|赤裸|裸体|前戏|爱抚|抚摸.{0,8}(?:胸|腿|腰|臀|阴部|下体)|骑乘|体位|床上.{0,12}(?:他|男人|男性)|酒店房间|开房|亲密行为|性行为)/iu.test(recent);
+
+  const datingFocus=/(约会|单独吃饭|一起吃饭|一起喝酒|一起散步|一起回家|送你回家|送我回家|单独相处|陪着你|陪着我|两个人|二人世界)/iu.test(recent);
+
+  const activeNames=currentMen
+    .map(person=>String(person?.name||'').trim())
+    .filter(Boolean);
+  const namedPresent=activeNames.some(name=>recent.includes(name));
+
+  const activeCurrent= currentMen.length>0;
+  const hardLock=(intimacy && activeCurrent);
+  const softLock=(activeCurrent && (namedPresent || datingFocus || !explicitNew));
+  const locked=!explicitNew && (hardLock || softLock);
+
+  return {
+    locked,
+    hardLock,
+    explicitNew,
+    intimacy,
+    datingFocus,
+    namedPresent,
+    activeCurrent,
+    currentMen:currentMen.map(person=>({id:person.id,name:person.name||'未命名对象'})),
+    reason:locked
+      ? (hardLock
+          ? '当前已有男性NPC参与亲密/色情场景，剧情焦点锁定'
+          : '当前已有男性NPC持续占用剧情焦点')
+      : explicitNew
+        ? '宿主明确主动要求引入新男性/新社交对象'
+        : '无当前男性剧情焦点',
+  };
+}
+
 function npcEncounterWheel(context,state=runtimeState()){
   const charm=Math.max(0,Math.min(100,Number(state.host?.charm)||0));
   const baseChance=Math.max(10,charm);
@@ -2911,11 +2959,13 @@ function npcEncounterWheel(context,state=runtimeState()){
   const user=latestUserTurnSeed(context?.chat);
   const day=Math.max(1,Number(state.tasks?.storyDay)||1);
   const nextTurn=Math.max(1,(Number(state.shop?.plotTurn)||0)+1);
-  const roll=(hashId('npc-wheel-v1|'+day+'|'+user.seed)%10000)/100;
+  const roll=(hashId('npc-wheel-v2|'+day+'|'+user.seed)%10000)/100;
   const lastNewTurn=latestNewManTurn(state);
   const blockedByCooldown=lastNewTurn>-999 && nextTurn-lastNewTurn<=2;
   const cooldownRemaining=blockedByCooldown ? Math.max(0,3-(nextTurn-lastNewTurn)) : 0;
-  const hit=!blockedByCooldown && roll<chance;
+  const focus=currentMaleSceneFocus(context,state);
+  const pausedByFocus=focus.locked;
+  const hit=!pausedByFocus && !blockedByCooldown && roll<chance;
   return {
     day,
     nextTurn,
@@ -2925,6 +2975,8 @@ function npcEncounterWheel(context,state=runtimeState()){
     chance,
     roll:Math.round(roll*100)/100,
     hit,
+    pausedByFocus,
+    focus,
     blockedByCooldown,
     cooldownRemaining,
     reactionGuide:npcCharmReactionGuide(charm),
@@ -3337,14 +3389,23 @@ CHARM=${npcWheel.charm}; public-scene base chance=${npcWheel.baseChance}%.
 Scene=${npcWheel.scene.label}; scene multiplier=${npcWheel.scene.multiplier}.
 Final encounter chance=${npcWheel.chance}%.
 Deterministic roll=${npcWheel.roll}.
+Scene-focus lock active=${npcWheel.pausedByFocus}; reason=${npcWheel.focus.reason}.
+Current focused MEN=${JSON.stringify(npcWheel.focus.currentMen)}.
 Two-turn newcomer cooldown active=${npcWheel.blockedByCooldown}.
-RESULT=${npcWheel.hit?'HIT — introduce one new adult male NPC naturally in this reply':'MISS — do not introduce a new random male NPC solely because of the wheel'}.
+RESULT=${npcWheel.pausedByFocus
+  ? 'PAUSED — current male scene focus owns the story; do not introduce a random new male NPC'
+  : npcWheel.hit
+    ? 'HIT — introduce one new adult male NPC naturally in this reply'
+    : 'MISS — do not introduce a new random male NPC solely because of the wheel'}.
 
 REACTION RULE FOR CURRENT CHARM:
 ${npcWheel.reactionGuide}
 
 HARD RULES:
-- One wheel result per user-story turn. Same user turn / swipe / regeneration keeps the same result.
+- SCENE FOCUS LOCK outranks the random wheel. While an existing male NPC is actively sharing the scene with the host, especially during a date, private one-on-one interaction, intimacy or sex, the random newcomer wheel is PAUSED for as many turns as that scene lasts. There is NO fixed maximum duration.
+- The focus lock ends only when the focused man actually leaves/exits the active scene, the scene clearly changes away from him, or the host explicitly asks to meet/invite/search for additional new men.
+- A sexual/intimate scene with a current male NPC is a HARD LOCK. Never inject a courier, passerby, neighbor, app match, staff member or other random newcomer into the active intimate sequence merely because enough turns passed.
+- One wheel result per user-story turn when the wheel is not focus-paused. Same user turn / swipe / regeneration keeps the same result.
 - HIT means ONE new explicit-adult male NPC gets a plausible opportunity to enter/intervene in the story. It does NOT mean attraction, sex, consent, romance, a DESIRE task, or long-term importance.
 - On HIT, fit the entry method to the scene: home can use courier/delivery/building staff/neighbor/doorbell/phone/social contact; public scenes can use passersby/staff/customers/classmates/coworkers/etc.; online dating/social scenes can use a match/message/profile interaction.
 - Generate the man's public personality from the full unrestricted adult archetype range. His private sexuality/XP is a separate axis and may contrast strongly with his public persona.
@@ -4848,7 +4909,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
-        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.12.4</small>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.12.5</small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
