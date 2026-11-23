@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.11.3';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.11.3';
-import { isBoundCharacter } from './src/binding.js?v=0.11.3';
+} from './src/state.js?v=0.11.4';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.11.4';
+import { isBoundCharacter } from './src/binding.js?v=0.11.4';
 
 /**
- * MÉMÉ OS v0.11.3
+ * MÉMÉ OS v0.11.4
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -1480,6 +1480,166 @@ const BOND_LOVE_TAGS = new Set([
   'sacrifice','personal_priority','vulnerability','future_choice','identity_choice',
 ]);
 
+function extractVisibleTaskCompletions(raw=''){
+  const text=String(raw||'');
+  const completions=[];
+  const re=/[【\[]\s*TASK\s*[｜|]\s*([^｜|\]】\n]{1,60})\s*[】\]]\s*[-—–_=~·•\s]*(划掉|已完成|完成|结算|DONE)/giu;
+  for(const match of text.matchAll(re)){
+    const title=String(match[1]||'').replace(/\s+/g,' ').trim().slice(0,60);
+    const marker=String(match[2]||'').trim();
+    if(title) completions.push({title,marker,index:Number(match.index)||0});
+  }
+  return completions;
+}
+
+function currentTaskCandidates(state=runtimeState()){
+  const currentDay=Math.max(1,Number(state.tasks?.storyDay)||1);
+  const activeIds=new Set(Object.keys(state.tasks?.active||{}));
+  const items=[
+    ...(state.tasks?.generatedDaily||[])
+      .filter(task=>Number(task.createdDay||currentDay)===currentDay || activeIds.has(task.id))
+      .map(task=>({...task,category:'daily',dynamicDailyTask:true})),
+    ...(state.tasks?.generated||[]).map(task=>({...task,category:'desire',dynamicTask:true})),
+    ...currentStaticTaskPool('daily',state).map(task=>({...task,category:'daily'})),
+    ...currentStaticTaskPool('desire',state).map(task=>({...task,category:'desire'})),
+    ...currentStaticTaskPool('special',state).map(task=>({...task,category:'special'})),
+  ];
+  for(const id of activeIds){
+    const task=findTask(id,state);
+    if(task) items.unshift(task);
+  }
+  const seen=new Set();
+  return items.filter(task=>{
+    if(!task?.id || seen.has(task.id)) return false;
+    seen.add(task.id);
+    return true;
+  });
+}
+
+function findCurrentTaskByVisibleTitle(title,state=runtimeState()){
+  const needle=normalizedTaskTitle(title);
+  if(!needle) return null;
+  const candidates=currentTaskCandidates(state);
+
+  const exact=candidates.find(task=>normalizedTaskTitle(task.title)===needle);
+  if(exact) return exact;
+
+  const partial=candidates
+    .filter(task=>{
+      const candidate=normalizedTaskTitle(task.title);
+      return candidate && (candidate.includes(needle) || needle.includes(candidate));
+    })
+    .sort((a,b)=>Math.abs(normalizedTaskTitle(a.title).length-needle.length)-Math.abs(normalizedTaskTitle(b.title).length-needle.length));
+  if(partial.length===1) return partial[0];
+
+  const titleTags=new Set(extractDailyActionTags(title));
+  if(titleTags.size){
+    const tagged=candidates.filter(task=>{
+      const tags=taskActionTags(task);
+      return tags.length && [...titleTags].every(tag=>tags.includes(tag));
+    });
+    if(tagged.length===1) return tagged[0];
+  }
+  return null;
+}
+
+function settleVisibleTaskCompletion(state,completion,messageId){
+  const task=findCurrentTaskByVisibleTitle(completion?.title,state);
+  if(!task) return false;
+
+  const id=String(task.id||'').trim();
+  if(!id) return false;
+
+  const currentDay=Math.max(1,Number(state.tasks?.storyDay)||1);
+  const repeatable=task.repeatable==='daily';
+  const isRollingDaily=task.category==='daily';
+  const dailyLike=isRollingDaily || repeatable;
+
+  if(dailyLike && Number(state.tasks?.dailyCompleted?.[id]?.day||0)===currentDay) return false;
+  if(!dailyLike && state.tasks?.completed?.[id]) return false;
+
+  const historyId=`meme_visible_task_complete_${currentDay}_${messageId}_${id}`;
+  if((state.history||[]).some(entry=>entry.id===historyId)) return false;
+
+  const reward=taskReward(task,state);
+  const wasEverCompleted=Boolean(state.tasks?.everCompleted?.[id]);
+  const active=state.tasks?.active?.[id];
+  const title=active?.title || task.title || completion.title;
+  const evidence=`正文明确标记「${completion.title}」${completion.marker||'完成'}。`;
+
+  state.resources.ap=Math.max(0,Number(state.resources.ap||0)+Math.max(0,Number(reward.ap)||0));
+  state.resources.sv=Math.max(0,Number(state.resources.sv||0)+Math.max(0,Number(reward.sv)||0));
+  if(state.tasks?.active?.[id]) delete state.tasks.active[id];
+
+  if(dailyLike){
+    const previous=state.tasks.dailyCompleted?.[id]||{};
+    state.tasks.dailyCompleted[id]={
+      id,
+      title,
+      category:task.category,
+      day:currentDay,
+      count:Math.max(0,Number(previous.count)||0)+1,
+      evidence,
+      completedAt:Date.now(),
+      completedTurn:Number(state.shop?.plotTurn)||0,
+      actionTags:task.category==='daily'?taskActionTags(task):[],
+    };
+  }else{
+    state.tasks.completed[id]={
+      id,
+      title,
+      category:task.category,
+      evidence,
+      completedAt:Date.now(),
+    };
+  }
+
+  state.tasks.everCompleted[id]={
+    id,
+    title,
+    category:task.category,
+    actionTags:task.category==='daily' ? taskActionTags(task) : (state.tasks.everCompleted?.[id]?.actionTags||[]),
+    firstCompletedAt:state.tasks.everCompleted?.[id]?.firstCompletedAt||Date.now(),
+  };
+
+  if(task.dynamicDailyTask){
+    state.tasks.generatedDaily=(state.tasks.generatedDaily||[]).filter(item=>item.id!==id);
+  }
+  if(task.dynamicTask){
+    state.tasks.generated=(state.tasks.generated||[]).filter(item=>item.id!==id);
+  }
+
+  state.permission.milestones.taskSettlements=Math.max(0,Number(state.permission.milestones.taskSettlements)||0)+1;
+  if(!wasEverCompleted){
+    state.permission.milestones.completedTasks=Math.max(0,Number(state.permission.milestones.completedTasks)||0)+1;
+  }
+
+  const rewardText=[
+    reward.ap>0?`AP +${reward.ap}`:'',
+    reward.sv>0?`SV +${reward.sv}`:'',
+  ].filter(Boolean).join(' / ') || '无资源奖励';
+
+  state.history.push({
+    id:historyId,
+    type:'task_complete_visible',
+    recordType:'task',
+    title:`正文验收完成：${title}`,
+    summary:`正文已经把这项任务划掉；扩展同步结算 ${rewardText}，并从 DAY ${String(currentDay).padStart(3,'0')} 任务板退场。`,
+    text:`VISIBLE TASK COMPLETED: ${id}`,
+    committedAt:Date.now(),
+  });
+  if(state.history.length>240) state.history=state.history.slice(-240);
+  return true;
+}
+
+function settleVisibleTaskCompletionsFromMessage(state,raw,messageId){
+  let changed=false;
+  for(const completion of extractVisibleTaskCompletions(raw)){
+    if(settleVisibleTaskCompletion(state,completion,messageId)) changed=true;
+  }
+  return changed;
+}
+
 function settleTaskFromModel(state,rawTask,messageId){
   if(!rawTask || typeof rawTask!=='object') return false;
   const id=String(rawTask.id||'').trim();
@@ -1546,6 +1706,9 @@ function settleTaskFromModel(state,rawTask,messageId){
     firstCompletedAt:state.tasks.everCompleted?.[id]?.firstCompletedAt||Date.now(),
   };
 
+  if(task.dynamicDailyTask){
+    state.tasks.generatedDaily=(state.tasks.generatedDaily||[]).filter(task=>task.id!==id);
+  }
   if(task.dynamicTask){
     state.tasks.generated=(state.tasks.generated||[]).filter(task=>task.id!==id);
   }
@@ -2126,6 +2289,31 @@ async function reconcileRecentVisibleTaskOffers(){
   }
 }
 
+async function reconcileRecentVisibleTaskCompletions(){
+  if(!isBoundCharacter() || !hasActiveChat()) return;
+  const context=globalThis.SillyTavern?.getContext?.()||{};
+  const chat=Array.isArray(context.chat)?context.chat:[];
+  const state=runtimeState();
+
+  const timeline=reconstructStoryTimeline(chat);
+  const dayChanged=syncStoryDayTo(state,timeline.day,{source:'visible-completion-reconcile',allowCorrection:true});
+
+  let changed=Boolean(dayChanged);
+  const start=Math.max(0,timeline.dayStartIndex);
+  for(let i=start;i<chat.length;i++){
+    const message=chat[i];
+    if(!message || message.is_user) continue;
+    const raw=String(message.mes||'');
+    if(settleVisibleTaskCompletionsFromMessage(state,raw,i)) changed=true;
+  }
+
+  if(changed){
+    await saveState(state);
+    renderView(currentView(),false);
+    installRuntimePrompt();
+  }
+}
+
 async function reconcileRecentVisibleSettlements(){
   if(!isBoundCharacter() || !hasActiveChat()) return;
   const context=globalThis.SillyTavern?.getContext?.()||{};
@@ -2257,6 +2445,8 @@ async function handleRuntimeEvent(messageId){
   });
 
   const raw=String(message.mes||'');
+
+  const visibleCompletionChanged=settleVisibleTaskCompletionsFromMessage(state,raw,messageId);
 
   const canonicalCards=extractCanonicalTaskMarkers(raw);
   const canonicalTasks=canonicalCards
@@ -2599,7 +2789,7 @@ async function handleRuntimeEvent(messageId){
     state.permission.systemEligible &&
     Number(state.permission?.adminInterestSignals||0)>=2;
 
-  if(changed || matches.length || state.shop.dynamic.length){
+  if(changed || visibleCompletionChanged || matches.length || state.shop.dynamic.length){
     await saveState(state);
     renderView(currentView(),false);
   }
@@ -4375,7 +4565,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
-        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.11.3</small>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.11.4</small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
@@ -4552,6 +4742,7 @@ function bindSillyTavernEvents(){
     // that belongs to that chat; it never clears or mutates another save.
     runtimeState();
     await reconcileRecentVisibleSettlements();
+    await reconcileRecentVisibleTaskCompletions();
     await reconcileRecentVisibleTaskOffers();
     renderView('home',false);
     installRuntimePrompt();
@@ -4715,6 +4906,7 @@ async function start() {
   }
   try{
     await reconcileRecentVisibleSettlements();
+    await reconcileRecentVisibleTaskCompletions();
     await reconcileRecentVisibleTaskOffers();
   }catch(error){
     console.warn('[MÉMÉ OS] startup state reconciliation failed',error);
