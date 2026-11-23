@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.32';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.32';
-import { isBoundCharacter } from './src/binding.js?v=0.10.32';
+} from './src/state.js?v=0.10.33';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.33';
+import { isBoundCharacter } from './src/binding.js?v=0.10.33';
 
 /**
- * MÉMÉ OS v0.10.32
+ * MÉMÉ OS v0.10.33
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -1338,6 +1338,11 @@ function settleTaskFromModel(state,rawTask,messageId){
 
 function settleStoryRewardFromModel(state,rawReward,messageId){
   if(!rawReward || typeof rawReward!=='object') return false;
+
+  // Retroactive story rewards share the exact same "system favor" budget as
+  // published plot [TASK] cards. They are not a second AP faucet.
+  const freq=plotTaskFrequency(state);
+  if(!freq.canIssue) return false;
   const title=String(rawReward.title||'').replace(/\s+/g,' ').trim().slice(0,48);
   const evidence=String(rawReward.evidence||'').replace(/\s+/g,' ').trim().slice(0,180);
   if(!title || !evidence) return false;
@@ -1384,6 +1389,7 @@ function settleStoryRewardFromModel(state,rawReward,messageId){
   state.tasks.everCompleted[id]={id,title,category:'daily',actionTags:taskActionTags(task),firstCompletedAt:Date.now()};
   state.permission.milestones.taskSettlements=Math.max(0,Number(state.permission.milestones.taskSettlements)||0)+1;
   state.permission.milestones.completedTasks=Math.max(0,Number(state.permission.milestones.completedTasks)||0)+1;
+  markPlotTaskIssued(state);
   state.history.push({
     id:historyId,
     type:'story_task_complete',
@@ -2044,7 +2050,7 @@ async function handleRuntimeEvent(messageId){
       }
 
       if(Array.isArray(event.storyRewards)){
-        for(const rawReward of event.storyRewards.slice(0,2)){
+        for(const rawReward of event.storyRewards.slice(0,1)){
           if(settleStoryRewardFromModel(state,rawReward,messageId)) changed=true;
         }
       }
@@ -2464,9 +2470,10 @@ DAY 001 onboarding invariant: if task clean ("先把自己收拾干净") has not
 Current generated daily/story tasks: ${JSON.stringify((state.tasks?.generatedDaily||[]).map(t=>({id:t.id,title:t.title,desc:t.desc,difficulty:t.difficulty,source:t.source,createdDay:t.createdDay})))}.
 Host-dismissed generated tasks for the current story day: ${JSON.stringify((state.tasks?.dismissed||[]).filter(t=>Number(t.storyDay||0)===Number(state.tasks?.storyDay||1)).map(t=>({title:t.title,actionTags:t.actionTags})))}. Do not reissue the same dismissed task or an equivalent same-action rewrite during this story day.
 
-PLOT-GIFT TASK RARITY:
-A plot-generated [TASK] is an occasional system favor / 放水, NOT a filler mechanism. Do not create one merely because the board has empty slots. Normally there should be 0 or 1 plot-gift task in an entire natural story day. A second one is only acceptable after a genuine major scene shift and at least 8 plot turns since the first. The extension enforces a maximum of two per story day.
-Current plot-gift count today=${plotTaskFreq.count}; current plot turn=${plotTaskFreq.turn}; last plot-gift turn=${plotTaskFreq.last}; may issue now=${plotTaskFreq.canIssue}.
+PLOT-GIFT / RETRO-REWARD SHARED BUDGET:
+A plot-generated [TASK] and a retroactive storyRewards payout are two forms of the SAME occasional system favor / 放水 budget. They are NOT separate AP faucets. Normally the entire natural story day should contain 0 or 1 total plot-favor payout across BOTH channels. A second total favor is only acceptable after a genuine major scene shift and at least 8 plot turns since the first. The extension enforces this shared quota.
+Ordinary household chores, routine hygiene, eating, drinking, normal walking, tidying, washing dishes, laundry and other everyday maintenance do NOT earn surprise storyRewards merely because the host did something responsible. They only pay AP if they were already a visible DAILY/[TASK] objective. Retroactive storyRewards are reserved for genuinely unexpected, non-trivial, scene-specific achievements that feel substantial enough that the administrator chooses to "give her a break."
+Current shared plot-favor count today=${plotTaskFreq.count}; current plot turn=${plotTaskFreq.turn}; last plot-favor turn=${plotTaskFreq.last}; may issue/pay another now=${plotTaskFreq.canIssue}.
 
 CANONICAL VISIBLE TASK PROTOCOL:
 When MÉMÉ OS/the administrator truly publishes a NEW temporary daily/story task, show exactly one OS-owned marker on its own line in this exact four-field syntax:
@@ -2479,7 +2486,7 @@ USER CORRECTION AUTHORITY: parenthetical user instructions beginning with （OS�
 PLOT RELEVANCE RULE: every plot-gift task must be caused by something concrete in the CURRENT visible scene: a mess just created, an unmet practical need, a body/presentation issue just noticed, a plan the host just stated, a location-specific opportunity, or a direct consequence of the immediately preceding action. Do not generate generic self-improvement filler.
 DIFFICULTY SEMANTICS: light = one quick low-effort action; normal = several linked actions or a sustained moderate effort; hard = substantial time, discomfort, persistence, social exposure/risk or a genuinely demanding multi-step requirement.
 dailyTaskOffers is deprecated for new daily/story publication and should remain empty.
-If the current visible scene itself unexpectedly completes a sensible one-off system challenge that was not previously active, you MAY use storyRewards to let the extension recognize it retroactively. storyRewards entries: maximum 2; fields {title,evidence,source,difficulty}. Never put AP/SV numbers in storyRewards or visible prose; the extension calculates the real reward. Do not use storyRewards for trivial actions merely to farm AP.
+If the current visible scene itself unexpectedly completes a genuinely substantial one-off system challenge that was not previously active, you MAY use storyRewards to let the extension recognize it retroactively, but only when the shared plot-favor budget above still permits it. storyRewards entries: maximum 1 useful candidate per reply; fields {title,evidence,source,difficulty}. Never put AP/SV numbers in storyRewards or visible prose; the extension calculates the real reward. Routine chores and ordinary self-care are explicitly ineligible unless they were already published as tasks.
 
 DYNAMIC DESIRE MISSION BOARD:
 The foundational desire milestones (spark/sample/oral/repeat/drain) are templates, not a permanently fixed screen. The visible fixed candidate subset reshuffles on each natural story day; completed non-repeatable milestones stay completed, while repeatable collection milestones may return on later days.
@@ -2514,6 +2521,7 @@ Current SHOP phase=${currentShopPhase(state).label} (${currentShopPhase(state).c
 TWO-STAGE BODY ECONOMY — HARD RULE:
 AP is the rescue currency. Daily/mundane tasks may generate AP, and AP-funded appearance/body/sensory upgrades can improve the host only up to CHARM ${AP_CHARM_CAP}. They represent hygiene, presentation, posture, basic repair and enough structural rescue to stop looking alarmingly unattractive.
 At CHARM ${AP_CHARM_CAP}, AP can no longer finance further outward appearance/body improvement. Existing AP appearance/body items automatically switch their next refinement purchase to SV. From that point onward, becoming genuinely prettier, more sexually striking or more refined requires SV gathered through the adult/sexual gameplay loop.
+CHARM gains are deliberately laddered by upgrade level rather than flat. Early rescue-level cosmetic cleanup produces only small overall CHARM movement; later II/III/IV refinements produce progressively larger CHARM gains because refinement has more leverage once the host has a normal base. Do not describe a tiny first-stage repair as a dramatic attractiveness jump.
 Never describe ordinary chores, walking, hygiene or AP farming as sufficient to carry the host beyond CHARM ${AP_CHARM_CAP}. AP may still exist for non-beauty utility/plot uses, but it cannot bypass the SV gate for body/appearance progression.
 Dynamic plot goods must respect the current SHOP phase. They may solve a concrete problem exposed by the just-written plot, but each purchase is only one incremental body-axis step and may not claim a sudden makeover, perfect body, instant beauty, or any effect far beyond the host's current progression.
 
@@ -2571,7 +2579,7 @@ After memory has already been bootstrapped, do not emit the comment when nothing
 dailyTaskOffers: deprecated compatibility field; normally leave [] for new daily/story tasks because visible [TASK｜任务名｜任务要求] is the canonical source.
 taskOffers: maximum 1 new generated erotic mission; fields title,desc,detail,source. title/desc/detail/source are written in the administrator's current OS voice and may be personal, rude, obscene or judgmental when appropriate. Never include tier, id or rewards.
 tasks: max 4 completed ACTIVE task entries; fields id,status("completed"),evidence. Never include rewards; the extension calculates them.
-storyRewards: max 2 one-off plot tasks that visibly became complete without prior acceptance; fields title,evidence,source,difficulty(light|normal|hard). Never include AP/SV numbers.
+storyRewards: max 1 candidate and it shares the same daily/turn quota as plot [TASK] issuance. Use only for substantial unexpected achievements, never ordinary chores/self-care. Fields title,evidence,source,difficulty(light|normal|hard). Never include AP/SV numbers.
 shop: maximum 2 BODY/PLOT temporary items only. Fields: title,desc,detail,currency("AP"|"SV"),ttl,icon,source,impact("minor"|"standard"|"major"),bodyAxis(optional),sourceIssueId(optional). At CHARM ${AP_CHARM_CAP} or above, body/appearance goods are forcibly repriced in SV even if you request AP. title/desc/detail/source are administrator-authored OS copy. A temporary plot item must answer something concrete in the visible story. Never use shop for ordinary lifestyle merchandise.
 lifestyleShop: dedicated 日常用品 shelf. Before CHARM ${AP_CHARM_CAP}, always leave []. At CHARM ${AP_CHARM_CAP}+, reconsider the CURRENT five-item shelf every assistant turn under the supplied lifestyleDisposition. If no change is useful, emit [] and the extension keeps all five unchanged. If ANY slot should change, emit EXACTLY 5 complete items representing the entire new shelf. Each item fields: title,desc,detail,icon,source,impact("minor"|"standard"|"major"),kind(skincare|food|daily|clothing|electronics|home|entertainment|service|other),consumable(boolean). Never include id, currency, price, bodyAxis or charmGain; these goods are AP-only and never change CHARM/body stats. Generate fresh context-specific products; do not reuse a fixed example as a template.
 status: optional story-status update with fields initialized(boolean),date,time,weather,location,people(array of names/labels),note. Only include supported in-story facts; omitted fields keep their stored value.
@@ -2657,17 +2665,35 @@ const RUDE_TASK_NAMES = {
   override:'真有本事就拿一次越级奖励',
 };
 
-const CHARM_GAIN = {
-  // Appearance/presentation cleanup: each permanent level moves objective CHARM a little.
-  lip1:1.3, hair1:1.3, skin1:1.3, posture1:1.3, leg1:1.3, neck1:1.3,
-  scent1:1.3, breath1:1.3, voice1:1.3, touch1:1.3, scent2:1.3, charmseal:1.3,
+const CHARM_GAIN_CLASS = {
+  // Fine cleanup/presentation: early repairs barely move overall attractiveness;
+  // later refinement matters much more once the base is no longer disastrous.
+  lip1:'polish', hair1:'polish', skin1:'polish', posture1:'polish', leg1:'polish', neck1:'polish',
+  scent1:'polish', breath1:'polish', voice1:'polish', touch1:'polish', scent2:'polish',
+  charmseal:'polish',
 
-  // Structural/proportion work has a larger visible effect.
-  face1:2.1, eye1:2.1, face2:2.1, bodyfat1:2.1, waist1:2.1, bust1:2.1,
+  // Structural/proportion changes have more visual leverage at every level.
+  face1:'structural', eye1:'structural', face2:'structural', bodyfat1:'structural',
+  waist1:'structural', bust1:'structural',
 
-  // Adult-response upgrades change experience, not outward CHARM.
-  sensitive1:0, arousal1:0, lubrication1:0, orgasm1:0, recovery1:0,
+  // Adult-response upgrades affect sexual experience, not outward CHARM.
+  sensitive1:'none', arousal1:'none', lubrication1:'none', orgasm1:'none', recovery1:'none',
 };
+
+const CHARM_GAIN_LADDERS = {
+  polish:[0.4,0.8,1.3,1.9],
+  structural:[0.6,1.2,1.9,2.7],
+  none:[0,0,0,0],
+};
+
+function staticCharmGain(item,state=runtimeState(),view=null){
+  if(!item) return 0;
+  const resolved=view||staticShopView(item,state);
+  const cls=CHARM_GAIN_CLASS[item.id]||'none';
+  const ladder=CHARM_GAIN_LADDERS[cls]||CHARM_GAIN_LADDERS.none;
+  const level=Math.max(1,Math.min(4,Number(resolved.nextLevel)||1));
+  return Number(ladder[level-1]||0);
+}
 
 const SHOP_MAX_LEVEL = {
   lip1:3, hair1:4, skin1:4, face1:3, eye1:3, face2:3,
@@ -2725,7 +2751,7 @@ function itemImprovesAppearance(item){
   if(item.dynamic){
     return PLOT_CHARM_AXES.has(String(item.bodyAxis||'')) || PLOT_POLISH_AXES.has(String(item.bodyAxis||''));
   }
-  return Number(CHARM_GAIN[item.id]||0)>0;
+  return (CHARM_GAIN_CLASS[item.id]||'none')!=='none';
 }
 
 function svRefinementPriceFromAp(apPrice){
@@ -3633,7 +3659,7 @@ function shopItem(item,category) {
         <div class="meme-shop-detail">${item.detail}</div>
       </div>
       <div class="meme-shop-buy">
-        <strong>${payment.currency==='LOCK'?'—':payment.price}</strong><em>${payment.currency}</em>
+        <strong>${payment.currency==='LOCK'?'—':payment.price}</strong><em>${payment.currency}${!item.dynamic && staticCharmGain(item,state,view)>0 ? ` · CHARM +${staticCharmGain(item,state,view)}` : ''}</em>
         <button type="button" data-shop-action="${item.id}" ${(soldOut||pending||!req.ok||!enough)?'disabled':''}>${button}</button>
       </div>
     </article>
@@ -4128,7 +4154,7 @@ async function handleShopAction(id){
     ? adminCopyText(item.title,item.category==='dailygoods'?'日常用品':'临时改造',40)
     : levelledShopTitle(item,state);
   const lifestyle=item.category==='dailygoods';
-  const baseCharmGain=lifestyle ? 0 : Number(item.dynamic ? item.charmGain : (CHARM_GAIN[item.id]||0));
+  const baseCharmGain=lifestyle ? 0 : Number(item.dynamic ? item.charmGain : staticCharmGain(item,state,view));
   const currentCharm=Math.max(0,Number(state.host?.charm)||0);
   const charmGain=payment.currency==='AP' && baseCharmGain>0
     ? Math.max(0,Math.min(baseCharmGain,AP_CHARM_CAP-currentCharm))
