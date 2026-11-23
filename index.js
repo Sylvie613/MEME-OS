@@ -3004,7 +3004,7 @@ Body/upgrades=${JSON.stringify(state.host?.body||{})}.
 TASK BOARD:
 Base DAILY today=${JSON.stringify(currentStaticTaskPool('daily',state).map(t=>({id:t.id,title:t.title,desc:t.desc,reward:t.reward})))}.
 Plot DAILY currently open=${JSON.stringify((state.tasks?.generatedDaily||[]).map(t=>({id:t.id,title:t.title,desc:t.desc,difficulty:t.difficulty,source:t.source,createdDay:t.createdDay,active:Boolean(state.tasks?.active?.[t.id])})))}.
-Active tasks=${JSON.stringify(Object.values(state.tasks?.active||{}))}.
+Active tasks=${JSON.stringify(Object.values(state.tasks?.active||{}).map(t=>({id:t.id,title:t.title,category:t.category,desc:t.desc||null,detail:t.detail||null,reward:t.reward||null,tier:t.tier||null,targetManId:t.targetManId||null,storyDay:t.storyDay})))}.
 Completed daily action tags today=${JSON.stringify([...completedDailyActionTags(state)])}.
 Dismissed plot tasks today=${JSON.stringify((state.tasks?.dismissed||[]).filter(t=>Number(t.storyDay||0)===Number(state.tasks?.storyDay||1)).map(t=>({title:t.title,actionTags:t.actionTags})))}.
 Plot-task budget today=${plotTaskFreq.count}/${plotTaskFreq.limit||2}; current turn=${plotTaskFreq.turn}; last issued turn=${plotTaskFreq.last}; canIssue=${plotTaskFreq.canIssue}.
@@ -3073,7 +3073,7 @@ Append at most ONE invisible comment at the very end ONLY when this reply change
 Exact container: <!--MEME_OS_EVENT {"taskOffers":[],"tasks":[],"storyRewards":[],"shop":[],"lifestyleShop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{}} -->
 Do NOT add retired compatibility fields. Scene chronology is owned by the dedicated extension path.
 taskOffers: max 1 new DESIRE; fields title,desc,detail,source,targetManId(optional). Never include id/tier/reward. If it introduces a new relevant man, include matching men entry and link targetManId.
-tasks: max 4 ACTIVE completions; fields id,status:"completed",evidence. Extension calculates rewards.
+tasks: max 4 ACTIVE completions; fields id,status:"completed",evidence. Only report completed when the visible/current story actually satisfies the accepted task requirement. evidence must name the exact act/result/constraint that was achieved; vague completion labels are invalid. For DESIRE, do not report completion until the required explicit sexual act and any measurable result such as ejaculation/orgasm/SV collection have actually occurred. Extension independently validates evidence and calculates rewards.
 storyRewards: max 1 substantial unexpected non-routine achievement; fields title,evidence,source,difficulty(light|normal|hard). If the visible reply uses the three-line retroactive reward card 【TASK｜title】/【判定：...】/【奖励：AP +N】, this hidden storyRewards entry is mandatory and must describe the same completed action.
 shop: max 2 temporary BODY/PLOT candidates; fields title,desc,detail,currency(AP|SV),ttl,icon,source,impact(minor|standard|major),bodyAxis(optional),sourceIssueId(optional). No price/charmGain.
 lifestyleShop: [] to keep shelf, or exactly 5 full items after unlock; fields title,desc,detail,icon,source,impact,kind,consumable. No price/currency/charmGain.
@@ -4666,9 +4666,10 @@ async function handleTaskAction(id){
   }
 
   const systemTitle=adminCopyText(task.title,'未命名任务',48);
-  const systemDesc=adminCopyText(task.desc,'按任务条件完成。',180);
+  const systemDesc=adminCopyText(task.desc,'按任务条件完成。',220);
+  const systemDetail=adminCopyText(task.detail,'',260);
   const dayTag=dailyLike?`DAY ${String(storyDay).padStart(3,'0')}｜`:'';
-  const text=`【MÉMÉ OS｜任务接取】${dayTag}TASK_ID:${task.id}｜「${systemTitle}」\n任务要求：${systemDesc}`;
+  const text=`【MÉMÉ OS｜任务接取】${dayTag}TASK_ID:${task.id}｜「${systemTitle}」\n任务要求：${systemDesc}${systemDetail?(`\n验收条件：${systemDetail}`):''}`;
 
   await queueAction(createPendingAction({
     type:'task_accept',
@@ -4676,7 +4677,18 @@ async function handleTaskAction(id){
     title:`接了就别装没看见：${systemTitle}`,
     summary:`「${systemTitle}」我给你挂上了。真做到条件，我会自己验收。`,
     text,
-    effect:{taskAccept:{id:task.id,title:systemTitle,category:task.category}},
+    effect:{taskAccept:{
+      id:task.id,
+      title:systemTitle,
+      category:task.category,
+      desc:systemDesc,
+      detail:systemDetail,
+      reward:String(task.reward||''),
+      tier:Number(task.tier)||null,
+      targetManId:task.targetManId||null,
+      dynamicTask:Boolean(task.dynamicTask),
+      dynamicDailyTask:Boolean(task.dynamicDailyTask),
+    }},
   }));
 }
 async function handleShopAction(id){
