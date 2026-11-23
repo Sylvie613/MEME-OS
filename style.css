@@ -675,65 +675,6 @@ html.meme-os-open body{
   font-size:14px;
 }
 
-.meme-adult-protocol{
-  padding:0;
-  overflow:hidden;
-}
-.meme-adult-protocol-summary{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  min-height:62px;
-  padding:12px 14px;
-  cursor:pointer;
-  list-style:none;
-  -webkit-tap-highlight-color:transparent;
-}
-.meme-adult-protocol-summary::-webkit-details-marker{display:none}
-.meme-adult-protocol-summary>span{
-  min-width:0;
-}
-.meme-adult-protocol-summary small{
-  display:block;
-  color:#a47c97;
-  font-size:7px;
-  font-weight:900;
-  letter-spacing:.22em;
-}
-.meme-adult-protocol-summary b{
-  display:block;
-  margin-top:4px;
-  color:#f7e7f0;
-  font-size:11px;
-  font-weight:700;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-.meme-adult-protocol-summary em{
-  flex:none;
-  color:#b786a1;
-  font-size:8px;
-  font-style:normal;
-}
-.meme-adult-protocol-summary i{
-  display:inline-block;
-  margin-left:4px;
-  font-style:normal;
-  transition:transform .18s ease;
-}
-.meme-adult-protocol[open] .meme-adult-protocol-summary i{
-  transform:rotate(180deg);
-}
-.meme-adult-protocol-body{
-  padding:0 14px 12px;
-  border-top:1px solid rgba(234,126,177,.08);
-}
-.meme-adult-protocol-body .meme-card-title{
-  padding-top:10px;
-}
-
 .meme-info-row{
   display:flex;
   align-items:center;
