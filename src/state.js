@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 32;
+const SCHEMA_VERSION = 33;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -98,7 +98,7 @@ const DEFAULT_STATE = Object.freeze({
         sourceTurns: 0,
         short: [],
         long: [],
-        core: [],
+        permanent: [],
         lastUpdatedTurn: 0,
     },
     reactivity: {
@@ -157,12 +157,14 @@ function defaultStoryDateForDay(day) {
 
 function charmToStage(charm) {
     const n = Number(charm) || 0;
-    if (n < 15) return { attitudeStage: 0, stage: '惨不忍睹阶段' };
-    if (n < 35) return { attitudeStage: 1, stage: '抢救修复阶段' };
-    if (n < 55) return { attitudeStage: 2, stage: '终于像样阶段' };
-    if (n < 70) return { attitudeStage: 3, stage: '明显好看阶段' };
+    if (n < 10) return { attitudeStage: 0, stage: '灾难抢救阶段' };
+    if (n < 30) return { attitudeStage: 1, stage: '抢救修复阶段' };
+    if (n < 55) return { attitudeStage: 2, stage: '普通顺眼阶段' };
+    if (n < 70) return { attitudeStage: 3, stage: '漂亮阶段' };
     if (n < 85) return { attitudeStage: 4, stage: '美女阶段' };
-    return { attitudeStage: 5, stage: '高魅力美女阶段' };
+    if (n < 93) return { attitudeStage: 5, stage: '高魅力美女阶段' };
+    if (n < 100) return { attitudeStage: 6, stage: '近完成体阶段' };
+    return { attitudeStage: 7, stage: '魅力完成体' };
 }
 
 function mergeState(raw) {
@@ -238,14 +240,15 @@ function mergeState(raw) {
             bootstrappedAt: raw.memory?.bootstrappedAt || null,
             sourceTurns: Math.max(0, Number(raw.memory?.sourceTurns) || 0),
             short: Array.isArray(raw.memory?.short)
-                ? raw.memory.short.map(v => String(v).replace(/\s+/g,' ').trim()).filter(Boolean).slice(-10)
+                ? raw.memory.short.map(v => String(v).replace(/\s+/g,' ').trim()).filter(Boolean).slice(-15)
                 : [],
             long: Array.isArray(raw.memory?.long)
-                ? raw.memory.long.map(v => String(v).replace(/\s+/g,' ').trim()).filter(Boolean).slice(-5)
+                ? raw.memory.long.map(v => String(v).replace(/\s+/g,' ').trim()).filter(Boolean).slice(-10)
                 : [],
-            core: Array.isArray(raw.memory?.core)
-                ? raw.memory.core.map(v => String(v).replace(/\s+/g,' ').trim()).filter(Boolean).slice(-5)
-                : [],
+            permanent: [
+                ...(Array.isArray(raw.memory?.permanent) ? raw.memory.permanent : []),
+                ...(Array.isArray(raw.memory?.core) ? raw.memory.core : []),
+            ].map(v => String(v).replace(/\s+/g,' ').trim()).filter((v,i,a)=>v && a.indexOf(v)===i),
             lastUpdatedTurn: Math.max(0, Number(raw.memory?.lastUpdatedTurn) || 0),
         },
         reactivity: {
