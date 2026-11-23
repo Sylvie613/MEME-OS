@@ -991,8 +991,8 @@ function settleTaskFromModel(state,rawTask,messageId){
     id:historyId,
     type:'task_complete',
     recordType:'task',
-    title:`${wasEverCompleted && repeatable?'重复结算':'完成'}：${title}`,
-    summary:`任务「${title}」验收通过；${rewardText}。证据：${evidence}`,
+    title:`${wasEverCompleted && repeatable?'又给你结了一次':'这次算你做完'}：${title}`,
+    summary:`我验过了。「${title}」算完成；${rewardText}。你干了什么我记着：${evidence}`,
     text:`TASK VERIFIED AND SETTLED: ${id}`,
     committedAt:Date.now(),
   });
@@ -1052,8 +1052,8 @@ function settleStoryRewardFromModel(state,rawReward,messageId){
     id:historyId,
     type:'story_task_complete',
     recordType:'task',
-    title:`剧情任务完成：${title}`,
-    summary:`剧情临时任务验收；AP +${reward.ap}。证据：${evidence}`,
+    title:`这次算你捡到了：${title}`,
+    summary:`我看过了，这个临时任务算你做成。AP +${reward.ap}。别装傻，依据是：${evidence}`,
     text:`STORY TASK VERIFIED AND SETTLED: ${id}`,
     committedAt:Date.now(),
   });
@@ -1414,8 +1414,8 @@ async function applyOsTaskCorrectionsFromUserMessage(text=''){
       id:`meme_user_task_correction_${Date.now()}_${removed.id}`,
       type:'user_task_correction',
       recordType:'task',
-      title:`宿主纠错：删除「${removed.title}」`,
-      summary:`宿主通过 OS 括号指令判定该剧情任务不应存在，已从 TASK 移除。`,
+      title:`行，给你删了：「${removed.title}」`,
+      summary:`你说这任务不该出现，我就从 TASK 里撤掉。当天别指望它换个名字又冒回来。`,
       text:`USER TASK CORRECTION REMOVE: ${removed.id}`,
       committedAt:Date.now(),
     });
@@ -1504,7 +1504,7 @@ async function reconcileRecentVisibleTaskOffers(){
     if(state.tasks.everCompleted?.[task.id] || state.tasks.active?.[task.id] || state.tasks.generatedDaily.some(old=>old.id===task.id)){
       state.history.push({
         id:historyId,type:'visible_task_reconcile_seen',recordType:'task',
-        title:`已存在：${task.title}`,summary:'可见剧情任务已在MÉMÉ OS中，无需重复补入。',
+        title:`我早记过了：${task.title}`,summary:'这张任务卡已经在 TASK 里，别重复塞第二份。',
         text:`VISIBLE TASK ALREADY PRESENT: ${task.id}`,committedAt:Date.now(),
       });
       changed=true;
@@ -1513,8 +1513,8 @@ async function reconcileRecentVisibleTaskOffers(){
     state.tasks.generatedDaily=[task,...state.tasks.generatedDaily].slice(0,8);
     state.history.push({
       id:historyId,type:'visible_task_reconcile',recordType:'task',
-      title:`补同步剧情任务：${task.title}`,
-      summary:'检测到旧回复中明确出现的新任务卡，但没有隐藏事件；已补入TASK。',
+      title:`漏的我给你补上了：${task.title}`,
+      summary:'正文里已经发过这张任务卡，TASK 当时没吃到。我现在把它补回去。',
       text:`VISIBLE TASK RECONCILED: ${task.id}`,committedAt:Date.now(),
     });
     changed=true;
@@ -1571,8 +1571,8 @@ async function reconcileRecentVisibleSettlements(){
       state.permission.milestones.taskSettlements=Math.max(0,Number(state.permission.milestones.taskSettlements)||0)+1;
       state.permission.milestones.completedTasks=Math.max(0,Number(state.permission.milestones.completedTasks)||0)+1;
       state.history.push({
-        id:historyId,type:'legacy_story_task_sync',recordType:'task',title:`同步旧剧情任务：${title}`,
-        summary:`识别旧版显式结算并同步；AP +${ap}。`,text:`LEGACY VISIBLE SETTLEMENT: ${originalId}`,committedAt:Date.now(),
+        id:historyId,type:'legacy_story_task_sync',recordType:'task',title:`旧账我也给你补了：${title}`,
+        summary:`旧回复里这笔明明结过，我给你补进 OS。AP +${ap}。`,text:`LEGACY VISIBLE SETTLEMENT: ${originalId}`,committedAt:Date.now(),
       });
       changed=true;
     }
@@ -1779,8 +1779,8 @@ async function handleRuntimeEvent(messageId){
           id:`meme_story_day_${state.tasks.storyDay}_${Date.now()}`,
           type:'story_day',
           recordType:'system',
-          title:`剧情进入 DAY ${String(state.tasks.storyDay).padStart(3,'0')}`,
-          summary:'新的剧情自然日开始：日常/特殊/欲望候选池重新洗牌；未接取的昨日剧情候选退场，已接取的非日常长期任务保留。',
+          title:`DAY ${String(state.tasks.storyDay).padStart(3,'0')} · 换批活给你`,
+          summary:'天换了，我把日常、特殊和欲望候选重新洗了一遍。昨天没接的退场，已经接下的长期活我没动。',
           text:'STORY DAY ADVANCED — TASK POOLS REFRESHED',
           committedAt:Date.now(),
         });
@@ -1817,7 +1817,7 @@ async function handleRuntimeEvent(messageId){
             type:'system_evolution',
             recordType:'system',
             title:`SYSTEM LV.${targetLevel} · ${meta.label}`,
-            summary:`形态进化完成：${meta.form}。触发依据：${reason}`,
+            summary:`我这边已经进到「${meta.form}」。别乱脑补，触发原因我记的是：${reason}`,
             text:`SYSTEM EVOLUTION: LV.${targetLevel}`,
             committedAt:now,
           });
@@ -1878,8 +1878,8 @@ async function handleRuntimeEvent(messageId){
           id:`meme_naming_confession_${Date.now()}`,
           type:'naming_confession',
           recordType:'system',
-          title:'命名权限开放',
-          summary:'SYSTEM 记录：命名权已由管理员主动移交宿主。',
+          title:'命名权给你了',
+          summary:'我主动把命名权交给你。不是系统抽奖，是我自己给的。',
           text:'NAMING RIGHT OFFERED BY ADMIN',
           committedAt:Date.now(),
         });
@@ -1897,8 +1897,8 @@ async function handleRuntimeEvent(messageId){
             id:`meme_admin_named_${Date.now()}`,
             type:'admin_named',
             recordType:'system',
-            title:'管理员命名完成',
-            summary:`SYSTEM 记录：管理员名称已登记为「${chosen}」。`,
+            title:`行，以后就叫「${chosen}」`,
+            summary:`名字我收了。以后 OS 和我的档案都按「${chosen}」记。`,
             text:`ADMIN NAME: ${chosen}`,
             committedAt:Date.now(),
           });
@@ -3370,8 +3370,8 @@ function renderRecordList(filter='all') {
   const dynamic=(state.history||[]).map(entry=>({
     type:entry.recordType==='purchase'?'change':entry.recordType || entry.type || 'system',
     code:String(entry.type||'EVENT').toUpperCase(),
-    title:entry.title || '系统操作',
-    desc:entry.summary || entry.text,
+    title:entry.title || '我记了一笔',
+    desc:entry.summary || entry.text || '发生过的事我没忘。',
   }));
   const all=[...RECORD_DATA,...dynamic];
   const list=filter==='all'?all:all.filter(item=>item.type===filter);
@@ -3490,8 +3490,8 @@ async function handleTaskAction(id){
   await queueAction(createPendingAction({
     type:'task_accept',
     recordType:'task',
-    title:`任务接取：${systemTitle}`,
-    summary:`任务已接取：${systemTitle}。状态：等待完成条件与系统验收。`,
+    title:`接了就别装没看见：${systemTitle}`,
+    summary:`「${systemTitle}」我给你挂上了。真做到条件，我会自己验收。`,
     text,
     effect:{taskAccept:{id:task.id,title:systemTitle,category:task.category}},
   }));
@@ -3507,7 +3507,7 @@ async function handleShopAction(id){
     return;
   }
   if(!req.ok){
-    globalThis.toastr?.warning?.(`商品未解锁：${req.reason}。`);
+    globalThis.toastr?.warning?.(`还没开。先把 ${req.reason} 做到，别急着惦记这件。`);
     return;
   }
   if(pendingFor('purchase',id,state)){
@@ -3518,7 +3518,7 @@ async function handleShopAction(id){
   const spendable=getSpendableResources(state);
   const balance=item.currency==='AP'?spendable.ap:spendable.sv;
   if(balance<view.price){
-    globalThis.toastr?.warning?.(`余额不足：缺少 ${view.price-balance} ${item.currency}。`);
+    globalThis.toastr?.warning?.(`差 ${view.price-balance} ${item.currency}。穷就先去做任务，别盯着买不起的东西流口水。`);
     return;
   }
 
@@ -3537,8 +3537,8 @@ async function handleShopAction(id){
   await queueAction(createPendingAction({
     type:'purchase',
     recordType:'change',
-    title:`购买完成：${systemTitle}`,
-    summary:`系统结算：「${systemTitle}」· ${levelText}；${item.currency} -${view.price}${charmGain?`；CHARM +${charmGain}`:''}。`,
+    title:`钱我扣了：${systemTitle}`,
+    summary:`「${systemTitle}」已经算到你身上。 ${item.currency} -${view.price}${charmGain?`；CHARM +${charmGain}`:''}。买都买了，别回头装后悔。`,
     text,
     effect:{
       apDelta,
