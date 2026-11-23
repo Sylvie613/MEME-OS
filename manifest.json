@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.10.25",
+  "version": "0.10.26",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS: AP rescue progression capped at CHARM 30 with SV-only refinement beyond the cap; adult protocol home block removed; low-engagement foul-mouthed administrator, rotating tasks, adaptive economy and correction controls.",
-  "js": "index.js?v=0.10.25",
-  "css": "style.css?v=0.10.25",
+  "description": "MÉMÉ OS: CHARM 30 two-currency economy with SV-only body refinement, persistent AP daily tasks, daily lifestyle AP shop refresh, inventory, low-engagement foul-mouthed administrator, rotating tasks and correction controls.",
+  "js": "index.js?v=0.10.26",
+  "css": "style.css?v=0.10.26",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
