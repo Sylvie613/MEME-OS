@@ -2681,8 +2681,10 @@ const CHARM_GAIN_CLASS = {
 };
 
 const CHARM_GAIN_LADDERS = {
-  polish:[0.4,0.8,1.3,1.9],
-  structural:[0.6,1.2,1.9,2.7],
+  // I = rescue, II = visible improvement, III = real refinement,
+  // IV = high-end polishing (normally already inside the SV era).
+  polish:[0.4,1.0,2.0,3.2],
+  structural:[0.8,1.6,3.0,4.5],
   none:[0,0,0,0],
 };
 
