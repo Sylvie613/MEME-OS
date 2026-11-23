@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.10';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.10';
-import { isBoundCharacter } from './src/binding.js?v=0.10.10';
+} from './src/state.js?v=0.10.11';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.11';
+import { isBoundCharacter } from './src/binding.js?v=0.10.11';
 
 /**
- * MÉMÉ OS v0.10.10
+ * MÉMÉ OS v0.10.11
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -886,6 +886,53 @@ function markRuntimeMessageProcessed(state,messageKey){
   ].slice(-4000);
 }
 
+const TURN_SNAPSHOT_KEYS=[
+  'resources','host','system','permission','shop','reactivity','upgrades','tasks','men','history',
+];
+
+function cloneTurnValue(value){
+  if(typeof structuredClone==='function') return structuredClone(value);
+  return JSON.parse(JSON.stringify(value));
+}
+
+function captureTurnBase(state){
+  const base={};
+  for(const key of TURN_SNAPSHOT_KEYS) base[key]=cloneTurnValue(state[key]);
+  return base;
+}
+
+function restoreTurnBase(state,base){
+  if(!base || typeof base!=='object') return false;
+  for(const key of TURN_SNAPSHOT_KEYS){
+    if(Object.prototype.hasOwnProperty.call(base,key)) state[key]=cloneTurnValue(base[key]);
+  }
+  return true;
+}
+
+function assistantVariantKey(message){
+  const swipeId=Number.isInteger(message?.swipe_id) ? message.swipe_id : -1;
+  const info=swipeId>=0 && Array.isArray(message?.swipe_info) ? message.swipe_info[swipeId] : null;
+  const stamp=messageDateKey(info)||messageDateKey(message);
+  const text=String(message?.mes||'');
+  return `variant_${swipeId}_${hashId(`${stamp}|${text}`).toString(36)}`;
+}
+
+function resolveAssistantMessageId(ref){
+  const context=globalThis.SillyTavern?.getContext?.()||{};
+  const chat=Array.isArray(context.chat)?context.chat:[];
+  if(Number.isInteger(ref) && chat[ref] && !chat[ref].is_user) return ref;
+  if(ref && typeof ref==='object'){
+    for(const key of ['message_id','messageId','id','mesId']){
+      const value=Number(ref[key]);
+      if(Number.isInteger(value) && chat[value] && !chat[value].is_user) return value;
+    }
+  }
+  for(let i=chat.length-1;i>=0;i--){
+    if(chat[i] && !chat[i].is_user) return i;
+  }
+  return null;
+}
+
 
 
 async function reconcileRecentVisibleSettlements(){
@@ -954,15 +1001,36 @@ async function handleRuntimeEvent(messageId){
 
   const state=runtimeState();
   const messageKey=assistantTurnKey(context,messageId,message);
-  if(runtimeMessageAlreadyProcessed(state,messageId,messageKey)){
-    if(migrateLegacyRuntimeMessageKey(state,messageId,messageKey)){
-      await saveState(state);
-    }
-    console.info(`[MÉMÉ OS] runtime event skipped: assistant turn ${messageKey} already processed`);
+  const variantKey=assistantVariantKey(message);
+  state.runtime=state.runtime||{processedAssistantMessages:[],lastTurnKey:null,lastTurnVariant:null,lastTurnBase:null};
+
+  // Chats created before swipe-safe snapshots existed may already have the
+  // current turn frozen in the legacy processed list. Do not replay those
+  // historical effects because there is no trustworthy pre-turn base to restore.
+  if(!state.runtime.lastTurnBase && runtimeMessageAlreadyProcessed(state,messageId,messageKey)){
+    if(migrateLegacyRuntimeMessageKey(state,messageId,messageKey)) await saveState(state);
+    console.info(`[MÉMÉ OS] legacy assistant turn ${messageKey} left frozen to avoid duplicate settlement`);
     return;
   }
 
+  if(state.runtime.lastTurnKey===messageKey && state.runtime.lastTurnBase){
+    if(state.runtime.lastTurnVariant===variantKey){
+      console.info(`[MÉMÉ OS] assistant variant ${variantKey} already applied`);
+      return;
+    }
+    // Same user turn, different swipe/regeneration: rewind every assistant-owned
+    // domain to the exact pre-turn snapshot, then replay only the visible variant.
+    restoreTurnBase(state,state.runtime.lastTurnBase);
+  }else{
+    if(state.runtime.lastTurnKey) markRuntimeMessageProcessed(state,state.runtime.lastTurnKey);
+    state.runtime.lastTurnKey=messageKey;
+    state.runtime.lastTurnVariant=null;
+    state.runtime.lastTurnBase=captureTurnBase(state);
+  }
+
   state.shop=state.shop||{dynamic:[],plotTurn:0};
+  // plotTurn advances from the pre-turn snapshot, so every swipe/regeneration
+  // of this same user message lands on exactly the same turn number.
   state.shop.plotTurn=(Number(state.shop.plotTurn)||0)+1;
   state.shop.dynamic=(state.shop.dynamic||[]).filter(item=>Number(item.expiresTurn||0)>=state.shop.plotTurn);
   state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
@@ -976,7 +1044,7 @@ async function handleRuntimeEvent(messageId){
   const raw=String(message.mes||'');
   const allMatches=[...raw.matchAll(/<!--MEME_OS_EVENT\s+([\s\S]*?)-->/g)];
   const matches=allMatches.length ? [allMatches[allMatches.length-1]] : [];
-  let changed=false;
+  let changed=true;
   const touchedMenIds=new Set();
 
   for(const match of matches){
@@ -1271,15 +1339,12 @@ async function handleRuntimeEvent(messageId){
     state.history=state.history.slice(-240);
   }
 
-  // Only lock a turn after a valid MÉMÉ OS event block was actually present.
-  // A truncated reply that ends before the hidden event must remain retryable:
-  // regenerating/swiping the same user turn can then still settle correctly.
-  // Once a valid event-bearing reply has been processed, the turn key prevents
-  // duplicate AP/SV/task settlement across refreshes or regenerated swipes.
-  if(matches.length){
-    markRuntimeMessageProcessed(state,messageKey);
-    changed=true;
-  }
+  // Remember exactly which visible swipe currently owns this turn's effects.
+  // Even a truncated/no-event variant is recorded: regenerating to a different
+  // variant will rewind to lastTurnBase and replay, while duplicate dispatch of
+  // the same visible variant becomes a no-op.
+  state.runtime.lastTurnKey=messageKey;
+  state.runtime.lastTurnVariant=variantKey;
 
   // Hidden eligibility is recalculated here too, without auto-unlocking.
   const milestones=state.permission?.milestones||{};
@@ -2851,10 +2916,14 @@ function bindSillyTavernEvents(){
   const events=context?.event_types || context?.eventTypes || {};
   if(!source?.on) return;
   if(events.MESSAGE_SENT) source.on(events.MESSAGE_SENT,handleMessageSent);
-  if(events.MESSAGE_RECEIVED) source.on(events.MESSAGE_RECEIVED,async(messageId)=>{
+  const handleAssistantVariant=async(ref)=>{
+    const messageId=resolveAssistantMessageId(ref);
+    if(!Number.isInteger(messageId)) return;
     await handleRuntimeEvent(messageId);
     installRuntimePrompt();
-  });
+  };
+  if(events.MESSAGE_RECEIVED) source.on(events.MESSAGE_RECEIVED,handleAssistantVariant);
+  if(events.MESSAGE_SWIPED) source.on(events.MESSAGE_SWIPED,handleAssistantVariant);
   if(events.CHAT_CHANGED) source.on(events.CHAT_CHANGED,async()=>{
     // getState() is chatId-scoped. Switching chats only re-renders the state
     // that belongs to that chat; it never clears or mutates another save.
