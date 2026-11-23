@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.13.1",
+  "version": "0.13.2",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS 0.13.1 memory repair: stored SHORT/LONG/PERMANENT now feed back into story prompts, quiet-memory JSON parsing is resilient, and the canonical 15/10 memory ladder is aligned across extension, card and preset.",
-  "js": "index-v0.13.1.js",
-  "css": "style.css?v=0.13.1",
+  "description": "MÉMÉ OS 0.13.2 removes the automatic MEMORY subsystem and its extra model calls. Narrative continuity now relies on real chat context plus extension-owned structured state for resources, tasks, MEN, DAY, upgrades, permissions and system progression.",
+  "js": "index-v0.13.2.js",
+  "css": "style.css?v=0.13.2",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
