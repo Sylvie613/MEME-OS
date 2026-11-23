@@ -1961,7 +1961,7 @@ function markRuntimeMessageProcessed(state,messageKey){
 }
 
 const TURN_SNAPSHOT_KEYS=[
-  'resources','host','system','permission','shop','inventory','memory','reactivity','upgrades','tasks','men','history',
+  'resources','host','system','permission','shop','inventory','memory','reactivity','encounters','upgrades','tasks','men','history',
 ];
 
 function cloneTurnValue(value){
@@ -2413,6 +2413,10 @@ async function handleRuntimeEvent(messageId){
     state.runtime.lastTurnBase=captureTurnBase(state);
   }
 
+  // This is the exact wheel result that governed the visible assistant reply.
+  // Compute it from the restored pre-turn state so swipes keep the same result.
+  const encounterForTurn=npcEncounterWheel(context,state);
+
   state.shop=state.shop||{dynamic:[],plotTurn:0};
   // plotTurn advances from the pre-turn snapshot, so every swipe/regeneration
   // of this same user message lands on exactly the same turn number.
@@ -2428,6 +2432,17 @@ async function handleRuntimeEvent(messageId){
   });
 
   const raw=String(message.mes||'');
+
+  let encounterCooldownChanged=false;
+  if(encounterForTurn.hit){
+    state.encounters=state.encounters||{};
+    state.encounters.randomMale=state.encounters.randomMale||{};
+    state.encounters.randomMale.lastHitTurn=Number(state.shop?.plotTurn)||0;
+    state.encounters.randomMale.lastHitDay=Math.max(1,Number(state.tasks?.storyDay)||1);
+    state.encounters.randomMale.lastSeed=encounterForTurn.seed||null;
+    state.encounters.randomMale.lastScene=encounterForTurn.scene?.id||null;
+    encounterCooldownChanged=true;
+  }
 
   const visibleCompletionChanged=settleVisibleTaskCompletionsFromMessage(state,raw,messageId);
 
@@ -2753,7 +2768,7 @@ async function handleRuntimeEvent(messageId){
     state.permission.systemEligible &&
     Number(state.permission?.adminInterestSignals||0)>=2;
 
-  if(changed || visibleCompletionChanged || matches.length || state.shop.dynamic.length){
+  if(changed || visibleCompletionChanged || encounterCooldownChanged || matches.length || state.shop.dynamic.length){
     await saveState(state);
     renderView(currentView(),false);
   }
@@ -2871,14 +2886,21 @@ function currentMaleSceneFocus(context,state=runtimeState()){
 
   const activeNames=currentMen.map(person=>String(person?.name||'').trim()).filter(Boolean);
   const namedPresent=activeNames.some(name=>recent.includes(name));
+  const userNamesCurrent=activeNames.some(name=>userText.includes(name));
+  const explicitContinuation=userNamesCurrent || /(和他|跟他|我们俩|我们一起|他陪我|他跟我|他送我|我跟他|我和他)/u.test(userText);
+  const soloCue=/(我一个人|我独自|独自一人|自己一个人|只剩我|我自己去|我自己回)/u.test(userText);
+  const timeCutCue=/(第二天|次日|翌日|隔天|第二天早上|第二天晚上|几小时后|一觉醒来|睡醒后)/u.test(userText) && !explicitContinuation;
+  const locationCutCue=/(我(?:去|到了|来到|回到).{0,10}(?:公司|学校|教室|图书馆|商场|超市|便利店|医院|健身房|公园|街上|办公室|宿舍|家里))/u.test(userText) && !explicitContinuation;
+  const sceneCutCue=soloCue || timeCutCue || locationCutCue;
+
   const heartbeat=currentMen.some(person=>{
     const last=Number(person?.lastSeenTurn);
     return Number.isFinite(last) && last>=currentTurn;
   });
 
   const activeCurrent=currentMen.length>0;
-  const hardLock=!exitCue && activeCurrent && intimacy;
-  const softLock=!exitCue && activeCurrent && (heartbeat || namedPresent || datingFocus || pronounInteraction);
+  const hardLock=!exitCue && !sceneCutCue && activeCurrent && intimacy;
+  const softLock=!exitCue && !sceneCutCue && activeCurrent && (heartbeat || namedPresent || datingFocus || pronounInteraction);
   const locked=!explicitNew && (hardLock || softLock);
 
   return {
@@ -2886,6 +2908,7 @@ function currentMaleSceneFocus(context,state=runtimeState()){
     hardLock,
     explicitNew,
     exitCue,
+    sceneCutCue,
     intimacy,
     datingFocus,
     pronounInteraction,
@@ -2899,7 +2922,9 @@ function currentMaleSceneFocus(context,state=runtimeState()){
         ? '宿主主动要求引入新男性/新社交对象'
         : exitCue
           ? '宿主明确结束当前男性场景'
-          : '无可靠当前男性焦点',
+          : sceneCutCue
+            ? '宿主明确切到新的单独/时间跳转场景'
+            : '无可靠当前男性焦点',
   };
 }
 
@@ -2912,7 +2937,11 @@ function npcEncounterWheel(context,state=runtimeState()){
   const day=Math.max(1,Number(state.tasks?.storyDay)||1);
   const nextTurn=Math.max(1,(Number(state.shop?.plotTurn)||0)+1);
   const roll=(hashId('npc-wheel-v3|'+day+'|'+user.seed)%10000)/100;
-  const lastNewTurn=latestNewManTurn(state);
+  const recordedHitTurn=Number(state.encounters?.randomMale?.lastHitTurn);
+  const lastNewTurn=Math.max(
+    Number.isFinite(recordedHitTurn) ? recordedHitTurn : -999,
+    latestNewManTurn(state)
+  );
   const blockedByCooldown=lastNewTurn>-999 && nextTurn-lastNewTurn<=2;
   const cooldownRemaining=blockedByCooldown ? Math.max(0,3-(nextTurn-lastNewTurn)) : 0;
   const focus=currentMaleSceneFocus(context,state);
