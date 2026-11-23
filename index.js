@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.38';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.38';
-import { isBoundCharacter } from './src/binding.js?v=0.10.38';
+} from './src/state.js?v=0.10.39';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.39';
+import { isBoundCharacter } from './src/binding.js?v=0.10.39';
 
 /**
- * MÉMÉ OS v0.10.38
+ * MÉMÉ OS v0.10.39
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -667,8 +667,11 @@ function taskFromCanonicalMarker(card,state=runtimeState()){
   if(task){
     task.canonicalMarker=true;
     task.source='剧情[TASK]标记';
-    task.shownReward=Number(card.shownReward)||0;
-    task.rewardVerified=Number(taskReward(task,state).ap)===Number(card.shownReward);
+    task.shownReward=Math.max(0,Number(card.shownReward)||0);
+    // The visible canonical card is already a published world fact.
+    // Keep OS reward identical to prose instead of silently recalculating it.
+    task.reward=`AP +${task.shownReward}`;
+    task.rewardVerified=true;
   }
   return task;
 }
@@ -2091,24 +2094,34 @@ async function handleRuntimeEvent(messageId){
   }
 
   const canonicalCards=extractCanonicalTaskMarkers(raw);
-  const candidateCanonicalTask=canonicalCards.length ? taskFromCanonicalMarker(canonicalCards[canonicalCards.length-1],state) : null;
-  const plotFreq=plotTaskFrequency(state);
-  const canonicalTask=candidateCanonicalTask && plotFreq.canIssue ? candidateCanonicalTask : null;
-  if(canonicalTask){
+  const canonicalTasks=canonicalCards
+    .map(card=>taskFromCanonicalMarker(card,state))
+    .filter(Boolean);
+
+  if(canonicalTasks.length){
     purgeKnownLegacyWrongGeneratedTasks(state);
-    removeFallbackTasksCompetingWithFormalCard(state,canonicalTask);
-    state.tasks.generatedDaily=[
-      canonicalTask,
-      ...state.tasks.generatedDaily.filter(old=>old.id!==canonicalTask.id),
-    ].slice(0,8);
+    for(const canonicalTask of canonicalTasks){
+      removeFallbackTasksCompetingWithFormalCard(state,canonicalTask);
+      state.tasks.generatedDaily=[
+        canonicalTask,
+        ...state.tasks.generatedDaily.filter(old=>old.id!==canonicalTask.id),
+      ].slice(0,8);
+    }
     state.tasks.lastGeneratedDailyTurn=Number(state.shop?.plotTurn)||0;
-    markPlotTaskIssued(state);
+    // Visible [TASK] cards are authoritative. Frequency limits control what the
+    // model SHOULD publish, not whether OS is allowed to acknowledge published cards.
+    state.tasks.plotTaskIssuedDay=Math.max(1,Number(state.tasks?.storyDay)||1);
+    state.tasks.plotTaskIssuedCount=Math.max(
+      Number(state.tasks.plotTaskIssuedCount)||0,
+      canonicalTasks.length
+    );
+    state.tasks.lastPlotTaskTurn=Number(state.shop?.plotTurn)||0;
   }
 
   const allMatches=[...raw.matchAll(/<!--MEME_OS_EVENT\s+([\s\S]*?)-->/g)];
   const matches=allMatches.length ? [allMatches[allMatches.length-1]] : [];
   let changed=true;
-  let structuredDailyOfferSeen=Boolean(canonicalTask);
+  let structuredDailyOfferSeen=canonicalTasks.length>0;
   const touchedMenIds=new Set();
 
   for(const match of matches){
@@ -2117,7 +2130,7 @@ async function handleRuntimeEvent(messageId){
 
       state.reactivity=state.reactivity||{recentChanges:[],recentIssues:[],recentReactions:[]};
 
-      if(Array.isArray(event.dailyTaskOffers) && !canonicalTask){
+      if(Array.isArray(event.dailyTaskOffers) && canonicalTasks.length===0){
         if(event.dailyTaskOffers.length) structuredDailyOfferSeen=true;
         state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
         state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
@@ -2226,13 +2239,22 @@ async function handleRuntimeEvent(messageId){
       if(applyStoryStatusEvent(state,event.status)) changed=true;
       if(applyMemoryEvent(state,event.memory,visibleChatTurns)) changed=true;
 
-      if(event.timeline?.dayAdvance===true){
+      {
         const currentDay=Math.max(1,Number(state.tasks?.storyDay)||1);
-        // If the visible reply already declared [DAY NNN], do not increment again.
-        const targetDay=visibleStoryDay && visibleStoryDay>=currentDay
-          ? visibleStoryDay
-          : currentDay+1;
-        if(syncStoryDayTo(state,targetDay,{source:'timeline',explicitDate:Boolean(event.status?.date)})) changed=true;
+        const hiddenStoryDay=Math.max(0,Number(event.timeline?.storyDay)||0);
+        let targetDay=currentDay;
+        if(hiddenStoryDay>currentDay){
+          targetDay=hiddenStoryDay;
+        }else if(visibleStoryDay && visibleStoryDay>currentDay){
+          targetDay=visibleStoryDay;
+        }else if(event.timeline?.dayAdvance===true){
+          targetDay=currentDay+1;
+        }
+        if(targetDay>currentDay && syncStoryDayTo(
+          state,
+          targetDay,
+          {source:hiddenStoryDay>currentDay?'timeline-absolute':visibleStoryDay>currentDay?'visible':'timeline',explicitDate:Boolean(event.status?.date)}
+        )) changed=true;
       }
 
       if(event.evolution?.targetLevel){
@@ -2600,7 +2622,8 @@ A completed task should disappear/cross out as soon as this reply is processed; 
 For sample, oral and drain: after their first-ever completion they become repeatable collection tasks, at most once per in-world story day. The extension automatically switches later payouts to SV-only repeat rewards. Never invent extra AP for repeated completions.
 
 STORY DAY:
-Current in-world story day=${Number(state.tasks?.storyDay)||1}. A natural-day advance reshuffles the visible fixed DAILY / DESIRE / SPECIAL candidate pools and removes unaccepted plot-generated candidates from the previous day. Accepted non-daily long-form desire/special contracts may persist; daily contracts expire at the day boundary. Repeatable collection milestones can pay again on a later story day. Set timeline.dayAdvance=true only when the visible narrative clearly crosses into a new in-world day (overnight sleep, explicit next morning/day, or explicit date jump), never merely because several turns passed.
+Current OS in-world story day=${Number(state.tasks?.storyDay)||1}. You must track the ACTUAL narrative day from the visible conversation even when the prose does NOT print "DAY 003" or any day label. A natural-day advance includes overnight sleep, waking the next morning, an explicit next/another day, or a date jump. Whenever the actual narrative day differs from the OS day, the hidden MÉMÉ_OS_EVENT is MANDATORY and timeline.storyDay MUST contain the absolute actual story-day number. Set timeline.dayAdvance=true when the narrative has advanced beyond the current OS day. If the narrative is still on the same day, timeline.storyDay may equal the current OS day. Never require a visible [DAY NNN] heading for synchronization and never advance merely because several turns passed.
+A natural-day advance reshuffles the visible fixed DAILY / DESIRE / SPECIAL candidate pools and removes unaccepted plot-generated candidates from the previous day. Accepted non-daily long-form desire/special contracts may persist; daily contracts expire at the day boundary. Repeatable collection milestones can pay again on a later story day.
 
 Current SHOP phase=${currentShopPhase(state).label} (${currentShopPhase(state).code}); appearance/presentation shop progress levels=${shopProgressLevels(state)}. Adult-response upgrades do not advance beauty-shelf phases.
 TWO-STAGE BODY ECONOMY — HARD RULE:
@@ -2660,8 +2683,9 @@ Do not emit a new relationship signal merely because a previous feeling continue
 Current CHARM=${state.host.charm}; desire allowed by appearance=${desireAllowed}; adminLove=${loveState}.
 
 Append ONE invisible HTML comment at the very end of the assistant reply when the current story creates a relevant MÉMÉ OS state update — tasks, shop, status, memory, feedback, MEN, evolution, permission, identity, or timeline. IMPORTANT: when memoryNeedsBootstrap=true, the comment is MANDATORY even if no other state changed, because the one-time history backfill itself is the required state update.
-Format exactly: <!--MEME_OS_EVENT {"dailyTaskOffers":[],"taskOffers":[],"tasks":[],"storyRewards":[],"shop":[],"lifestyleShop":[],"status":{},"memory":{"bootstrap":false,"short":"","longSummary":"","permanentSummary":""},"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{},"timeline":{}} -->
+Format exactly: <!--MEME_OS_EVENT {"dailyTaskOffers":[],"taskOffers":[],"tasks":[],"storyRewards":[],"shop":[],"lifestyleShop":[],"status":{},"memory":{"bootstrap":false,"short":"","longSummary":"","permanentSummary":""},"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{},"timeline":{"storyDay":null,"dayAdvance":false}} -->
 After memory has already been bootstrapped, do not emit the comment when nothing relevant changed.
+timeline: storyDay is the absolute in-world day represented by the visible narrative, not a turn counter. If the reply crosses into a later natural day, timeline is mandatory even if there are no other state changes. dayAdvance=true only when storyDay is greater than the current OS story day.
 dailyTaskOffers: deprecated compatibility field; normally leave [] for new daily/story tasks because visible [TASK｜任务名｜任务要求] is the canonical source.
 taskOffers: maximum 1 new generated erotic mission; fields title,desc,detail,source. title/desc/detail/source are written in the administrator's current OS voice and may be personal, rude, obscene or judgmental when appropriate. Never include tier, id or rewards.
 tasks: max 4 completed ACTIVE task entries; fields id,status("completed"),evidence. Never include rewards; the extension calculates them.
