@@ -6,7 +6,6 @@ on:
     branches: [main]
     paths:
       - "cards/meme_os_card_v0.4.0-alpha.json"
-      - "cards/meme_os_card_v0.4.0-alpha.png"
       - "scripts/build_card_png.py"
       - "index.js"
       - "src/state.js"
