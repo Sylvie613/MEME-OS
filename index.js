@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.33';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.33';
-import { isBoundCharacter } from './src/binding.js?v=0.10.33';
+} from './src/state.js?v=0.10.34';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.34';
+import { isBoundCharacter } from './src/binding.js?v=0.10.34';
 
 /**
- * MÉMÉ OS v0.10.33
+ * MÉMÉ OS v0.10.34
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -2697,6 +2697,44 @@ function staticCharmGain(item,state=runtimeState(),view=null){
   return Number(ladder[level-1]||0);
 }
 
+function cumulativeCharmForStaticUpgrade(id,level){
+  const cls=CHARM_GAIN_CLASS[id]||'none';
+  const ladder=CHARM_GAIN_LADDERS[cls]||CHARM_GAIN_LADDERS.none;
+  const count=Math.max(0,Math.min(4,Number(level)||0));
+  return ladder.slice(0,count).reduce((sum,value)=>sum+Number(value||0),0);
+}
+
+function migrateLegacyCharmLadder(state=runtimeState()){
+  state.runtime=state.runtime||{};
+  if(state.runtime.charmLadderMigratedV1) return false;
+  state.runtime.charmLadderMigratedV1=true;
+
+  const current=Math.max(0,Number(state.host?.charm)||0);
+  // Advanced saves may already contain SV-era progression from several old
+  // versions; do not rewrite them retroactively.
+  if(current<=0 || current>=AP_CHARM_CAP) return true;
+
+  let oldStatic=0;
+  let newStatic=0;
+  for(const upgrade of Object.values(state.upgrades||{})){
+    const id=String(upgrade?.id||'');
+    const cls=CHARM_GAIN_CLASS[id]||'none';
+    if(cls==='none') continue;
+    const level=Math.max(0,Math.min(4,Number(upgrade?.level)||0));
+    const oldPerLevel=cls==='structural'?2.1:1.3;
+    oldStatic+=oldPerLevel*level;
+    newStatic+=cumulativeCharmForStaticUpgrade(id,level);
+  }
+
+  // Anything not explained by old static-shop math is preserved as plot/dynamic
+  // contribution, so old temporary story upgrades are not erased.
+  const residual=Math.max(0,current-oldStatic);
+  const migrated=Math.min(AP_CHARM_CAP,Math.round((residual+newStatic)*10)/10);
+  state.host.charm=migrated;
+  state.host.progress=migrated;
+  return true;
+}
+
 const SHOP_MAX_LEVEL = {
   lip1:3, hair1:4, skin1:4, face1:3, eye1:3, face2:3,
   posture1:3, bodyfat1:4, waist1:4, leg1:3, neck1:3, bust1:4,
@@ -4391,7 +4429,13 @@ function start() {
   ensureDialog();
   {
     const state=runtimeState();
-    if(purgeKnownLegacyWrongGeneratedTasks(state)) saveState(state).catch(error=>console.warn('[MÉMÉ OS] legacy task purge failed',error));
+    const purged=purgeKnownLegacyWrongGeneratedTasks(state);
+    const migrated=migrateLegacyCharmLadder(state);
+    if(purged || migrated){
+      saveState(state)
+        .then(()=>renderView('home',false))
+        .catch(error=>console.warn('[MÉMÉ OS] startup migration failed',error));
+    }
   }
   reconcileRecentVisibleSettlements().catch(error=>console.warn('[MÉMÉ OS] legacy settlement sync failed',error));
   reconcileRecentVisibleTaskOffers().catch(error=>console.warn('[MÉMÉ OS] visible task sync failed',error));
