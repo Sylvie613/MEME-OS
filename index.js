@@ -2045,7 +2045,7 @@ function purgeKnownLegacyWrongGeneratedTasks(state=runtimeState()){
       changed=true;
       return false;
     }
-    // All pre-canonical dialogue/fallback guesses are retired once 0.10.16 loads.
+    // All legacy pre-canonical dialogue/fallback guesses are retired.
     const source=String(task.source||'');
     if(/可见剧情任务卡兜底|当前可见剧情直接触发/.test(source)){
       if(state.tasks?.active?.[task.id]) delete state.tasks.active[task.id];
