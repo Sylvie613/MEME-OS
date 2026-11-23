@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.11.2';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.11.2';
-import { isBoundCharacter } from './src/binding.js?v=0.11.2';
+} from './src/state.js?v=0.11.3';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.11.3';
+import { isBoundCharacter } from './src/binding.js?v=0.11.3';
 
 /**
- * MÉMÉ OS v0.11.2
+ * MÉMÉ OS v0.11.3
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -4375,7 +4375,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
-        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.11.2</small>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.11.3</small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
