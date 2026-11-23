@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.24';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.24';
-import { isBoundCharacter } from './src/binding.js?v=0.10.24';
+} from './src/state.js?v=0.10.25';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.25';
+import { isBoundCharacter } from './src/binding.js?v=0.10.25';
 
 /**
- * MÉMÉ OS v0.10.24
+ * MÉMÉ OS v0.10.25
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -696,7 +696,10 @@ function distinctEroticTaskCount(state=runtimeState()){
 
 function sanitizeDynamicItem(raw,state=runtimeState()){
   if(!raw || typeof raw!=='object') return null;
-  const currency=raw.currency==='SV'?'SV':'AP';
+  const bodyAxis=BODY_AXES.has(String(raw.bodyAxis||'')) ? String(raw.bodyAxis) : null;
+  const requestedCurrency=raw.currency==='SV'?'SV':'AP';
+  const appearanceAxis=PLOT_CHARM_AXES.has(bodyAxis) || PLOT_POLISH_AXES.has(bodyAxis);
+  const currency=(Number(state.host?.charm)||0)>=AP_CHARM_CAP && appearanceAxis ? 'SV' : requestedCurrency;
   const impact=['minor','standard','major'].includes(String(raw.impact||'').toLowerCase())
     ? String(raw.impact).toLowerCase()
     : 'standard';
@@ -707,7 +710,6 @@ function sanitizeDynamicItem(raw,state=runtimeState()){
   const title=adminCopyText(raw.title,'临时改造',40);
   const desc=adminCopyText(raw.desc,'系统临时上架。',140);
   const detail=adminCopyText(raw.detail,'根据当前剧情临时出现，过期后自动撤架。',180);
-  const bodyAxis=BODY_AXES.has(String(raw.bodyAxis||'')) ? String(raw.bodyAxis) : null;
   const fingerprint=`${title.toLowerCase()}|${desc.toLowerCase()}|${bodyAxis||'none'}|${currency}|${String(raw.source||'')}`;
   const id=`plot_${hashId(fingerprint).toString(36)}`;
   const charmGain=PLOT_CHARM_AXES.has(bodyAxis) ? 0.5 : PLOT_POLISH_AXES.has(bodyAxis) ? 0.25 : 0;
@@ -2123,6 +2125,10 @@ STORY DAY:
 Current in-world story day=${Number(state.tasks?.storyDay)||1}. A natural-day advance reshuffles the visible fixed DAILY / DESIRE / SPECIAL candidate pools and removes unaccepted plot-generated candidates from the previous day. Accepted non-daily long-form desire/special contracts may persist; daily contracts expire at the day boundary. Repeatable collection milestones can pay again on a later story day. Set timeline.dayAdvance=true only when the visible narrative clearly crosses into a new in-world day (overnight sleep, explicit next morning/day, or explicit date jump), never merely because several turns passed.
 
 Current SHOP phase=${currentShopPhase(state).label} (${currentShopPhase(state).code}); appearance/presentation shop progress levels=${shopProgressLevels(state)}. Adult-response upgrades do not advance beauty-shelf phases.
+TWO-STAGE BODY ECONOMY — HARD RULE:
+AP is the rescue currency. Daily/mundane tasks may generate AP, and AP-funded appearance/body/sensory upgrades can improve the host only up to CHARM ${AP_CHARM_CAP}. They represent hygiene, presentation, posture, basic repair and enough structural rescue to stop looking alarmingly unattractive.
+At CHARM ${AP_CHARM_CAP}, AP can no longer finance further outward appearance/body improvement. Existing AP appearance/body items automatically switch their next refinement purchase to SV. From that point onward, becoming genuinely prettier, more sexually striking or more refined requires SV gathered through the adult/sexual gameplay loop.
+Never describe ordinary chores, walking, hygiene or AP farming as sufficient to carry the host beyond CHARM ${AP_CHARM_CAP}. AP may still exist for non-beauty utility/plot uses, but it cannot bypass the SV gate for body/appearance progression.
 Dynamic plot goods must respect the current SHOP phase. They may solve a concrete problem exposed by the just-written plot, but each purchase is only one incremental body-axis step and may not claim a sudden makeover, perfect body, instant beauty, or any effect far beyond the host's current progression.
 
 PLOT → SHOP → BODY → REACTION LOOP:
@@ -2180,7 +2186,7 @@ dailyTaskOffers: deprecated compatibility field; normally leave [] for new daily
 taskOffers: maximum 1 new generated erotic mission; fields title,desc,detail,source. title/desc/detail/source are written in the administrator's current OS voice and may be personal, rude, obscene or judgmental when appropriate. Never include tier, id or rewards.
 tasks: max 4 completed ACTIVE task entries; fields id,status("completed"),evidence. Never include rewards; the extension calculates them.
 storyRewards: max 2 one-off plot tasks that visibly became complete without prior acceptance; fields title,evidence,source,difficulty(light|normal|hard). Never include AP/SV numbers.
-shop: maximum 2 temporary items. Each item fields: title,desc,detail,currency("AP"|"SV"),ttl(1-8),icon,source,impact("minor"|"standard"|"major"),bodyAxis(optional),sourceIssueId(optional). title/desc/detail/source are administrator-authored OS copy: they may use his first-person voice, insults, dirty jokes and current-stage attitude when natural. A temporary item must be a direct answer to something that just happened in the visible plot: a newly exposed problem, a consequence, a desire, a task outcome or a scene-specific opportunity. source must name that trigger. impact describes how substantial the item's actual effect is, not how expensive you want it to be. Never include id, price or charmGain; MÉMÉ OS derives price from current shelf phase, effect impact and current spendable balance. bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
+shop: maximum 2 temporary items. Each item fields: title,desc,detail,currency("AP"|"SV"),ttl(1-8),icon,source,impact("minor"|"standard"|"major"),bodyAxis(optional),sourceIssueId(optional). At CHARM ${AP_CHARM_CAP} or above, any temporary item that improves an outward body/appearance axis is forcibly repriced by the extension in SV even if you request AP. title/desc/detail/source are administrator-authored OS copy: they may use his first-person voice, insults, dirty jokes and current-stage attitude when natural. A temporary item must be a direct answer to something that just happened in the visible plot: a newly exposed problem, a consequence, a desire, a task outcome or a scene-specific opportunity. source must name that trigger. impact describes how substantial the item's actual effect is, not how expensive you want it to be. Never include id, price or charmGain; MÉMÉ OS derives price from current shelf phase, effect impact and current spendable balance. bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
 feedback.issues: max 2, only direct story evidence; fields id,axis(optional),source,note,severity(low|medium|high). source/note are his OS notes: short and specific, with his personal wording allowed.
 feedback.reactions: max 2, only directly observed reactions to established state/change; fields id,axis(optional),source,note,valence(negative|neutral|positive|sexual). source/note are SYSTEM log copy.
 men: max 3 qualifying adult men updates; fields id(optional for new),name,meta,summary,relation,desire,lastContact,note,badges,present,contactDelta,qualifies. MEN is the administrator's own archive: factual identity fields may stay concise, but summary/relation/desire/lastContact/note/badges should sound like he personally wrote them, including crude, mocking or sexual wording when the established facts support it.
@@ -2291,6 +2297,37 @@ const BODY_EFFECTS = {
   recovery1:{recovery:1},
   charmseal:{specialMark:1},
 };
+
+const AP_CHARM_CAP = 30;
+
+function itemImprovesAppearance(item){
+  if(!item) return false;
+  if(item.dynamic){
+    return PLOT_CHARM_AXES.has(String(item.bodyAxis||'')) || PLOT_POLISH_AXES.has(String(item.bodyAxis||''));
+  }
+  return Number(CHARM_GAIN[item.id]||0)>0;
+}
+
+function svRefinementPriceFromAp(apPrice){
+  const raw=Math.max(0,Number(apPrice)||0);
+  return Math.max(25,roundEconomy(raw/7,5));
+}
+
+function shopPaymentMeta(item,state=runtimeState(),view=null){
+  const resolved=view||staticShopView(item,state);
+  if(item.currency==='LOCK') return {currency:'LOCK',price:0,switched:false};
+  const charm=Math.max(0,Number(state.host?.charm)||0);
+  const switchToSv=item.currency==='AP' && itemImprovesAppearance(item) && charm>=AP_CHARM_CAP;
+  if(switchToSv){
+    return {
+      currency:'SV',
+      price:svRefinementPriceFromAp(resolved.price),
+      switched:true,
+      reason:`CHARM ${AP_CHARM_CAP} 后的外貌精修只收 SV`,
+    };
+  }
+  return {currency:item.currency,price:resolved.price,switched:false,reason:''};
+}
 
 const BODY_AXES = new Set([
   'lips','face','eyes','skin','hair','posture','bodyShape','waistHip','legs',
@@ -2521,7 +2558,8 @@ function shopRequirement(item,state=runtimeState()){
   }
   const needTask=REQUIRE_TASK[item.id];
   if(view.nextLevel===1 && needTask && !state.tasks?.completed?.[needTask]) return {ok:false,reason:'前置欲望任务未完成'};
-  return {ok:true,reason:''};
+  const payment=shopPaymentMeta(item,state,view);
+  return {ok:true,reason:payment.switched?payment.reason:''};
 }
 
 function pendingTrayMarkup(state=runtimeState()){
@@ -2810,39 +2848,6 @@ function statsMarkup(compact = false) {
   `;
 }
 
-function adultProtocolPreviewMarkup(state=runtimeState()){
-  const charm=Math.max(0,Number(state.host?.charm)||0);
-  const rows=[
-    {need:8, code:'CHARM 8', title:'先让个男人看着你硬起来', sub:'明确性唤起才算，嘴上夸你好看不算。'},
-    {need:12, code:'CHARM 12', title:'第一次精液别空手回来', sub:'射出来、收得到，才算第一次可结算采集。'},
-    {need:15, code:'CHARM 15', title:'这张嘴终于有别的用途', sub:'口交完成并拿到射精结算，才算正式过关。'},
-  ];
-  const next=rows.find(row=>charm<row.need);
-  const nextText=next ? `${next.code} · ${next.title}` : '欲望协议已开放';
-  return `
-    <details class="meme-page-card meme-adult-protocol">
-      <summary class="meme-adult-protocol-summary">
-        <span>
-          <small>ADULT PROTOCOL · ${charm<8?'LOCKED':'ACTIVE'}</small>
-          <b>${nextText}</b>
-        </span>
-        <em>点开看 <i>⌄</i></em>
-      </summary>
-      <div class="meme-adult-protocol-body">
-        <div class="meme-card-title">
-          <h3>${charm<8?'别急着骚。正菜你现在还没资格吃。':'欲望协议已经开始开锁。'}</h3>
-        </div>
-        ${rows.map(row=>labelValue(
-          row.code,
-          row.title,
-          charm>=row.need ? `OPEN · ${row.sub}` : `LOCKED · ${row.sub}`
-        )).join('')}
-        ${labelValue('SV','精液值','以后拿别人的精液，换你自己的成人反应改造。')}
-      </div>
-    </details>
-  `;
-}
-
 function homeMarkup() {
   const state=runtimeState();
   const voice=attitude(state);
@@ -2871,8 +2876,6 @@ function homeMarkup() {
       <article><small>CURRENT TASK</small><b>${activeCount ? `已挂上 ${activeCount} 项` : '一项都没接'}</b><em>${activeCount ? '做完再回来邀功' : '去 TASK，别装忙'}</em></article>
       <article><small>NEXT UNLOCK</small><b>${nextUnlock}</b><em>我说开才开</em></article>
     </section>
-
-    ${adultProtocolPreviewMarkup(state)}
 
     <section class="meme-whisper-card">
       <span>♛</span>
@@ -3101,7 +3104,8 @@ function shopItem(item,category) {
   const req=shopRequirement(item,state);
   const pending=pendingFor('purchase',item.id,state);
   const spendable=getSpendableResources(state);
-  const enough=item.currency==='AP' ? spendable.ap>=view.price : item.currency==='SV' ? spendable.sv>=view.price : false;
+  const payment=shopPaymentMeta(item,state,view);
+  const enough=payment.currency==='AP' ? spendable.ap>=payment.price : payment.currency==='SV' ? spendable.sv>=payment.price : false;
   const soldOut=view.soldOut;
   let button=soldOut?'改满了':pending?'待发送':!req.ok?'锁着':!enough?'穷':'买';
   const levelMeta=item.dynamic
@@ -3114,11 +3118,11 @@ function shopItem(item,category) {
       <div class="meme-shop-copy" data-shop-detail>
         <b>${soldOut ? (state.upgrades?.[item.id]?.title || item.title) : shopVoiceName(item,state)}</b>
         <p>${soldOut ? '这项已经被你改到当前版本上限。再点也榨不出第五层。' : shopVoiceDesc(item,state)}</p>
-        <small>${levelMeta} · ${req.ok ? (view.nextLevel===1 ? item.req : view.phase.label) : req.reason}</small>
+        <small>${levelMeta} · ${req.ok ? (payment.switched ? '精液阶段 · AP 抢救上限已到' : (view.nextLevel===1 ? item.req : view.phase.label)) : req.reason}</small>
         <div class="meme-shop-detail">${item.detail}</div>
       </div>
       <div class="meme-shop-buy">
-        <strong>${item.currency==='LOCK'?'—':view.price}</strong><em>${item.currency}</em>
+        <strong>${payment.currency==='LOCK'?'—':payment.price}</strong><em>${payment.currency}</em>
         <button type="button" data-shop-action="${item.id}" ${(soldOut||pending||!req.ok||!enough)?'disabled':''}>${button}</button>
       </div>
     </article>
@@ -3142,7 +3146,8 @@ function shopMarkup() {
     <section class="meme-page-card">
       <div class="meme-card-title"><small>CURRENT SHELF</small><h3>${phase.label}</h3></div>
       ${labelValue('外观进度',`${levels} 级`,nextPhase?`再完成 ${Math.max(0,nextPhase.minLevels-levels)} 级外观/感官改造开 ${nextPhase.label}`:'固定商城已到最高货架')}
-      ${labelValue('货架规则','同一项目可以继续升Ⅱ / Ⅲ / Ⅳ级。','越往后越贵，也越不是“擦屁股级修复”。')}
+      ${labelValue('货架规则','同一项目可以继续升Ⅱ / Ⅲ / Ⅳ级。','CHARM 30 前 AP 负责抢救；到 30 后外貌与身体精修自动改收 SV。')}
+      ${labelValue('普通人上限',`CHARM ${AP_CHARM_CAP}`,Number(state.host?.charm||0)>=AP_CHARM_CAP?'AP 已经没法继续把你往漂亮方向推了。想再变好看，去弄精液。':'日常和 AP 只能先把你救到普通、能看、有人愿意碰的程度。')}
     </section>
     <div class="meme-shop-balance">
       <span><small>AP 可用</small><b>${String(spendable.ap).padStart(3,'0')}</b></span>
@@ -3578,29 +3583,34 @@ async function handleShopAction(id){
   }
 
   const spendable=getSpendableResources(state);
-  const balance=item.currency==='AP'?spendable.ap:spendable.sv;
-  if(balance<view.price){
-    globalThis.toastr?.warning?.(`差 ${view.price-balance} ${item.currency}。穷就先去做任务，别盯着买不起的东西流口水。`);
+  const payment=shopPaymentMeta(item,state,view);
+  const balance=payment.currency==='AP'?spendable.ap:spendable.sv;
+  if(balance<payment.price){
+    globalThis.toastr?.warning?.(`差 ${payment.price-balance} ${payment.currency}。穷就先去做任务，别盯着买不起的东西流口水。`);
     return;
   }
 
   const systemTitle=item.dynamic
     ? adminCopyText(item.title,'临时改造',40)
     : levelledShopTitle(item,state);
-  const charmGain=Number(item.dynamic ? item.charmGain : (CHARM_GAIN[item.id]||0));
+  const baseCharmGain=Number(item.dynamic ? item.charmGain : (CHARM_GAIN[item.id]||0));
+  const currentCharm=Math.max(0,Number(state.host?.charm)||0);
+  const charmGain=payment.currency==='AP' && baseCharmGain>0
+    ? Math.max(0,Math.min(baseCharmGain,AP_CHARM_CAP-currentCharm))
+    : baseCharmGain;
   const bodyDelta=item.dynamic
     ? (item.bodyAxis ? {[item.bodyAxis]:1} : {})
     : (BODY_EFFECTS[item.id] || {});
-  const apDelta=item.currency==='AP'?-view.price:0;
-  const svDelta=item.currency==='SV'?-view.price:0;
+  const apDelta=payment.currency==='AP'?-payment.price:0;
+  const svDelta=payment.currency==='SV'?-payment.price:0;
   const levelText=item.dynamic?'剧情临时改造':`LV.${view.nextLevel}`;
-  const text=`【MÉMÉ OS｜已结算｜勿重复结算】购买完成：「${systemTitle}」· ${levelText}；${item.currency} -${view.price}${charmGain?`；CHARM +${charmGain}`:''}。状态已写入，正文仅承接改造结果。`;
+  const text=`【MÉMÉ OS｜已结算｜勿重复结算】购买完成：「${systemTitle}」· ${levelText}；${payment.currency} -${payment.price}${charmGain?`；CHARM +${charmGain}`:''}。状态已写入，正文仅承接改造结果。`;
 
   await queueAction(createPendingAction({
     type:'purchase',
     recordType:'change',
     title:`钱我扣了：${systemTitle}`,
-    summary:`「${systemTitle}」已经算到你身上。 ${item.currency} -${view.price}${charmGain?`；CHARM +${charmGain}`:''}。买都买了，别回头装后悔。`,
+    summary:`「${systemTitle}」已经算到你身上。 ${payment.currency} -${payment.price}${charmGain?`；CHARM +${charmGain}`:''}。买都买了，别回头装后悔。`,
     text,
     effect:{
       apDelta,
