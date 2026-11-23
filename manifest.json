@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.10.13",
+  "version": "0.10.14",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS: plot-synchronized adaptive task rewards and temporary-shop pricing, swipe-safe state replay, authoritative resources, rolling tasks, and mobile-safe launcher positioning.",
-  "js": "index.js?v=0.10.13",
-  "css": "style.css?v=0.10.13",
+  "description": "MÉMÉ OS: semantic daily-task dedupe, formal visible-task-card synchronization, adaptive plot economy, swipe-safe replay, and authoritative state.",
+  "js": "index.js?v=0.10.14",
+  "css": "style.css?v=0.10.14",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
