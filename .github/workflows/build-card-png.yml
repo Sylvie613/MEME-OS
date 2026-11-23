@@ -10,7 +10,7 @@ on:
       - "index-v*.js"
       - "style.css"
       - "src/**"
-      - "cards/meme_os_card_v0.4.0-alpha.json"
+      - "cards/meme_os_card_v0.4.1-alpha.json"
       - "presets/**"
       - "scripts/build_card_png.py"
       - ".github/workflows/build-card-png.yml"
@@ -22,7 +22,7 @@ on:
       - "index-v*.js"
       - "style.css"
       - "src/**"
-      - "cards/meme_os_card_v0.4.0-alpha.json"
+      - "cards/meme_os_card_v0.4.1-alpha.json"
       - "presets/**"
       - "scripts/build_card_png.py"
       - ".github/workflows/build-card-png.yml"
@@ -46,7 +46,7 @@ jobs:
       - name: Validate JSON
         run: |
           python3 -m json.tool manifest.json >/dev/null
-          python3 -m json.tool cards/meme_os_card_v0.4.0-alpha.json >/dev/null
+          python3 -m json.tool cards/meme_os_card_v0.4.1-alpha.json >/dev/null
           python3 -m json.tool presets/MEME-OS_Gemini3.1Pro_Momo_LongReply_v1.json >/dev/null
 
       - name: Validate architecture invariants
@@ -75,7 +75,7 @@ jobs:
           for token in retired:
               assert token not in index, f"retired runtime token returned: {token}"
 
-          card = json.loads(Path("cards/meme_os_card_v0.4.0-alpha.json").read_text(encoding="utf-8"))
+          card = json.loads(Path("cards/meme_os_card_v0.4.1-alpha.json").read_text(encoding="utf-8"))
           meme = card["data"]["extensions"]["meme_os"]
           assert meme["minimum_extension_version"] == version
           assert meme["enabled"] is True
@@ -83,7 +83,7 @@ jobs:
           assert meme["desire_policy"]["hide_locked_content"] is True
 
           cards = sorted(p.name for p in Path("cards").iterdir() if p.is_file())
-          expected_cards = ["meme_os_card_v0.4.0-alpha.json", "meme_os_card_v0.4.0-alpha.png"]
+          expected_cards = ["meme_os_card_v0.4.1-alpha.json", "meme_os_card_v0.4.1-alpha.png"]
           assert cards == expected_cards, f"unexpected duplicate card artifacts: {cards}"
           PY
 
@@ -95,7 +95,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add cards/meme_os_card_v0.4.0-alpha.png
+          git add cards/meme_os_card_v0.4.1-alpha.png
           if git diff --cached --quiet; then
             echo "PNG already up to date."
           else
