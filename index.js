@@ -1401,12 +1401,20 @@ function settleVisibleTaskCompletion(state,completion,messageId){
 
   const active=state.tasks?.active?.[id];
   if(!active) return false;
-  const verification=taskCompletionEvidenceValid(task,String(completion?.context||''),String(completion?.context||''));
+  const settledTask={
+    ...task,
+    ...active,
+    category:active.category||task.category,
+    reward:active.reward||task.reward,
+    tier:Number.isFinite(Number(active.tier))?Number(active.tier):task.tier,
+    targetManId:active.targetManId||task.targetManId||null,
+  };
+  const verification=taskCompletionEvidenceValid(settledTask,String(completion?.context||''),String(completion?.context||''));
   if(!verification.ok) return false;
 
   const currentDay=Math.max(1,Number(state.tasks?.storyDay)||1);
-  const repeatable=task.repeatable==='daily';
-  const isRollingDaily=task.category==='daily';
+  const repeatable=settledTask.repeatable==='daily';
+  const isRollingDaily=settledTask.category==='daily';
   const dailyLike=isRollingDaily || repeatable;
 
   if(dailyLike && Number(state.tasks?.dailyCompleted?.[id]?.day||0)===currentDay) return false;
@@ -1415,7 +1423,7 @@ function settleVisibleTaskCompletion(state,completion,messageId){
   const historyId=`meme_visible_task_complete_${currentDay}_${messageId}_${id}`;
   if((state.history||[]).some(entry=>entry.id===historyId)) return false;
 
-  const reward=taskReward(task,state);
+  const reward=taskReward(settledTask,state);
   const wasEverCompleted=Boolean(state.tasks?.everCompleted?.[id]);
   const title=active?.title || task.title || completion.title;
   const evidence=`正文明确标记「${completion.title}」${completion.marker||'完成'}。`;
@@ -1429,22 +1437,22 @@ function settleVisibleTaskCompletion(state,completion,messageId){
     state.tasks.dailyCompleted[id]={
       id,
       title,
-      category:task.category,
+      category:settledTask.category,
       day:currentDay,
       count:Math.max(0,Number(previous.count)||0)+1,
       evidence,
       completedAt:Date.now(),
       completedTurn:Number(state.shop?.plotTurn)||0,
-      actionTags:task.category==='daily'?taskActionTags(task):[],
+      actionTags:settledTask.category==='daily'?taskActionTags(settledTask):[],
     };
   }else{
     state.tasks.completed[id]={
       id,
       title,
-      category:task.category,
+      category:settledTask.category,
       evidence,
       reward:{ap:reward.ap,sv:reward.sv},
-      tier:Number(task.tier)||null,
+      tier:Number(settledTask.tier)||null,
       completedAt:Date.now(),
     };
   }
@@ -1452,17 +1460,17 @@ function settleVisibleTaskCompletion(state,completion,messageId){
   state.tasks.everCompleted[id]={
     id,
     title,
-    category:task.category,
-    actionTags:task.category==='daily' ? taskActionTags(task) : (state.tasks.everCompleted?.[id]?.actionTags||[]),
+    category:settledTask.category,
+    actionTags:settledTask.category==='daily' ? taskActionTags(settledTask) : (state.tasks.everCompleted?.[id]?.actionTags||[]),
     firstCompletedAt:state.tasks.everCompleted?.[id]?.firstCompletedAt||Date.now(),
     reward:{ap:reward.ap,sv:reward.sv},
-    tier:Number(task.tier)||null,
+    tier:Number(settledTask.tier)||null,
   };
 
-  if(task.dynamicDailyTask){
+  if(settledTask.dynamicDailyTask){
     state.tasks.generatedDaily=(state.tasks.generatedDaily||[]).filter(item=>item.id!==id);
   }
-  if(task.dynamicTask){
+  if(settledTask.dynamicTask){
     state.tasks.generated=(state.tasks.generated||[]).filter(item=>item.id!==id);
   }
 
