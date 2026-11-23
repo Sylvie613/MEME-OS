@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 30;
+const SCHEMA_VERSION = 31;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -81,6 +81,25 @@ const DEFAULT_STATE = Object.freeze({
     inventory: {
         items: {},
         recent: [],
+    },
+    storyStatus: {
+        initialized: false,
+        date: '',
+        time: '',
+        weather: '',
+        location: '',
+        people: [],
+        note: '',
+        updatedTurn: 0,
+    },
+    memory: {
+        initialized: false,
+        bootstrappedAt: null,
+        sourceTurns: 0,
+        short: [],
+        long: [],
+        core: [],
+        lastUpdatedTurn: 0,
     },
     reactivity: {
         recentChanges: [],
@@ -190,6 +209,37 @@ function mergeState(raw) {
         inventory: {
             items: raw.inventory?.items && typeof raw.inventory.items === 'object' ? { ...raw.inventory.items } : {},
             recent: Array.isArray(raw.inventory?.recent) ? raw.inventory.recent.slice(0, 20) : [],
+        },
+        storyStatus: {
+            ...base.storyStatus,
+            ...(raw.storyStatus ?? {}),
+            initialized: Boolean(raw.storyStatus?.initialized),
+            date: String(raw.storyStatus?.date || '').slice(0, 40),
+            time: String(raw.storyStatus?.time || '').slice(0, 24),
+            weather: String(raw.storyStatus?.weather || '').slice(0, 48),
+            location: String(raw.storyStatus?.location || '').slice(0, 80),
+            people: Array.isArray(raw.storyStatus?.people)
+                ? raw.storyStatus.people.map(v => String(v).trim()).filter(Boolean).slice(0, 8)
+                : [],
+            note: String(raw.storyStatus?.note || '').slice(0, 120),
+            updatedTurn: Math.max(0, Number(raw.storyStatus?.updatedTurn) || 0),
+        },
+        memory: {
+            ...base.memory,
+            ...(raw.memory ?? {}),
+            initialized: Boolean(raw.memory?.initialized),
+            bootstrappedAt: raw.memory?.bootstrappedAt || null,
+            sourceTurns: Math.max(0, Number(raw.memory?.sourceTurns) || 0),
+            short: Array.isArray(raw.memory?.short)
+                ? raw.memory.short.map(v => String(v).replace(/\s+/g,' ').trim()).filter(Boolean).slice(-10)
+                : [],
+            long: Array.isArray(raw.memory?.long)
+                ? raw.memory.long.map(v => String(v).replace(/\s+/g,' ').trim()).filter(Boolean).slice(-5)
+                : [],
+            core: Array.isArray(raw.memory?.core)
+                ? raw.memory.core.map(v => String(v).replace(/\s+/g,' ').trim()).filter(Boolean).slice(-5)
+                : [],
+            lastUpdatedTurn: Math.max(0, Number(raw.memory?.lastUpdatedTurn) || 0),
         },
         reactivity: {
             ...base.reactivity,
