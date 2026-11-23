@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 29;
+const SCHEMA_VERSION = 30;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -75,8 +75,8 @@ const DEFAULT_STATE = Object.freeze({
     },
     shop: {
         dynamic: [],
+        lifestyleShelf: [],
         plotTurn: 0,
-        lastLifestyleRefreshDay: 0,
     },
     inventory: {
         items: {},
@@ -185,7 +185,7 @@ function mergeState(raw) {
             ...base.shop,
             ...(raw.shop ?? {}),
             dynamic: Array.isArray(raw.shop?.dynamic) ? raw.shop.dynamic : [],
-            lastLifestyleRefreshDay: Math.max(0, Number(raw.shop?.lastLifestyleRefreshDay) || 0),
+            lifestyleShelf: Array.isArray(raw.shop?.lifestyleShelf) ? raw.shop.lifestyleShelf.slice(0, 5) : [],
         },
         inventory: {
             items: raw.inventory?.items && typeof raw.inventory.items === 'object' ? { ...raw.inventory.items } : {},
