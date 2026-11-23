@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.22';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.22';
-import { isBoundCharacter } from './src/binding.js?v=0.10.22';
+} from './src/state.js?v=0.10.23';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.23';
+import { isBoundCharacter } from './src/binding.js?v=0.10.23';
 
 /**
- * MÉMÉ OS v0.10.22
+ * MÉMÉ OS v0.10.23
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -2400,12 +2400,14 @@ function toneIndex(state=runtimeState()){
 
 function pickStable(lines, state=runtimeState(), salt=0){
   if(!Array.isArray(lines)||!lines.length) return '';
-  const seed=(Number(state.host?.charm)||0)+(Number(state.history?.length)||0)+salt;
-  return lines[Math.abs(seed)%lines.length];
+  const seed=(Number(state.host?.charm)||0)+(Number(state.history?.length)||0)+(Number(salt)||0);
+  const index=Math.floor(Math.abs(Number.isFinite(seed)?seed:0))%lines.length;
+  return String(lines[index] ?? lines[0] ?? '').trim();
 }
 
 function systemHomeLine(state=runtimeState()){
-  return pickStable(attitude(state).home,state,3);
+  const stage=attitude(state);
+  return pickStable(stage?.home,state,3) || '“啧。”';
 }
 
 function shopVoiceName(item,state=runtimeState()){
