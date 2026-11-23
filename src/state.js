@@ -274,8 +274,12 @@ function mergeState(raw) {
         schemaVersion: SCHEMA_VERSION,
     };
 
-    // MEMORY was retired in schema 36. Strip legacy buckets from old chat metadata.
+    // MEMORY was retired in schema 36. Strip legacy buckets from old chat metadata
+    // and from pre-0.13.2 swipe snapshots.
     delete merged.memory;
+    if (merged.runtime?.lastTurnBase && typeof merged.runtime.lastTurnBase === 'object') {
+        delete merged.runtime.lastTurnBase.memory;
+    }
 
     const tone = charmToStage(merged.host.charm);
     merged.host.stage = tone.stage;
