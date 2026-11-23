@@ -797,6 +797,119 @@ function getLifestyleShelf(state=runtimeState()){
   return Array.isArray(state.shop?.lifestyleShelf) ? state.shop.lifestyleShelf.slice(0,5) : [];
 }
 
+function cleanMemoryText(value,max=240){
+  return String(value||'').replace(/\s+/g,' ').trim().slice(0,max);
+}
+
+function uniqueMemoryList(values,maxItems,maxChars){
+  const out=[];
+  const seen=new Set();
+  for(const raw of Array.isArray(values)?values:[]){
+    const text=cleanMemoryText(raw,maxChars);
+    if(!text) continue;
+    const key=text.toLowerCase();
+    if(seen.has(key)) continue;
+    seen.add(key);
+    out.push(text);
+    if(out.length>=maxItems) break;
+  }
+  return out;
+}
+
+function applyMemoryEvent(state,raw,visibleTurns=0){
+  if(!raw || typeof raw!=='object') return false;
+  state.memory=state.memory||{
+    initialized:false,bootstrappedAt:null,sourceTurns:0,short:[],long:[],core:[],lastUpdatedTurn:0,
+  };
+  const turn=Math.max(0,Number(state.shop?.plotTurn)||0);
+
+  if(raw.bootstrap===true && !state.memory.initialized){
+    state.memory.short=uniqueMemoryList(raw.short,10,36);
+    state.memory.long=uniqueMemoryList(raw.long,5,240);
+    state.memory.core=uniqueMemoryList(raw.core,5,320);
+    state.memory.initialized=true;
+    state.memory.bootstrappedAt=Date.now();
+    state.memory.sourceTurns=Math.max(0,Number(visibleTurns)||0);
+    state.memory.lastUpdatedTurn=turn;
+    return true;
+  }
+
+  if(!state.memory.initialized) return false;
+
+  const shortAdd=uniqueMemoryList(raw.short,2,36);
+  const longAdd=uniqueMemoryList(raw.long,2,240);
+  const coreAdd=uniqueMemoryList(raw.core,1,320);
+  let changed=false;
+
+  for(const item of shortAdd){
+    if(!state.memory.short.includes(item)){
+      state.memory.short=[...state.memory.short,item].slice(-10);
+      changed=true;
+    }
+  }
+  for(const item of longAdd){
+    if(!state.memory.long.includes(item)){
+      state.memory.long=[...state.memory.long,item].slice(-5);
+      changed=true;
+    }
+  }
+  for(const item of coreAdd){
+    if(!state.memory.core.includes(item)){
+      state.memory.core=[...state.memory.core,item].slice(-5);
+      changed=true;
+    }
+  }
+
+  if(raw.compactShort===true && longAdd.length){
+    state.memory.short=[];
+    changed=true;
+  }
+  if(raw.compactLong===true && coreAdd.length){
+    state.memory.long=[];
+    changed=true;
+  }
+  if(changed) state.memory.lastUpdatedTurn=turn;
+  return changed;
+}
+
+function applyStoryStatusEvent(state,raw){
+  if(!raw || typeof raw!=='object') return false;
+  state.storyStatus=state.storyStatus||{
+    initialized:false,date:'',time:'',weather:'',location:'',people:[],note:'',updatedTurn:0,
+  };
+  let changed=false;
+  const assignText=(key,max)=>{
+    if(!Object.prototype.hasOwnProperty.call(raw,key)) return;
+    const value=cleanMemoryText(raw[key],max);
+    if(value!==state.storyStatus[key]){
+      state.storyStatus[key]=value;
+      changed=true;
+    }
+  };
+  assignText('date',40);
+  assignText('time',24);
+  assignText('weather',48);
+  assignText('location',80);
+  assignText('note',120);
+
+  if(Array.isArray(raw.people)){
+    const people=uniqueMemoryList(raw.people,8,40);
+    if(JSON.stringify(people)!==JSON.stringify(state.storyStatus.people||[])){
+      state.storyStatus.people=people;
+      changed=true;
+    }
+  }
+
+  if(raw.initialized===true || changed){
+    if(!state.storyStatus.initialized){
+      state.storyStatus.initialized=true;
+      changed=true;
+    }
+  }
+  if(changed) state.storyStatus.updatedTurn=Math.max(0,Number(state.shop?.plotTurn)||0);
+  return changed;
+}
+
 function lifestyleShelfDisposition(state=runtimeState()){
   const day=Math.max(1,Number(state.tasks?.storyDay)||1);
   const turn=Math.max(0,Number(state.shop?.plotTurn)||0);
@@ -1325,7 +1438,7 @@ function markRuntimeMessageProcessed(state,messageKey){
 }
 
 const TURN_SNAPSHOT_KEYS=[
-  'resources','host','system','permission','shop','inventory','reactivity','upgrades','tasks','men','history',
+  'resources','host','system','permission','shop','inventory','storyStatus','memory','reactivity','upgrades','tasks','men','history',
 ];
 
 function cloneTurnValue(value){
