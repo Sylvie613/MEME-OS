@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.13';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.13';
-import { isBoundCharacter } from './src/binding.js?v=0.10.13';
+} from './src/state.js?v=0.10.14';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.14';
+import { isBoundCharacter } from './src/binding.js?v=0.10.14';
 
 /**
- * MÉMÉ OS v0.10.13
+ * MÉMÉ OS v0.10.14
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -385,6 +385,97 @@ function sanitizeGeneratedDesireTask(raw,state=runtimeState()){
   };
 }
 
+const DAILY_ACTION_PATTERNS = {
+  hair_wash:/(洗头|洗(?:一遍)?头发|头发.{0,8}(?:洗净|洗干净))/i,
+  shower:/(洗澡|淋浴|冲澡|冲(?:个|一下)?澡)/i,
+  hair_dry:/(吹干.{0,8}(?:头发|头)|(?:头发|湿发).{0,10}吹干|吹头发)/i,
+  change_clothes:/(换(?:掉|下|上|一身|套)?.{0,8}(?:衣服|衣物|内衣|T恤|睡衣)|换洗衣物)/i,
+  oral_hygiene:/(刷牙|口腔清洁|漱口)/i,
+  bed_cleanup:/(床单|床铺|被罩|纸巾|脏衣服|垃圾堆|收拾.{0,8}床|整理.{0,8}床|换.{0,6}(?:床单|被罩))/i,
+  posture:/(含胸|塌肩|肩颈|坐姿|站姿|姿态|背挺|挺背)/i,
+  outfit:/(穿搭|搭配.{0,8}(?:衣服|外出服)|合身.{0,8}(?:衣服|衣物)|像样.{0,8}出门)/i,
+  mirror:/(镜子|镜前|照镜|观察.{0,8}外貌)/i,
+  movement:/(步行|散步|运动|走路|活动.{0,8}(?:分钟|小时)|动起来)/i,
+};
+
+const STATIC_DAILY_ACTIONS = {
+  clean:['hair_wash','shower','change_clothes','oral_hygiene'],
+  mirror:['mirror'],
+  walk:['movement'],
+  posture:['posture'],
+  outfit:['outfit'],
+};
+
+function extractDailyActionTags(text=''){
+  const source=String(text||'');
+  return Object.entries(DAILY_ACTION_PATTERNS)
+    .filter(([,pattern])=>pattern.test(source))
+    .map(([tag])=>tag);
+}
+
+function taskActionTags(task){
+  if(!task) return [];
+  if(Array.isArray(task.actionTags) && task.actionTags.length) return [...new Set(task.actionTags.map(String))];
+  const staticTags=STATIC_DAILY_ACTIONS[String(task.id||'')];
+  if(staticTags) return [...staticTags];
+  return extractDailyActionTags(`${task.title||''} ${task.desc||''} ${task.detail||''}`);
+}
+
+function completedDailyActionTags(state=runtimeState()){
+  const tags=new Set();
+  for(const [id,record] of Object.entries(state.tasks?.everCompleted||{})){
+    const saved=Array.isArray(record?.actionTags)?record.actionTags:[];
+    saved.forEach(tag=>tags.add(String(tag)));
+    const staticTags=STATIC_DAILY_ACTIONS[id]||[];
+    staticTags.forEach(tag=>tags.add(tag));
+  }
+  return tags;
+}
+
+function isSemanticallyFinishedDaily(task,state=runtimeState()){
+  const tags=taskActionTags(task);
+  if(!tags.length) return false;
+  const completed=completedDailyActionTags(state);
+  return tags.every(tag=>completed.has(tag));
+}
+
+function hasOpenSemanticDuplicate(task,state=runtimeState()){
+  const tags=taskActionTags(task);
+  if(!tags.length) return false;
+  const tagSet=new Set(tags);
+  const open=[
+    ...(state.tasks?.generatedDaily||[]),
+    ...TASK_DATA.daily.filter(item=>!state.tasks?.everCompleted?.[item.id]),
+  ];
+  return open.some(existing=>{
+    if(existing.id===task.id) return false;
+    const other=taskActionTags(existing);
+    return other.length>0 && other.every(tag=>tagSet.has(tag)) && tags.every(tag=>other.includes(tag));
+  });
+}
+
+function pruneRedundantGeneratedDaily(state=runtimeState()){
+  state.tasks=state.tasks||{};
+  state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
+  const seenSemantic=new Set();
+  let changed=false;
+  state.tasks.generatedDaily=state.tasks.generatedDaily.filter(task=>{
+    if(isSemanticallyFinishedDaily(task,state)){
+      changed=true;
+      return false;
+    }
+    const tags=taskActionTags(task).sort();
+    const key=tags.length?tags.join('|'):`id:${task.id}`;
+    if(tags.length && seenSemantic.has(key) && !state.tasks?.active?.[task.id]){
+      changed=true;
+      return false;
+    }
+    seenSemantic.add(key);
+    return true;
+  });
+  return changed;
+}
+
 function sanitizeGeneratedDailyTask(raw,state=runtimeState()){
   if(!raw || typeof raw!=='object') return null;
   const title=String(raw.title||'').replace(/\s+/g,' ').trim().slice(0,48);
@@ -397,11 +488,15 @@ function sanitizeGeneratedDailyTask(raw,state=runtimeState()){
     : 'normal';
   const reward=dynamicDailyRewardMeta(difficulty,state);
   const source=String(raw.source||'当前剧情').replace(/\s+/g,' ').trim().slice(0,80);
+  const actionTags=extractDailyActionTags(`${title} ${desc} ${detail}`);
   const fingerprint=`${title.toLowerCase()}|${desc.toLowerCase()}|${source.toLowerCase()}`;
   const id=`daily_${hashId(fingerprint).toString(36)}`;
+  const candidate={id,title,desc,detail,actionTags};
   if(state.tasks?.everCompleted?.[id]) return null;
   if((state.tasks?.generatedDaily||[]).some(task=>task.id===id)) return null;
   if(state.tasks?.active?.[id]) return null;
+  if(isSemanticallyFinishedDaily(candidate,state)) return null;
+  if(hasOpenSemanticDuplicate(candidate,state)) return null;
 
   return {
     id,
@@ -411,6 +506,7 @@ function sanitizeGeneratedDailyTask(raw,state=runtimeState()){
     difficulty,
     title,
     desc,
+    actionTags,
     detail:detail || '根据当前剧情生成的一次性日常任务。完成后从任务板移除。',
     reward:`AP +${reward.ap}`,
     state:'剧情生成',
@@ -423,6 +519,30 @@ function sanitizeGeneratedDailyTask(raw,state=runtimeState()){
 
 function inferVisibleDailyTaskOffer(raw,state=runtimeState()){
   const text=String(raw||'');
+
+  // Highest priority: a visibly formatted system task card such as
+  // 【DAILY · 别睡猪窝】 followed by the actual requirement paragraph.
+  const formal=[...text.matchAll(/【\s*(?:DAILY|日常)(?:\s*[·:：|｜-]\s*|\s+)([^】\n]{2,48})】\s*([\s\S]{0,320})/gi)];
+  if(formal.length){
+    const match=formal[formal.length-1];
+    const title=String(match[1]||'').replace(/\s+/g,' ').trim().slice(0,48);
+    const after=String(match[2]||'');
+    const paragraph=after.split(/\n\s*\n|(?=【)|(?=你(?:盯|看|愣|僵|抬|低|下意识|沉默|咬|攥))/)[0]||'';
+    const desc=paragraph.replace(/\s+/g,' ').trim().slice(0,180);
+    if(title && desc){
+      const actionCount=(desc.match(/[，,、；;]/g)||[]).length+1;
+      const hardCue=/(二十分钟|半小时|一小时|坚持|运动|出门|公共|社交|当众|长时间|彻底|完整完成)/.test(desc);
+      const lightCue=actionCount<=1 && /(扔|擦|关|拿|喝|换一件|刷牙|洗脸)/.test(desc);
+      const difficulty=hardCue?'hard':lightCue?'light':'normal';
+      return sanitizeGeneratedDailyTask({
+        title,desc,
+        detail:'由当前可见剧情中的正式任务卡同步；完成后按滚动任务规则退场。',
+        source:'当前剧情正式任务卡',
+        difficulty,
+      },state);
+    }
+  }
+
   const cue=/(?:一张|新的?|弹出|出现|生成|砸下|亮起)[^。\n]{0,28}(?:日常|剧情)?任务卡|(?:新的?|临时)(?:日常|剧情)?任务(?:出现|生成|弹出|亮起)/i.exec(text);
   if(!cue) return null;
 
@@ -755,6 +875,7 @@ function settleTaskFromModel(state,rawTask,messageId){
     id,
     title,
     category:task.category,
+    actionTags:task.category==='daily' ? taskActionTags(task) : (state.tasks.everCompleted?.[id]?.actionTags||[]),
     firstCompletedAt:state.tasks.everCompleted?.[id]?.firstCompletedAt||Date.now(),
   };
 
@@ -828,7 +949,7 @@ function settleStoryRewardFromModel(state,rawReward,messageId){
     completedAt:Date.now(),
     completedTurn:Number(state.shop?.plotTurn)||0,
   };
-  state.tasks.everCompleted[id]={id,title,category:'daily',firstCompletedAt:Date.now()};
+  state.tasks.everCompleted[id]={id,title,category:'daily',actionTags:taskActionTags(task),firstCompletedAt:Date.now()};
   state.permission.milestones.taskSettlements=Math.max(0,Number(state.permission.milestones.taskSettlements)||0)+1;
   state.permission.milestones.completedTasks=Math.max(0,Number(state.permission.milestones.completedTasks)||0)+1;
   state.history.push({
@@ -1075,7 +1196,7 @@ async function reconcileRecentVisibleTaskOffers(){
   const state=runtimeState();
   state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
   state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
-  let changed=false;
+  let changed=pruneRedundantGeneratedDaily(state);
 
   const start=Math.max(0,chat.length-16);
   for(let i=start;i<chat.length;i++){
@@ -1214,6 +1335,7 @@ async function handleRuntimeEvent(messageId){
   state.shop.dynamic=(state.shop.dynamic||[]).filter(item=>Number(item.expiresTurn||0)>=state.shop.plotTurn);
   state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
   state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
+  pruneRedundantGeneratedDaily(state);
   state.tasks.generatedDaily=state.tasks.generatedDaily.filter(task=>{
     const done=state.tasks.dailyCompleted?.[task.id];
     if(!done) return true;
@@ -1625,11 +1747,13 @@ Current body-axis levels: ${JSON.stringify(state.host?.body||{})}.
 Only describe a permanent physical improvement as already present when the matching body axis / purchased upgrade supports it. Unmodified areas stay at their established baseline.
 
 ROLLING DAILY / STORY TASK BOARD:
+Completed action semantics already satisfied by the host: ${JSON.stringify([...completedDailyActionTags(state)])}.
+A new task MUST add a genuinely unfinished action. Never issue a task whose entire requirement is already satisfied in the current scene or by a completed task. In particular, if the host has just showered and the scene explicitly shows wet freshly washed hair, do not assign "wash hair" again; "dry the wet hair" is a different unfinished action and may be valid. Do not split one already-completed bundle into fake new tasks merely to create more rewards.
 Completed daily tasks are not permanent checklist items. A just-completed daily/story task may remain visible as crossed-out for the current assistant turn only; on the next assistant turn it leaves the board permanently. Completed starter dailies do not reopen tomorrow.
 Current open starter dailies: ${JSON.stringify(TASK_DATA.daily.filter(t=>!state.tasks?.everCompleted?.[t.id]).map(t=>({id:t.id,title:t.title,desc:t.desc})))}.
 Current generated daily/story tasks: ${JSON.stringify((state.tasks?.generatedDaily||[]).filter(t=>!state.tasks?.everCompleted?.[t.id]).map(t=>({id:t.id,title:t.title,desc:t.desc,difficulty:t.difficulty,source:t.source})))}.
 When the visible daily board has fewer than 5 unfinished tasks, you SHOULD create one context-fitting replacement through dailyTaskOffers if the current plot offers a sensible mundane, appearance, hygiene, movement, social-presentation or practical challenge. Do not regenerate an already completed task under a synonym.
-CRITICAL SYNC RULE: if your visible prose says or implies that MÉMÉ OS/the administrator actually creates, pops up, displays, throws out, assigns or reveals a NEW daily/story task or task card, dailyTaskOffers is REQUIRED in the same reply. Never visibly create a task card and omit its hidden event. If you are not going to emit dailyTaskOffers, do not claim that a new system task was created.
+CRITICAL SYNC RULE: if your visible prose says or implies that MÉMÉ OS/the administrator actually creates, pops up, displays, throws out, assigns or reveals a NEW daily/story task or task card — especially if you print a visible block like 【DAILY · 任务名】 — dailyTaskOffers is REQUIRED in the same reply. Never visibly create a task card and omit its hidden event. If you are not going to emit dailyTaskOffers, do not claim that a new system task was created.
 PLOT RELEVANCE RULE: every generated daily/story task must be caused by something concrete in the CURRENT visible scene: a mess that was just created, an unmet practical need, a body/presentation problem just noticed, a plan the host just stated, a location-specific opportunity, or a direct consequence of the immediately preceding action. Do not throw in generic self-improvement chores unrelated to what is happening now. source must briefly name the actual scene trigger.
 DIFFICULTY SEMANTICS: light = one quick low-effort action; normal = several linked actions or a sustained moderate effort; hard = substantial time, discomfort, persistence, social exposure/risk or a genuinely demanding multi-step requirement. Choose difficulty from the actual scene demand, not from the reward you want.
 ECONOMY RULE: never choose or display a numeric AP reward for generated tasks. MÉMÉ OS calculates the reward from difficulty plus the current spendable AP and nearby shop-price band. This keeps a task useful when the host is broke without letting trivial chores print money when the host is already rich.
