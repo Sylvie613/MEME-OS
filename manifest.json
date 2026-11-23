@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.12.5",
+  "version": "0.13.0",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS 0.12.5: NPC encounter wheel now has a scene-focus lock; existing male interaction, dates and intimate/sexual scenes pause random newcomers indefinitely until the focus scene ends or the host explicitly invites new men.",
-  "js": "index-v0.12.5.js",
-  "css": "style.css?v=0.12.5",
+  "description": "MÉMÉ OS 0.13.0 audit cleanup: retired duplicate scene/status paths, slimmed runtime bridge, single-owner MEMORY, safer NPC wheel focus/exit logic, canonical card build, and repository cleanup.",
+  "js": "index-v0.13.0.js",
+  "css": "style.css?v=0.13.0",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }

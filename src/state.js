@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 33;
+const SCHEMA_VERSION = 34;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -82,16 +82,6 @@ const DEFAULT_STATE = Object.freeze({
         items: {},
         recent: [],
     },
-    storyStatus: {
-        initialized: false,
-        date: '7月18日',
-        time: '',
-        weather: '晴 · 闷热',
-        location: '',
-        people: [],
-        note: '盛夏',
-        updatedTurn: 0,
-    },
     memory: {
         initialized: false,
         bootstrappedAt: null,
@@ -105,6 +95,14 @@ const DEFAULT_STATE = Object.freeze({
         recentChanges: [],
         recentIssues: [],
         recentReactions: [],
+    },
+    encounters: {
+        randomMale: {
+            lastHitTurn: -999,
+            lastHitDay: 0,
+            lastSeed: null,
+            lastScene: null,
+        },
     },
     runtime: {
         chatKey: null,
@@ -148,11 +146,13 @@ function cloneDefaultState() {
     return clone(DEFAULT_STATE);
 }
 
-function defaultStoryDateForDay(day) {
-    const n = Math.max(1, Number(day) || 1);
-    const date = new Date(Date.UTC(2026, 6, 18));
-    date.setUTCDate(date.getUTCDate() + (n - 1));
-    return `${date.getUTCMonth() + 1}月${date.getUTCDate()}日`;
+function normalizeResource(value) {
+    return Math.max(0, Math.round(Number(value) || 0));
+}
+
+function normalizeCharm(value) {
+    const n = Math.min(100, Math.max(0, Number(value) || 0));
+    return Math.round((n + Number.EPSILON) * 10) / 10;
 }
 
 function charmToStage(charm) {
@@ -219,20 +219,6 @@ function mergeState(raw) {
             items: raw.inventory?.items && typeof raw.inventory.items === 'object' ? { ...raw.inventory.items } : {},
             recent: Array.isArray(raw.inventory?.recent) ? raw.inventory.recent.slice(0, 20) : [],
         },
-        storyStatus: {
-            ...base.storyStatus,
-            ...(raw.storyStatus ?? {}),
-            initialized: Boolean(raw.storyStatus?.initialized),
-            date: String(raw.storyStatus?.date || defaultStoryDateForDay(raw.tasks?.storyDay || 1)).slice(0, 40),
-            time: String(raw.storyStatus?.time || '').slice(0, 24),
-            weather: String(raw.storyStatus?.weather || base.storyStatus.weather).slice(0, 48),
-            location: String(raw.storyStatus?.location || '').slice(0, 80),
-            people: Array.isArray(raw.storyStatus?.people)
-                ? raw.storyStatus.people.map(v => String(v).trim()).filter(Boolean).slice(0, 8)
-                : [],
-            note: String(raw.storyStatus?.note || base.storyStatus.note).slice(0, 120),
-            updatedTurn: Math.max(0, Number(raw.storyStatus?.updatedTurn) || 0),
-        },
         memory: {
             ...base.memory,
             ...(raw.memory ?? {}),
@@ -260,6 +246,20 @@ function mergeState(raw) {
             recentChanges: Array.isArray(raw.reactivity?.recentChanges) ? raw.reactivity.recentChanges.slice(0, 8) : [],
             recentIssues: Array.isArray(raw.reactivity?.recentIssues) ? raw.reactivity.recentIssues.slice(0, 8) : [],
             recentReactions: Array.isArray(raw.reactivity?.recentReactions) ? raw.reactivity.recentReactions.slice(0, 8) : [],
+        },
+        encounters: {
+            ...base.encounters,
+            ...(raw.encounters ?? {}),
+            randomMale: {
+                ...base.encounters.randomMale,
+                ...(raw.encounters?.randomMale ?? {}),
+                lastHitTurn: Number.isFinite(Number(raw.encounters?.randomMale?.lastHitTurn))
+                    ? Number(raw.encounters.randomMale.lastHitTurn)
+                    : -999,
+                lastHitDay: Math.max(0, Number(raw.encounters?.randomMale?.lastHitDay) || 0),
+                lastSeed: raw.encounters?.randomMale?.lastSeed ? String(raw.encounters.randomMale.lastSeed) : null,
+                lastScene: raw.encounters?.randomMale?.lastScene ? String(raw.encounters.randomMale.lastScene) : null,
+            },
         },
         runtime: {
             ...base.runtime,
@@ -307,15 +307,10 @@ function mergeState(raw) {
     const tone = charmToStage(merged.host.charm);
     merged.host.stage = tone.stage;
     merged.system.attitudeStage = tone.attitudeStage;
-    merged.resources.ap = Math.max(0, Number(merged.resources.ap) || 0);
-    merged.resources.sv = Math.max(0, Number(merged.resources.sv) || 0);
-    merged.host.charm = Math.min(100, Math.max(0, Number(merged.host.charm) || 0));
-    merged.host.progress = Math.min(100, Math.max(0, merged.host.charm));
-    if (!merged.storyStatus.date || /^DAY\s+\d+/i.test(String(merged.storyStatus.date))) {
-        merged.storyStatus.date = defaultStoryDateForDay(merged.tasks.storyDay);
-    }
-    if (!merged.storyStatus.weather) merged.storyStatus.weather = '晴 · 闷热';
-    if (!merged.storyStatus.note) merged.storyStatus.note = '盛夏';
+    merged.resources.ap = normalizeResource(merged.resources.ap);
+    merged.resources.sv = normalizeResource(merged.resources.sv);
+    merged.host.charm = normalizeCharm(merged.host.charm);
+    merged.host.progress = merged.host.charm;
     const allowedAccessStages = ['locked','peek','open','private'];
     if (!allowedAccessStages.includes(merged.system.accessStage)) {
         merged.system.accessStage = merged.system.pageUnlocked ? 'open' : 'locked';
@@ -336,6 +331,10 @@ function mergeState(raw) {
     for (const key of Object.keys(base.host.body)) {
         merged.host.body[key] = Math.max(0, Number(merged.host.body[key]) || 0);
     }
+
+    // Scene date/time/weather/location moved to visible prose in 0.11.x.
+    // Drop the legacy persisted copy so it cannot drift or reappear.
+    delete merged.storyStatus;
 
     // Purge pre-release test-only metadata if an old chat still carries it.
     delete merged.dev;
@@ -483,15 +482,15 @@ function applyEffect(state, effect) {
     if (!effect || typeof effect !== 'object') return;
 
     if (Number.isFinite(effect.apDelta)) {
-        state.resources.ap = Math.max(0, state.resources.ap + effect.apDelta);
+        state.resources.ap = normalizeResource(state.resources.ap + effect.apDelta);
     }
 
     if (Number.isFinite(effect.svDelta)) {
-        state.resources.sv = Math.max(0, state.resources.sv + effect.svDelta);
+        state.resources.sv = normalizeResource(state.resources.sv + effect.svDelta);
     }
 
     if (Number.isFinite(effect.charmDelta)) {
-        state.host.charm = Math.min(100, Math.max(0, state.host.charm + effect.charmDelta));
+        state.host.charm = normalizeCharm(state.host.charm + effect.charmDelta);
     }
 
     if (effect.bodyDelta && typeof effect.bodyDelta === 'object') {
@@ -563,7 +562,7 @@ function applyEffect(state, effect) {
                 title: item.title,
                 level: nextLevel,
                 axes: changedAxes,
-                charmDelta: Number(effect.charmDelta) || 0,
+                charmDelta: normalizeCharm(Number(effect.charmDelta) || 0),
                 storyDay: Number(state.tasks?.storyDay) || 1,
                 committedAt: Date.now(),
             },
@@ -585,7 +584,10 @@ function applyEffect(state, effect) {
     const tone = charmToStage(state.host.charm);
     state.host.stage = tone.stage;
     state.system.attitudeStage = tone.attitudeStage;
-    state.host.progress = Math.min(100, Math.max(0, Number(state.host.charm) || 0));
+    state.host.charm = normalizeCharm(state.host.charm);
+    state.resources.ap = normalizeResource(state.resources.ap);
+    state.resources.sv = normalizeResource(state.resources.sv);
+    state.host.progress = state.host.charm;
 
     const milestones = state.permission.milestones;
     state.permission.systemEligible =

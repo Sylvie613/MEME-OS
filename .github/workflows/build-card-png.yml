@@ -1,39 +1,104 @@
-name: Build character card PNG
+name: Validate and build MÉMÉ OS
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "manifest.json"
+      - "index.js"
+      - "index-v*.js"
+      - "style.css"
+      - "src/**"
+      - "cards/meme_os_card_v0.4.0-alpha.json"
+      - "presets/**"
+      - "scripts/build_card_png.py"
+      - ".github/workflows/build-card-png.yml"
   push:
     branches: [main]
     paths:
-      - "cards/MEME-OS-alpha.json"
-      - "cards/MEME-OS-avatar.b64"
-      - "scripts/build_card_png.py"
+      - "manifest.json"
       - "index.js"
-      - "src/state.js"
+      - "index-v*.js"
+      - "style.css"
+      - "src/**"
+      - "cards/meme_os_card_v0.4.0-alpha.json"
+      - "presets/**"
+      - "scripts/build_card_png.py"
       - ".github/workflows/build-card-png.yml"
 
 permissions:
   contents: write
 
 jobs:
-  build:
+  validate-and-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Check extension JavaScript syntax
         run: |
           node --check index.js
           node --check src/state.js
-      - name: Build PNG character card
+          node --check src/input.js
+          node --check src/binding.js
+
+      - name: Validate JSON
+        run: |
+          python3 -m json.tool manifest.json >/dev/null
+          python3 -m json.tool cards/meme_os_card_v0.4.0-alpha.json >/dev/null
+          python3 -m json.tool presets/MEME-OS_Gemini3.1Pro_Momo_LongReply_v1.json >/dev/null
+
+      - name: Validate architecture invariants
+        run: |
+          python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          manifest = json.loads(Path("manifest.json").read_text(encoding="utf-8"))
+          version = manifest["version"]
+          entry = manifest["js"]
+
+          versioned = sorted(p.name for p in Path(".").glob("index-v*.js"))
+          assert versioned == [entry], f"expected only {entry}, found {versioned}"
+
+          entry_text = Path(entry).read_text(encoding="utf-8")
+          assert entry_text.strip() == f"import './index.js?v={version}';"
+
+          index = Path("index.js").read_text(encoding="utf-8")
+          for module in ("state", "input", "binding"):
+              expected = f"./src/{module}.js?v={version}"
+              assert expected in index, f"missing cache-busted import {expected}"
+
+          retired = ("currentDate", "currentWeather", "applyStoryStatusEvent", "storyStatusMarkup")
+          for token in retired:
+              assert token not in index, f"retired runtime token returned: {token}"
+
+          card = json.loads(Path("cards/meme_os_card_v0.4.0-alpha.json").read_text(encoding="utf-8"))
+          meme = card["data"]["extensions"]["meme_os"]
+          assert meme["minimum_extension_version"] == version
+          assert meme["enabled"] is True
+          assert meme["desire_policy"]["sealed_before_charm"] == 8
+          assert meme["desire_policy"]["hide_locked_content"] is True
+
+          cards = sorted(p.name for p in Path("cards").iterdir() if p.is_file())
+          expected_cards = ["meme_os_card_v0.4.0-alpha.json", "meme_os_card_v0.4.0-alpha.png"]
+          assert cards == expected_cards, f"unexpected duplicate card artifacts: {cards}"
+          PY
+
+      - name: Build canonical PNG character card
         run: python3 scripts/build_card_png.py
+
       - name: Commit generated PNG
+        if: github.event_name != 'pull_request'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add cards/MEME-OS-alpha.png
+          git add cards/meme_os_card_v0.4.0-alpha.png
           if git diff --cached --quiet; then
             echo "PNG already up to date."
           else
-            git commit -m "build: refresh MEME OS character card PNG"
+            git commit -m "build: refresh canonical MÉMÉ OS character card PNG"
             git push
           fi

@@ -6,17 +6,27 @@ import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-JSON_PATH = ROOT / "cards" / "MEME-OS-alpha.json"
-AVATAR_B64_PATH = ROOT / "cards" / "MEME-OS-avatar.b64"
-PNG_PATH = ROOT / "cards" / "MEME-OS-alpha.png"
+JSON_PATH = ROOT / "cards" / "meme_os_card_v0.4.0-alpha.json"
+PNG_PATH = ROOT / "cards" / "meme_os_card_v0.4.0-alpha.png"
 
 PNG_SIG = b"\x89PNG\r\n\x1a\n"
-DROP_TEXT_KEYS = {b"chara", b"ccv3", b"M\xc3\x89M\xc3\x89-OS-Version", b"M\xc3\x89M\xc3\x89-OS-Min-Extension"}
+DROP_TEXT_KEYS = {
+    b"chara",
+    b"ccv3",
+    b"MEME-OS-Version",
+    b"MEME-OS-Min-Extension",
+    "MÉMÉ-OS-Version".encode("utf-8"),  # legacy cleanup
+    "MÉMÉ-OS-Min-Extension".encode("utf-8"),  # legacy cleanup
+}
 
 
 def chunk(kind: bytes, data: bytes) -> bytes:
     payload = kind + data
-    return struct.pack(">I", len(data)) + payload + struct.pack(">I", zlib.crc32(payload) & 0xFFFFFFFF)
+    return (
+        struct.pack(">I", len(data))
+        + payload
+        + struct.pack(">I", zlib.crc32(payload) & 0xFFFFFFFF)
+    )
 
 
 def text_chunk(key: str, value: str) -> bytes:
@@ -25,10 +35,12 @@ def text_chunk(key: str, value: str) -> bytes:
 
 def inject_text_chunks(base_png: bytes, additions: list[bytes]) -> bytes:
     if not base_png.startswith(PNG_SIG):
-        raise ValueError("Avatar source is not a PNG")
+        raise ValueError("Canonical card image is not a PNG")
+
     out = bytearray(PNG_SIG)
     pos = len(PNG_SIG)
     inserted = False
+
     while pos < len(base_png):
         length = struct.unpack(">I", base_png[pos:pos + 4])[0]
         kind = base_png[pos + 4:pos + 8]
@@ -46,6 +58,7 @@ def inject_text_chunks(base_png: bytes, additions: list[bytes]) -> bytes:
             key = data.split(b"\x00", 1)[0]
             if key in DROP_TEXT_KEYS:
                 keep = False
+
         if keep:
             out += raw_chunk
         pos = end
@@ -57,6 +70,10 @@ def inject_text_chunks(base_png: bytes, additions: list[bytes]) -> bytes:
 
 def main():
     card_v2 = json.loads(JSON_PATH.read_text(encoding="utf-8"))
+    meme = card_v2.get("data", {}).get("extensions", {}).get("meme_os", {})
+    card_version = str(meme.get("card_version") or card_v2.get("data", {}).get("character_version") or "unknown")
+    min_extension = str(meme.get("minimum_extension_version") or "unknown")
+
     card_v3 = copy.deepcopy(card_v2)
     card_v3["spec"] = "chara_card_v3"
     card_v3["spec_version"] = "3.0"
@@ -66,18 +83,22 @@ def main():
     chara = base64.b64encode(compact_v2).decode("ascii")
     ccv3 = base64.b64encode(compact_v3).decode("ascii")
 
-    avatar_png = base64.b64decode(AVATAR_B64_PATH.read_text(encoding="ascii").strip())
+    # Preserve the current canonical artwork. Only refresh metadata chunks.
+    base_png = PNG_PATH.read_bytes()
     final_png = inject_text_chunks(
-        avatar_png,
+        base_png,
         [
             text_chunk("chara", chara),
             text_chunk("ccv3", ccv3),
-            text_chunk("MÉMÉ-OS-Version", "0.3.7-alpha"),
-            text_chunk("MÉMÉ-OS-Min-Extension", "0.10.6"),
+            text_chunk("MEME-OS-Version", card_version),
+            text_chunk("MEME-OS-Min-Extension", min_extension),
         ],
     )
     PNG_PATH.write_bytes(final_png)
-    print(f"Wrote {PNG_PATH} ({len(final_png)} bytes)")
+    print(
+        f"Wrote {PNG_PATH} ({len(final_png)} bytes) "
+        f"card={card_version} min_extension={min_extension}"
+    )
 
 
 if __name__ == "__main__":
