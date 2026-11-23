@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.27';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.27';
-import { isBoundCharacter } from './src/binding.js?v=0.10.27';
+} from './src/state.js?v=0.10.28';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.28';
+import { isBoundCharacter } from './src/binding.js?v=0.10.28';
 
 /**
- * MÉMÉ OS v0.10.27
+ * MÉMÉ OS v0.10.28
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -119,6 +119,11 @@ function availableApPriceTargets(state=runtimeState()){
     }
   }
   for(const item of getDynamicShop(state)){
+    const view=staticShopView(item,state);
+    const payment=shopPaymentMeta(item,state,view);
+    if(payment.currency==='AP' && Number(payment.price)>0) prices.push(Number(payment.price));
+  }
+  for(const item of getLifestyleShelf(state)){
     const view=staticShopView(item,state);
     const payment=shopPaymentMeta(item,state,view);
     if(payment.currency==='AP' && Number(payment.price)>0) prices.push(Number(payment.price));
@@ -3193,7 +3198,7 @@ function inventoryItems(state=runtimeState()){
 function inventoryItemCard(item){
   const kindLabels={
     skincare:'护肤',food:'食物',daily:'日用',clothing:'穿搭',electronics:'电子',
-    home:'家居',entertainment:'娱乐',service:'服务',plot:'剧情',
+    home:'家居',entertainment:'娱乐',service:'服务',other:'其他',plot:'剧情',
   };
   return `
     <article class="meme-shop-card">
@@ -3221,7 +3226,7 @@ function shopItem(item,category) {
   const soldOut=view.soldOut;
   let button=soldOut?'改满了':pending?'待发送':!req.ok?'锁着':!enough?'穷':'买';
   const levelMeta=item.dynamic
-    ? (item.category==='dailygoods' ? `LIFE · ${String(item.kind||'daily').toUpperCase()}` : 'PLOT · 临时货')
+    ? (item.category==='dailygoods' ? `DAILY GOODS · ${String(item.kind||'daily').toUpperCase()}` : 'PLOT · 临时货')
     : `${view.phase.code} · ${view.currentLevel}/${view.maxLevel} → ${ROMAN_LEVELS[Math.max(0,view.nextLevel-1)]}`;
 
   return `
@@ -3242,13 +3247,18 @@ function shopItem(item,category) {
 }
 
 function renderShopList(category='appearance') {
-  if(category==='life'){
-    const items=getDynamicShop().filter(item=>item.category==='dailygoods');
-    return items.map(item=>shopItem(item,'life')).join('')
-      || '<div class="meme-men-empty"><small>LIFE SHELF</small><b>今天还没刷到新杂货</b><p>过了普通人那道坎以后，这里每天会换点能花 AP 的东西。</p></div>';
+  if(category==='dailygoods'){
+    const state=runtimeState();
+    if((Number(state.host?.charm)||0)<AP_CHARM_CAP){
+      return '<div class="meme-men-empty"><small>DAILY GOODS · LOCKED</small><b>CHARM 30 解锁</b><p>先把自己救到普通人的程度。后面这格才轮得到你逛。</p></div>';
+    }
+    const items=getLifestyleShelf(state);
+    return items.length===5
+      ? items.map(item=>shopItem(item,'dailygoods')).join('')
+      : '<div class="meme-men-empty"><small>DAILY GOODS</small><b>货架还在整理</b><p>下一回合我会按你现在缺的东西塞满五格。</p></div>';
   }
   if(category==='plot'){
-    const items=getDynamicShop().filter(item=>item.category!=='life');
+    const items=getDynamicShop();
     return items.map(item=>shopItem(item,'plot')).join('')
       || '<div class="meme-men-empty"><small>NO PLOT GOODS</small><b>现在没什么值得临时上架</b><p>剧情真发生点有意思的事，我自然会塞东西进来。</p></div>';
   }
@@ -3274,7 +3284,7 @@ function shopMarkup() {
       ${labelValue('外观进度',`${levels} 级`,nextPhase?`再完成 ${Math.max(0,nextPhase.minLevels-levels)} 级外观/感官改造开 ${nextPhase.label}`:'固定商城已到最高货架')}
       ${labelValue('货架规则','同一项目可以继续升Ⅱ / Ⅲ / Ⅳ级。','CHARM 30 前 AP 负责抢救；到 30 后外貌与身体精修自动改收 SV。')}
       ${labelValue('普通人上限',`CHARM ${AP_CHARM_CAP}`,Number(state.host?.charm||0)>=AP_CHARM_CAP?'身体精修改收 SV；AP 留着买生活货、便利和别的乱七八糟东西。':'日常和 AP 只能先把你救到普通、能看、有人愿意碰的程度。')}
-      ${Number(state.host?.charm||0)>=AP_CHARM_CAP ? labelValue('生活货架','每日自然日刷新','护肤、吃的、日用品、衣服、电子产品、家居、服务……我想卖什么就卖什么。') : ''}
+      ${labelValue('日常用品',Number(state.host?.charm||0)>=AP_CHARM_CAP?'5 格动态货架':'LOCKED · CHARM 30','不按日期乱刷。你缺什么、提到什么、什么坏了，我才考虑换。')}
     </section>
     <div class="meme-shop-balance">
       <span><small>AP 可用</small><b>${String(spendable.ap).padStart(3,'0')}</b></span>
@@ -3287,9 +3297,9 @@ function shopMarkup() {
       <button type="button" data-shop-filter="sensory">感官</button>
       <button type="button" data-shop-filter="desire">欲望</button>
       <button type="button" data-shop-filter="special">特殊</button>
-      ${getDynamicShop(state).filter(item=>item.category==='dailygoods').length ? '<button type="button" data-shop-filter="life">杂货 · '+getDynamicShop(state).filter(item=>item.category==='dailygoods').length+'</button>' : ''}
-      ${getDynamicShop(state).filter(item=>item.category!=='life').length ? '<button type="button" data-shop-filter="plot">剧情 · '+getDynamicShop(state).filter(item=>item.category!=='life').length+'</button>' : ''}
+      ${getDynamicShop(state).length ? '<button type="button" data-shop-filter="plot">剧情 · '+getDynamicShop(state).length+'</button>' : ''}
       ${inventoryItems(state).length ? '<button type="button" data-shop-filter="inventory">持有 · '+inventoryItems(state).length+'</button>' : ''}
+      <button type="button" data-shop-filter="dailygoods" ${Number(state.host?.charm||0)<AP_CHARM_CAP?'disabled aria-disabled="true"':''}>日常用品${Number(state.host?.charm||0)<AP_CHARM_CAP?' · LOCK':''}</button>
     </div>
     <section class="meme-shop-list" data-shop-list>${renderShopList('appearance')}</section>
     <p class="meme-preview-note">价格是我定的。买不起就去做任务，别一边穷一边对着改造项目发骚。</p>
@@ -3699,7 +3709,7 @@ async function handleShopAction(id){
   const view=staticShopView(item,state);
   const req=shopRequirement(item,state);
   if(view.soldOut){
-    globalThis.toastr?.info?.('这项已经改到当前上限了。再点也榨不出下一层。');
+    globalThis.toastr?.info?.(item.category==='dailygoods'?'这个耐用品你已经买过了。':'这项已经改到当前上限了。再点也榨不出下一层。');
     return;
   }
   if(!req.ok){
@@ -3720,7 +3730,7 @@ async function handleShopAction(id){
   }
 
   const systemTitle=item.dynamic
-    ? adminCopyText(item.title,'临时改造',40)
+    ? adminCopyText(item.title,item.category==='dailygoods'?'日常用品':'临时改造',40)
     : levelledShopTitle(item,state);
   const lifestyle=item.category==='dailygoods';
   const baseCharmGain=lifestyle ? 0 : Number(item.dynamic ? item.charmGain : (CHARM_GAIN[item.id]||0));
