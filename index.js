@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.23';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.23';
-import { isBoundCharacter } from './src/binding.js?v=0.10.23';
+} from './src/state.js?v=0.10.24';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.24';
+import { isBoundCharacter } from './src/binding.js?v=0.10.24';
 
 /**
- * MÉMÉ OS v0.10.23
+ * MÉMÉ OS v0.10.24
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -2817,19 +2817,29 @@ function adultProtocolPreviewMarkup(state=runtimeState()){
     {need:12, code:'CHARM 12', title:'第一次精液别空手回来', sub:'射出来、收得到，才算第一次可结算采集。'},
     {need:15, code:'CHARM 15', title:'这张嘴终于有别的用途', sub:'口交完成并拿到射精结算，才算正式过关。'},
   ];
+  const next=rows.find(row=>charm<row.need);
+  const nextText=next ? `${next.code} · ${next.title}` : '欲望协议已开放';
   return `
-    <section class="meme-page-card meme-adult-protocol">
-      <div class="meme-card-title">
-        <small>ADULT PROTOCOL · ${charm<8?'LOCKED':'ACTIVE'}</small>
-        <h3>${charm<8?'别急着骚。正菜你现在还没资格吃。':'欲望协议已经开始开锁。'}</h3>
+    <details class="meme-page-card meme-adult-protocol">
+      <summary class="meme-adult-protocol-summary">
+        <span>
+          <small>ADULT PROTOCOL · ${charm<8?'LOCKED':'ACTIVE'}</small>
+          <b>${nextText}</b>
+        </span>
+        <em>点开看 <i>⌄</i></em>
+      </summary>
+      <div class="meme-adult-protocol-body">
+        <div class="meme-card-title">
+          <h3>${charm<8?'别急着骚。正菜你现在还没资格吃。':'欲望协议已经开始开锁。'}</h3>
+        </div>
+        ${rows.map(row=>labelValue(
+          row.code,
+          row.title,
+          charm>=row.need ? `OPEN · ${row.sub}` : `LOCKED · ${row.sub}`
+        )).join('')}
+        ${labelValue('SV','精液值','以后拿别人的精液，换你自己的成人反应改造。')}
       </div>
-      ${rows.map(row=>labelValue(
-        row.code,
-        row.title,
-        charm>=row.need ? `OPEN · ${row.sub}` : `LOCKED · ${row.sub}`
-      )).join('')}
-      ${labelValue('SV','精液值','以后拿别人的精液，换你自己的成人反应改造。')}
-    </section>
+    </details>
   `;
 }
 
