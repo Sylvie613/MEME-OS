@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.13.6",
+  "version": "0.13.7",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS 0.13.6 makes DESIRE offers scene-locked, provocative, and novelty-aware using the current adult target, recent scene facts, and recent DESIRE history.",
-  "js": "index-v0.13.6.js",
-  "css": "style.css?v=0.13.6",
+  "description": "MÉMÉ OS 0.13.7 enforces an explicit-sex minimum for DESIRE from Tier 1 onward; flirt-only or teasing-only tasks are rejected before entering TASK.",
+  "js": "index-v0.13.7.js",
+  "css": "style.css?v=0.13.7",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
