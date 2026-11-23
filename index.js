@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.11.7';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.11.7';
-import { isBoundCharacter } from './src/binding.js?v=0.11.7';
+} from './src/state.js?v=0.11.8';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.11.8';
+import { isBoundCharacter } from './src/binding.js?v=0.11.8';
 
 /**
- * MÉMÉ OS v0.11.7
+ * MÉMÉ OS v0.11.8
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -889,7 +889,7 @@ function applyMemoryEvent(state,raw,visibleTurns=0){
 }
 
 function applyStoryStatusEvent(){
-  // Retired in v0.11.7. Scene date/time/weather/location live in visible prose only.
+  // Retired in v0.11.8. Scene date/time/weather/location live in visible prose only.
   return false;
 }
 
@@ -2752,6 +2752,27 @@ async function handleRuntimeEvent(messageId){
   }
 }
 
+function latestVisibleSceneStatus(chat=[]){
+  const messages=Array.isArray(chat)?chat:[];
+  for(let i=messages.length-1;i>=0;i--){
+    const message=messages[i];
+    if(!message || message.is_user) continue;
+    const raw=String(message.mes||'');
+    const match=raw.match(/【\s*DAY\s*0*(\d{1,3})\s*｜\s*([^｜】\n]+)\s*｜\s*([^｜】\n]+)\s*｜\s*([^｜】\n]+)\s*｜\s*([^】\n]+)\s*】/u);
+    if(!match) continue;
+    return {
+      raw:match[0],
+      day:Math.max(1,Number(match[1])||1),
+      date:String(match[2]||'').trim(),
+      time:String(match[3]||'').trim(),
+      weather:String(match[4]||'').trim(),
+      location:String(match[5]||'').trim(),
+      messageIndex:i,
+    };
+  }
+  return null;
+}
+
 function installRuntimePrompt(){
   if(!isBoundCharacter()) return;
   const context=globalThis.SillyTavern?.getContext?.();
@@ -2772,6 +2793,8 @@ function installRuntimePrompt(){
   const plotTaskFreq=plotTaskFrequency(state);
   const lifestyleDisposition=lifestyleShelfDisposition(state);
   const visibleChatTurns=Array.isArray(context?.chat)?context.chat.length:0;
+  const previousSceneStatus=latestVisibleSceneStatus(context?.chat);
+  const previousSceneStatusText=previousSceneStatus?.raw || 'NONE — establish a precise scene clock in this reply';
   const memoryNeedsBootstrap=!Boolean(state.memory?.initialized);
   const prompt=`[MÉMÉ OS runtime bridge]
 HOST PERSONA RULE:
@@ -2918,11 +2941,22 @@ Do not verify intentions, promises, partial attempts, vague claims, or a task th
 A completed task should disappear/cross out as soon as this reply is processed; there is no separate claim step.
 For sample, oral and drain: after their first-ever completion they become repeatable collection tasks, at most once per in-world story day. The extension automatically switches later payouts to SV-only repeat rewards. Never invent extra AP for repeated completions.
 
-VISIBLE SCENE STATUS — HARD FORMAT RULE:
-Every normal assistant story reply MUST begin with exactly one compact visible status line BEFORE any prose:
-【DAY ${String(Math.max(1,Number(state.tasks?.storyDay)||1)).padStart(3,'0')}｜<日期>｜<时间段>｜<天气>｜<地点>】
-This line belongs to the visible正文, not the MÉMÉ OS panel.
-Infer 日期 / 时间段 / 天气 / 地点 from the visible narrative continuity. Preserve the previous value when the scene has not changed. Do not invent a new time, weather or location merely to make the line look different. When the story clearly crosses into a new natural day, update the visible status line accordingly. Do not include AP, SV, CHARM or WITH/人物列表 in this line.
+VISIBLE SCENE STATUS — PRECISE STORY CLOCK — HARD FORMAT RULE:
+Every normal assistant story reply MUST begin with exactly one compact visible status line BEFORE any prose, in EXACTLY this shape:
+【DAY ${String(Math.max(1,Number(state.tasks?.storyDay)||1)).padStart(3,'0')}｜<M月D日>｜<HH:MM>｜<天气>｜<地点>】
+
+Current previous visible scene status:
+${previousSceneStatusText}
+
+STRICT DATE/TIME RULES:
+1. 日期 MUST contain both month AND day, e.g. "11月23日". Never output only "11月", "23日", "今天", "次日" or another vague date.
+2. 时间 MUST be exact 24-hour HH:MM, e.g. "08:17", "14:05", "23:41". Never output "上午 / 下午 / 清晨 / 晚上 / 深夜" in the time slot.
+3. Treat the previous visible scene status as the story-clock anchor. Advance from its exact date/time according to the amount of time visibly consumed by the current narrative actions. Immediate continuation may advance only a few minutes; walking, eating, bathing, travel, sleep, waiting, etc. must advance by a plausible matching duration.
+4. Do NOT randomly reset the clock or invent large time jumps just to change the header. If the story has not established a large jump, preserve continuity and advance only as much as the described actions reasonably take.
+5. When HH:MM passes midnight, advance M月D日 and the natural DAY number consistently. When the story explicitly says "第二天 / 次日 / N天后", advance the calendar by the stated amount even if no sleep scene is shown.
+6. If an older header is incomplete (for example "11月｜上午"), repair it ONCE in the next reply by establishing a specific M月D日 and HH:MM consistent with the visible story, then use that precise value as the stable anchor from then on.
+7. Weather and location must follow narrative continuity. Keep them unchanged unless the story actually changes them.
+8. This line belongs to visible正文, not the MÉMÉ OS panel. Do not include AP, SV, CHARM or a people/WITH list.
 
 STORY DAY:
 Current reconstructed in-world story day=${Number(state.tasks?.storyDay)||1}. The extension reconstructs chronology from the COMPLETE VISIBLE CHAT, so do not force visible DAY headings merely to feed the OS. Keep natural time progression internally consistent. If the story goes through night/sleep and then wakes into the next morning, that is a new natural day. Explicit "次日 / 第二天 / N天后 / N周后" jumps are also real day transitions. timeline.storyDay/dayAdvance may be emitted as advisory metadata, but they do not control the stored day.
@@ -4536,7 +4570,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
-        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.11.7</small>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.11.8</small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
