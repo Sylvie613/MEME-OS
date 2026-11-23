@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 27;
+const SCHEMA_VERSION = 28;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -98,6 +98,9 @@ const DEFAULT_STATE = Object.freeze({
         dismissed: [],
         lastGeneratedDesireDay: 0,
         lastGeneratedDailyTurn: 0,
+        plotTaskIssuedDay: 0,
+        plotTaskIssuedCount: 0,
+        lastPlotTaskTurn: -999,
         completed: {},
         dailyCompleted: {},
         everCompleted: {},
@@ -210,6 +213,9 @@ function mergeState(raw) {
             dismissed: Array.isArray(raw.tasks?.dismissed) ? raw.tasks.dismissed.slice(-40) : [],
             lastGeneratedDesireDay: Math.max(0, Number(raw.tasks?.lastGeneratedDesireDay) || 0),
             lastGeneratedDailyTurn: Math.max(0, Number(raw.tasks?.lastGeneratedDailyTurn) || 0),
+            plotTaskIssuedDay: Math.max(0, Number(raw.tasks?.plotTaskIssuedDay) || 0),
+            plotTaskIssuedCount: Math.max(0, Number(raw.tasks?.plotTaskIssuedCount) || 0),
+            lastPlotTaskTurn: Number.isFinite(Number(raw.tasks?.lastPlotTaskTurn)) ? Number(raw.tasks.lastPlotTaskTurn) : -999,
             completed: { ...base.tasks.completed, ...(raw.tasks?.completed ?? {}) },
             dailyCompleted: { ...base.tasks.dailyCompleted, ...(raw.tasks?.dailyCompleted ?? {}) },
             everCompleted: { ...base.tasks.everCompleted, ...(raw.tasks?.everCompleted ?? {}), ...(raw.tasks?.completed ?? {}) },
