@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.13.9",
+  "version": "0.13.10",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS 0.13.9 aligns prose↔OS linkage: canonical DAY header parsing, returning-MEN focus lock, and mandatory DESIRE target binding.",
-  "js": "index-v0.13.9.js",
-  "css": "style.css?v=0.13.9",
+  "description": "MÉMÉ OS 0.13.10 persists DESIRE completion progress across multiple turns, verifies from task acceptance onward, and settles only after all required conditions are proven.",
+  "js": "index-v0.13.10.js",
+  "css": "style.css?v=0.13.10",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
