@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.11.6';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.11.6';
-import { isBoundCharacter } from './src/binding.js?v=0.11.6';
+} from './src/state.js?v=0.11.7';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.11.7';
+import { isBoundCharacter } from './src/binding.js?v=0.11.7';
 
 /**
- * MÉMÉ OS v0.11.6
+ * MÉMÉ OS v0.11.7
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -888,42 +888,9 @@ function applyMemoryEvent(state,raw,visibleTurns=0){
   return changed;
 }
 
-function applyStoryStatusEvent(state,raw){
-  if(!raw || typeof raw!=='object') return false;
-  state.storyStatus=state.storyStatus||{
-    initialized:false,date:'',time:'',weather:'',location:'',people:[],note:'',updatedTurn:0,
-  };
-  let changed=false;
-  const assignText=(key,max)=>{
-    if(!Object.prototype.hasOwnProperty.call(raw,key)) return;
-    const value=cleanMemoryText(raw[key],max);
-    if(value!==state.storyStatus[key]){
-      state.storyStatus[key]=value;
-      changed=true;
-    }
-  };
-  assignText('date',40);
-  assignText('time',24);
-  assignText('weather',48);
-  assignText('location',80);
-  assignText('note',120);
-
-  if(Array.isArray(raw.people)){
-    const people=uniqueMemoryList(raw.people,8,40);
-    if(JSON.stringify(people)!==JSON.stringify(state.storyStatus.people||[])){
-      state.storyStatus.people=people;
-      changed=true;
-    }
-  }
-
-  if(raw.initialized===true || changed){
-    if(!state.storyStatus.initialized){
-      state.storyStatus.initialized=true;
-      changed=true;
-    }
-  }
-  if(changed) state.storyStatus.updatedTurn=Math.max(0,Number(state.shop?.plotTurn)||0);
-  return changed;
+function applyStoryStatusEvent(){
+  // Retired in v0.11.7. Scene date/time/weather/location live in visible prose only.
+  return false;
 }
 
 function extractJsonObject(raw){
@@ -1196,9 +1163,6 @@ async function quietSyncMemory({force=false,bootstrapOnly=false}={}){
   memoryQuietLastAttemptTurn=turn;
 
   const chatCount=Array.isArray(context.chat)?context.chat.length:0;
-  const currentDate=storyDateLabel(state);
-  const currentWeather=String(state.storyStatus.weather||'晴 · 闷热');
-
   const prompt=bootstrap
     ? `你正在为持续角色扮演聊天建立第一次 MEMORY。请阅读当前能看到的完整聊天历史，并按“每一个 user+assistant 剧情回合对应一条短期记忆”的规则回填。
 
@@ -2585,7 +2549,6 @@ async function handleRuntimeEvent(messageId){
         }
       }
 
-      if(applyStoryStatusEvent(state,event.status)) changed=true;
       if(applyMemoryEvent(state,event.memory,visibleChatTurns)) changed=true;
 
       // timeline.storyDay/dayAdvance is advisory metadata only.
@@ -4573,7 +4536,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
-        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.11.6</small>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.11.7</small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
