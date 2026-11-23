@@ -1,0 +1,77 @@
+name: Build MÉMÉ OS role-card PNG
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "cards/meme_os_card_v0.4.1-alpha.json"
+      - ".github/workflows/build-rolecard-png.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build PNG card from latest JSON
+        shell: python
+        run: |
+          import base64, binascii, json, struct
+          from pathlib import Path
+
+          src_png = Path("cards/meme_os_card_v0.4.0-alpha.png")
+          src_json = Path("cards/meme_os_card_v0.4.1-alpha.json")
+          out_png = Path("cards/meme_os_card_v0.4.1-alpha.png")
+
+          data = json.loads(src_json.read_text(encoding="utf-8"))
+          compact = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+          payload = base64.b64encode(compact)
+
+          raw = src_png.read_bytes()
+          sig = raw[:8]
+          pos = 8
+          chunks = []
+
+          def chunk(kind: bytes, body: bytes) -> bytes:
+              return (
+                  struct.pack(">I", len(body))
+                  + kind
+                  + body
+                  + struct.pack(">I", binascii.crc32(kind + body) & 0xffffffff)
+              )
+
+          while pos < len(raw):
+              ln = struct.unpack(">I", raw[pos:pos+4])[0]
+              kind = raw[pos+4:pos+8]
+              body = raw[pos+8:pos+8+ln]
+              full = raw[pos:pos+12+ln]
+              pos += 12 + ln
+
+              if kind == b"tEXt":
+                  key = body.split(b"\x00", 1)[0]
+                  if key in {b"chara", b"ccv3"}:
+                      continue
+
+              if kind == b"IEND":
+                  chunks.append(chunk(b"tEXt", b"chara\x00" + payload))
+                  chunks.append(chunk(b"tEXt", b"ccv3\x00" + payload))
+
+              chunks.append(full)
+
+          out_png.write_bytes(sig + b"".join(chunks))
+
+      - name: Commit generated card
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add cards/meme_os_card_v0.4.1-alpha.png
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Build MÉMÉ OS v0.4.1-alpha PNG card"
+          git push
