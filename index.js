@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.11.0';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.11.0';
-import { isBoundCharacter } from './src/binding.js?v=0.11.0';
+} from './src/state.js?v=0.11.1';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.11.1';
+import { isBoundCharacter } from './src/binding.js?v=0.11.1';
 
 /**
- * MÉMÉ OS v0.11.0
+ * MÉMÉ OS v0.11.1
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -1001,7 +1001,7 @@ function relativeStoryDayJump(text=''){
 }
 
 function currentNightCue(text=''){
-  return /(今晚|今夜|当天晚上|傍晚|晚上|深夜|夜深|凌晨|半夜|后半夜|准备睡|去睡|睡下|睡着|入睡|上床睡|熬到天亮)/u.test(String(text||''));
+  return /(今晚|今夜|当天晚上|傍晚|晚上|深夜|夜深|凌晨|半夜|准备睡|去睡|睡下|睡着|入睡|上床睡|熬到天亮)/u.test(String(text||''));
 }
 
 function morningCue(text=''){
@@ -1021,6 +1021,7 @@ function reconstructStoryTimeline(chat=[]){
   let day=1;
   let dayStartIndex=0;
   let sawCurrentNight=false;
+  let morningClusterActive=false;
   let previousText='';
   const boundaries=[];
 
@@ -1036,6 +1037,7 @@ function reconstructStoryTimeline(chat=[]){
       dayStartIndex=i;
       boundaries.push({index:i,day,kind:'visible-day'});
       sawCurrentNight=currentNightCue(text);
+      morningClusterActive=morningCue(text);
       previousText=text;
       continue;
     }
@@ -1046,6 +1048,7 @@ function reconstructStoryTimeline(chat=[]){
       dayStartIndex=i;
       boundaries.push({index:i,day,kind:'explicit-transition',jump});
       sawCurrentNight=currentNightCue(text);
+      morningClusterActive=morningCue(text);
       previousText=text;
       continue;
     }
@@ -1056,7 +1059,8 @@ function reconstructStoryTimeline(chat=[]){
     const previousWake=wakeCue(previousText);
     const previousMorning=morningCue(previousText);
 
-    const strongMorningBoundary=
+    const selfContainedMorningBoundary=morning && wake && priorNight;
+    const contextualMorningBoundary=
       sawCurrentNight &&
       (
         (morning && wake) ||
@@ -1064,17 +1068,30 @@ function reconstructStoryTimeline(chat=[]){
         (morning && previousWake) ||
         (wake && previousMorning && priorNight)
       );
+    const strongMorningBoundary=
+      !morningClusterActive &&
+      (selfContainedMorningBoundary || contextualMorningBoundary);
 
     if(strongMorningBoundary){
       day+=1;
       dayStartIndex=i;
-      boundaries.push({index:i,day,kind:'night-to-morning'});
+      boundaries.push({
+        index:i,
+        day,
+        kind:selfContainedMorningBoundary?'self-contained-morning':'night-to-morning',
+      });
       sawCurrentNight=false;
+      morningClusterActive=true;
     }
 
-    // Only current-night/sleep evidence arms the NEXT morning boundary.
-    // Historical wording such as "昨晚" does not arm it.
-    if(currentNightCue(text)) sawCurrentNight=true;
+    // A real present-night/sleep cue arms the next morning and closes the
+    // current morning cluster. Historical "昨晚 / 后半夜" references do not.
+    if(currentNightCue(text)){
+      sawCurrentNight=true;
+      morningClusterActive=false;
+    }else if(morning){
+      morningClusterActive=true;
+    }
     previousText=text;
   }
 
