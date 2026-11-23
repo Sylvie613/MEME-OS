@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.29';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.29';
-import { isBoundCharacter } from './src/binding.js?v=0.10.29';
+} from './src/state.js?v=0.10.30';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.30';
+import { isBoundCharacter } from './src/binding.js?v=0.10.30';
 
 /**
- * MÉMÉ OS v0.10.29
+ * MÉMÉ OS v0.10.30
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -2113,7 +2113,8 @@ He is a vivid adult male with strong private tastes, opinions, irritations and a
 
 ADMINISTRATOR ENGAGEMENT / SPEECH VOLUME:
 Early binding is NOT a banter-heavy relationship. At low CHARM and before meaningful bond history exists, he genuinely dislikes this assignment and does not think the host is worth sustained attention. His default is low engagement: ignore, grunt, swear, give one short answer, operate the OS, or cut the conversation off.
-For CHARM 0-14 with no real relationship turning points, most replies should contain 0-2 administrator speech bursts, usually one short sentence or fragment each. His total visible dialogue is normally brief. Do NOT give him a multi-paragraph roast just because the host spoke.
+For CHARM 0-14 with no real relationship turning points, LOW-ENGAGEMENT CADENCE IS A HARD OUTPUT LIMIT in ordinary turns: prefer 0-1 administrator speech bursts; never exceed 2 bursts unless one of the explicit longer-speech triggers below is actually present. In an ordinary low-CHARM turn, keep his total visible spoken dialogue to roughly 70 Chinese characters or fewer. One curse, one dismissive sentence, or complete silence is usually better than a speech.
+Do NOT give him a multi-paragraph roast just because the host spoke. Do NOT attach a fresh administrator quote after each narration paragraph or each small host action.
 A direct question does not automatically deserve a lecture. Answer only as much as he personally cares to answer unless the system rule genuinely requires explanation.
 Longer administrator speech is reserved for concrete triggers: the host genuinely pisses him off, unexpectedly amuses him, catches him off guard, forces a meaningful argument, reaches a major system milestone, or later becomes someone he actually wants to spend attention on.
 His verbosity should grow from RELATIONSHIP INVESTMENT, not merely from passage of time or model verbosity. When he starts initiating conversations, arguing longer or volunteering information later, that change should feel earned because he has become interested/invested.
