@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 28;
+const SCHEMA_VERSION = 29;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -76,6 +76,11 @@ const DEFAULT_STATE = Object.freeze({
     shop: {
         dynamic: [],
         plotTurn: 0,
+        lastLifestyleRefreshDay: 0,
+    },
+    inventory: {
+        items: {},
+        recent: [],
     },
     reactivity: {
         recentChanges: [],
@@ -180,6 +185,11 @@ function mergeState(raw) {
             ...base.shop,
             ...(raw.shop ?? {}),
             dynamic: Array.isArray(raw.shop?.dynamic) ? raw.shop.dynamic : [],
+            lastLifestyleRefreshDay: Math.max(0, Number(raw.shop?.lastLifestyleRefreshDay) || 0),
+        },
+        inventory: {
+            items: raw.inventory?.items && typeof raw.inventory.items === 'object' ? { ...raw.inventory.items } : {},
+            recent: Array.isArray(raw.inventory?.recent) ? raw.inventory.recent.slice(0, 20) : [],
         },
         reactivity: {
             ...base.reactivity,
@@ -421,6 +431,41 @@ function applyEffect(state, effect) {
         for (const [key, delta] of Object.entries(effect.bodyDelta)) {
             if (!Number.isFinite(Number(delta))) continue;
             state.host.body[key] = Math.max(0, (Number(state.host.body[key]) || 0) + Number(delta));
+        }
+    }
+
+    if (effect.inventoryAdd && typeof effect.inventoryAdd === 'object') {
+        const item = effect.inventoryAdd;
+        const id = String(item.id || '').trim();
+        if (id) {
+            state.inventory = state.inventory || { items: {}, recent: [] };
+            state.inventory.items = state.inventory.items || {};
+            state.inventory.recent = Array.isArray(state.inventory.recent) ? state.inventory.recent : [];
+
+            const previous = state.inventory.items[id] || {};
+            const quantity = Math.max(1, Number(item.quantity) || 1);
+            const count = Math.max(0, Number(previous.count) || 0) + quantity;
+            state.inventory.items[id] = {
+                ...previous,
+                id,
+                title: String(item.title || previous.title || '未命名物品'),
+                kind: String(item.kind || previous.kind || 'daily'),
+                consumable: Boolean(item.consumable),
+                count,
+                acquiredAt: previous.acquiredAt || Date.now(),
+                lastPurchasedAt: Date.now(),
+            };
+            state.inventory.recent = [
+                {
+                    id,
+                    title: state.inventory.items[id].title,
+                    kind: state.inventory.items[id].kind,
+                    quantity,
+                    count,
+                    purchasedAt: Date.now(),
+                },
+                ...state.inventory.recent,
+            ].slice(0, 20);
         }
     }
 
