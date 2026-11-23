@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.10.17",
+  "version": "0.10.18",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS: canonical [TASK] story-task protocol, user task correction controls with dismiss persistence, legacy DAILY migration, semantic dedupe, adaptive economy, and swipe-safe replay.",
-  "js": "index.js?v=0.10.17",
-  "css": "style.css?v=0.10.17",
+  "description": "MÉMÉ OS: natural-day rotating task pools, rare plot-gift [TASK] markers with OS-priced rewards, user correction controls, adaptive economy, and swipe-safe authoritative state.",
+  "js": "index.js?v=0.10.18",
+  "css": "style.css?v=0.10.18",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
