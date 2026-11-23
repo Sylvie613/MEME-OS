@@ -3003,6 +3003,7 @@ function moduleIcon(type) {
     men: '♂',
     system: '♛',
     record: '≋',
+    memory: '✧',
     home: '⌂',
   };
   return icons[type] || '•';
@@ -3138,6 +3139,61 @@ function statsMarkup(compact = false) {
   `;
 }
 
+function storyStatusMarkup(state=runtimeState()){
+  const status=state.storyStatus||{};
+  const date=status.date || `DAY ${String(Math.max(1,Number(state.tasks?.storyDay)||1)).padStart(3,'0')}`;
+  const time=status.time || '—';
+  const weather=status.weather || '—';
+  const location=status.location || '—';
+  const people=Array.isArray(status.people)&&status.people.length ? status.people.join(' · ') : '—';
+  return `
+    <section class="meme-story-status">
+      <span><small>DATE</small><b>${date}</b></span>
+      <span><small>TIME</small><b>${time}</b></span>
+      <span><small>WEATHER</small><b>${weather}</b></span>
+      <span class="is-wide"><small>LOCATION</small><b>${location}</b></span>
+      <span class="is-wide"><small>WITH</small><b>${people}</b></span>
+    </section>
+  `;
+}
+
+function memoryLayerMarkup(title,code,items,emptyText,open=false){
+  const list=Array.isArray(items)?items:[];
+  return `
+    <details class="meme-memory-layer" ${open?'open':''}>
+      <summary><span><small>${code}</small><b>${title}</b></span><em>${list.length}</em></summary>
+      <div class="meme-memory-body">
+        ${list.length
+          ? list.map((item,index)=>`<article><i>${String(index+1).padStart(2,'0')}</i><p>${escapeHtml(item)}</p></article>`).join('')
+          : `<p class="meme-memory-empty">${emptyText}</p>`}
+      </div>
+    </details>
+  `;
+}
+
+function memoryMarkup(){
+  const state=runtimeState();
+  const memory=state.memory||{};
+  const initialized=Boolean(memory.initialized);
+  return `
+    ${pageHeader('CONTEXT VAULT','MEMORY · 我替你记着',initialized?'SYNCED':'BOOTSTRAP')}
+    <section class="meme-page-card">
+      <div class="meme-card-title">
+        <small>MEMORY STATUS</small>
+        <h3>${initialized?'旧账已经接上了':'等下一轮自动巡查旧聊天'}</h3>
+      </div>
+      ${labelValue('回填状态',initialized?'BOOTSTRAPPED':'PENDING',initialized?`首次回填参考了约 ${Number(memory.sourceTurns)||0} 条可见消息`:'第一次生成回复时，会回看当前模型能看到的旧聊天后再建档。')}
+      ${labelValue('记忆原则','只记会影响后续的东西','不保存普通走路、重复数值、无意义流水账，也不凭空补事实。')}
+    </section>
+
+    <section class="meme-memory-stack">
+      ${memoryLayerMarkup('近期','SHORT',memory.short,'还没有值得单独记下的近期事实。',true)}
+      ${memoryLayerMarkup('阶段','LONG',memory.long,'短期记忆积累到足够有意义时，会压成阶段总结。')}
+      ${memoryLayerMarkup('永久','CORE',memory.core,'真正长期影响剧情的关系、变化和关键事实才会进这里。')}
+    </section>
+  `;
+}
+
 function homeMarkup() {
   const state=runtimeState();
   const voice=attitude(state);
@@ -3167,6 +3223,8 @@ function homeMarkup() {
       <article><small>NEXT UNLOCK</small><b>${nextUnlock}</b><em>我说开才开</em></article>
     </section>
 
+    ${storyStatusMarkup(state)}
+
     <section class="meme-whisper-card">
       <span>♛</span>
       <div><small>${adminDisplayName(state)} · ${voice.label}</small><b>${systemHomeLine(state)}</b></div>
@@ -3175,7 +3233,7 @@ function homeMarkup() {
     <section class="meme-modules">
       <div class="meme-section-head">
         <div><small>PRIVATE ACCESS</small><h3>想看什么自己点</h3></div>
-        <span>7 / 7</span>
+        <span>8 / 8</span>
       </div>
       <div class="meme-module-grid">
         ${moduleCard('me','ME','看看这副身子还剩多少能救')}
@@ -3184,6 +3242,7 @@ function homeMarkup() {
         ${moduleCard('men','MEN','睡过你、想睡你的男人')}
         ${moduleCard('system','SYSTEM','看我干什么')}
         ${moduleCard('record','RECORD','你干过的脏事我都记着')}
+        ${moduleCard('memory','MEMORY','前面的事别指望我忘')}
         ${moduleCard('home','HOME','滚回总览')}
       </div>
     </section>
@@ -3818,6 +3877,7 @@ function renderView(view='home', animate=true) {
     men: menMarkup,
     system: () => systemAccessStage(runtimeState())==='locked' ? lockedSystemMarkup() : systemMarkup(),
     record: recordMarkup,
+    memory: memoryMarkup,
   };
 
   const paint=()=>{
