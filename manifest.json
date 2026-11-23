@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.10.14",
+  "version": "0.10.15",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS: semantic daily-task dedupe, formal visible-task-card synchronization, adaptive plot economy, swipe-safe replay, and authoritative state.",
-  "js": "index.js?v=0.10.14",
-  "css": "style.css?v=0.10.14",
+  "description": "MÉMÉ OS: canonical visible DAILY-card sync, semantic task dedupe, adaptive plot economy, swipe-safe replay, and authoritative state.",
+  "js": "index.js?v=0.10.15",
+  "css": "style.css?v=0.10.15",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
