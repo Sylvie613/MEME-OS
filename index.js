@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.16';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.16';
-import { isBoundCharacter } from './src/binding.js?v=0.10.16';
+} from './src/state.js?v=0.10.17';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.17';
+import { isBoundCharacter } from './src/binding.js?v=0.10.17';
 
 /**
- * MÉMÉ OS v0.10.16
+ * MÉMÉ OS v0.10.17
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -476,6 +476,45 @@ function pruneRedundantGeneratedDaily(state=runtimeState()){
   return changed;
 }
 
+function normalizedTaskTitle(value=''){
+  return String(value||'').replace(/\s+/g,'').replace(/[“”"'「」『』【】\[\]·•・⋅∙:：|｜，,。！？!?；;]/g,'').toLowerCase();
+}
+
+function isDismissedGeneratedTask(candidate,state=runtimeState()){
+  const dismissed=Array.isArray(state.tasks?.dismissed)?state.tasks.dismissed:[];
+  const storyDay=Math.max(1,Number(state.tasks?.storyDay)||1);
+  const title=normalizedTaskTitle(candidate?.title);
+  const tags=taskActionTags(candidate).sort().join('|');
+  return dismissed.some(item=>{
+    if(Number(item?.storyDay||0)!==storyDay) return false;
+    const oldTitle=normalizedTaskTitle(item?.title);
+    const oldTags=Array.isArray(item?.actionTags)?[...item.actionTags].map(String).sort().join('|'):'';
+    return (title && oldTitle && title===oldTitle) || (tags && oldTags && tags===oldTags);
+  });
+}
+
+function rememberDismissedTask(state,task){
+  if(!task) return;
+  state.tasks=state.tasks||{};
+  state.tasks.dismissed=Array.isArray(state.tasks.dismissed)?state.tasks.dismissed:[];
+  const record={
+    id:String(task.id||''),
+    title:String(task.title||''),
+    category:String(task.category||'daily'),
+    actionTags:taskActionTags(task),
+    storyDay:Math.max(1,Number(state.tasks.storyDay)||1),
+    dismissedTurn:Number(state.shop?.plotTurn)||0,
+    dismissedAt:Date.now(),
+  };
+  state.tasks.dismissed=[
+    ...state.tasks.dismissed.filter(item=>!(item.id===record.id || (
+      Number(item.storyDay||0)===record.storyDay &&
+      normalizedTaskTitle(item.title)===normalizedTaskTitle(record.title)
+    ))),
+    record,
+  ].slice(-40);
+}
+
 function sanitizeGeneratedDailyTask(raw,state=runtimeState()){
   if(!raw || typeof raw!=='object') return null;
   const title=String(raw.title||'').replace(/\s+/g,' ').trim().slice(0,48);
@@ -495,6 +534,7 @@ function sanitizeGeneratedDailyTask(raw,state=runtimeState()){
   if(state.tasks?.everCompleted?.[id]) return null;
   if((state.tasks?.generatedDaily||[]).some(task=>task.id===id)) return null;
   if(state.tasks?.active?.[id]) return null;
+  if(isDismissedGeneratedTask(candidate,state)) return null;
   if(isSemanticallyFinishedDaily(candidate,state)) return null;
   if(hasOpenSemanticDuplicate(candidate,state)) return null;
 
@@ -1206,35 +1246,46 @@ function purgeKnownLegacyWrongGeneratedTasks(state=runtimeState()){
   return changed;
 }
 
-function removeGeneratedDailyByTitle(state,title){
+function removeGeneratedTaskByTitle(state,title){
   const needle=String(title||'').trim();
   if(!needle) return null;
   state.tasks=state.tasks||{};
   state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
+  state.tasks.generated=Array.isArray(state.tasks.generated)?state.tasks.generated:[];
   let removed=null;
-  state.tasks.generatedDaily=state.tasks.generatedDaily.filter(task=>{
-    const taskTitle=String(task.title||'').trim();
-    const match=taskTitle===needle || taskTitle.includes(needle) || needle.includes(taskTitle);
-    if(match && !removed){
-      removed=task;
-      return false;
-    }
-    return true;
-  });
-  if(removed && state.tasks?.active?.[removed.id]) delete state.tasks.active[removed.id];
+
+  for(const key of ['generatedDaily','generated']){
+    state.tasks[key]=state.tasks[key].filter(task=>{
+      const taskTitle=String(task.title||'').trim();
+      const match=taskTitle===needle || taskTitle.includes(needle) || needle.includes(taskTitle);
+      if(match && !removed){
+        removed=task;
+        return false;
+      }
+      return true;
+    });
+    if(removed) break;
+  }
+
+  if(removed){
+    if(state.tasks?.active?.[removed.id]) delete state.tasks.active[removed.id];
+    rememberDismissedTask(state,removed);
+  }
   return removed;
 }
 
-function removeLatestGeneratedDaily(state){
+function removeLatestGeneratedTask(state){
   state.tasks=state.tasks||{};
-  const list=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
+  const list=[
+    ...(Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[]),
+    ...(Array.isArray(state.tasks.generated)?state.tasks.generated:[]),
+  ];
   if(!list.length) return null;
   const sorted=[...list].sort((a,b)=>
     Number(b.createdTurn||0)-Number(a.createdTurn||0) ||
     Number(b.createdDay||0)-Number(a.createdDay||0)
   );
-  const target=sorted[0];
-  return removeGeneratedDailyByTitle(state,target.title);
+  return removeGeneratedTaskByTitle(state,sorted[0].title);
 }
 
 function parseOsTaskCorrections(text=''){
@@ -1267,9 +1318,9 @@ async function applyOsTaskCorrectionsFromUserMessage(text=''){
 
   for(const directive of directives){
     let removed=null;
-    if(directive.title) removed=removeGeneratedDailyByTitle(state,directive.title);
-    if(!removed && directive.latest) removed=removeLatestGeneratedDaily(state);
-    if(!removed && !directive.title) removed=removeLatestGeneratedDaily(state);
+    if(directive.title) removed=removeGeneratedTaskByTitle(state,directive.title);
+    if(!removed && directive.latest) removed=removeLatestGeneratedTask(state);
+    if(!removed && !directive.title) removed=removeLatestGeneratedTask(state);
     if(!removed) continue;
 
     state.history.push({
@@ -1293,6 +1344,52 @@ async function applyOsTaskCorrectionsFromUserMessage(text=''){
   return results;
 }
 
+function extractLegacyDailyCardsForMigration(raw=''){
+  const text=String(raw||'');
+  const cards=[];
+  const re=/【\s*(?:DAILY|日常)\s*[·•・⋅∙:：|｜-]\s*([^】\n]{2,48})】/gi;
+  const matches=[...text.matchAll(re)];
+  for(let i=0;i<matches.length;i++){
+    const match=matches[i];
+    const title=String(match[1]||'').replace(/\s+/g,' ').trim().slice(0,48);
+    const start=Number(match.index||0)+String(match[0]||'').length;
+    const next=i+1<matches.length?Number(matches[i+1].index||text.length):text.length;
+    const lines=text.slice(start,next).split(/\r?\n/);
+    const req=[];
+    for(const rawLine of lines){
+      const line=String(rawLine||'').trim();
+      if(!line){
+        if(req.length) break;
+        continue;
+      }
+      if(/^【/.test(line) || /^\[TASK/i.test(line)) break;
+      if(req.length && /^(?:你|他|男人|管理员|系统).{0,12}(?:说|看|盯|笑|冷笑|声音|视线|问|答|开口|僵|愣|咬|攥)/u.test(line)) break;
+      req.push(line);
+      if(req.join(' ').length>=220) break;
+    }
+    const desc=req.join(' ').replace(/\s+/g,' ').trim().slice(0,180);
+    if(title && desc) cards.push({title,desc});
+  }
+  return cards;
+}
+
+function taskFromLegacyDailyCard(card,state=runtimeState()){
+  if(!card) return null;
+  const actionCount=(String(card.desc||'').match(/[，,、；;]/g)||[]).length+1;
+  const hardCue=/(二十分钟|半小时|一小时|坚持|运动|出门|公共|社交|当众|长时间|彻底|完整完成|连续)/.test(card.desc||'');
+  const lightCue=actionCount<=1 && /(扔|擦|关|拿|喝|换一件|刷牙|洗脸|吹干)/.test(card.desc||'');
+  const difficulty=hardCue?'hard':lightCue?'light':'normal';
+  const task=sanitizeGeneratedDailyTask({
+    title:card.title,
+    desc:card.desc,
+    detail:'旧式 DAILY 可见任务卡一次性迁移；后续新任务只认 [TASK]。',
+    source:'迁移：旧式DAILY卡',
+    difficulty,
+  },state);
+  if(task) task.legacyMigrated=true;
+  return task;
+}
+
 async function reconcileRecentVisibleTaskOffers(){
   if(!isBoundCharacter() || !hasActiveChat()) return;
   const context=globalThis.SillyTavern?.getContext?.()||{};
@@ -1308,9 +1405,13 @@ async function reconcileRecentVisibleTaskOffers(){
     const message=chat[i];
     if(!message || message.is_user) continue;
     const raw=String(message.mes||'');
-    const task=inferVisibleDailyTaskOffer(raw,state);
+    let task=inferVisibleDailyTaskOffer(raw,state);
+    if(!task){
+      const legacy=extractLegacyDailyCardsForMigration(raw);
+      if(legacy.length) task=taskFromLegacyDailyCard(legacy[legacy.length-1],state);
+    }
     if(!task) continue;
-    if(task.canonicalMarker && removeFallbackTasksCompetingWithFormalCard(state,task)) changed=true;
+    if((task.canonicalMarker || task.legacyMigrated) && removeFallbackTasksCompetingWithFormalCard(state,task)) changed=true;
     const historyId=`meme_visible_task_reconcile_${i}_${task.id}`;
     if((state.history||[]).some(entry=>entry.id===historyId)) continue;
     if(state.tasks.everCompleted?.[task.id] || state.tasks.active?.[task.id] || state.tasks.generatedDaily.some(old=>old.id===task.id)){
@@ -1846,6 +1947,7 @@ A new task MUST add a genuinely unfinished action. Never issue a task whose enti
 Completed daily tasks are not permanent checklist items. A just-completed daily/story task may remain visible as crossed-out for the current assistant turn only; on the next assistant turn it leaves the board permanently. Completed starter dailies do not reopen tomorrow.
 Current open starter dailies: ${JSON.stringify(TASK_DATA.daily.filter(t=>!state.tasks?.everCompleted?.[t.id]).map(t=>({id:t.id,title:t.title,desc:t.desc})))}.
 Current generated daily/story tasks: ${JSON.stringify((state.tasks?.generatedDaily||[]).filter(t=>!state.tasks?.everCompleted?.[t.id]).map(t=>({id:t.id,title:t.title,desc:t.desc,difficulty:t.difficulty,source:t.source})))}.
+Host-dismissed generated tasks for the current story day: ${JSON.stringify((state.tasks?.dismissed||[]).filter(t=>Number(t.storyDay||0)===Number(state.tasks?.storyDay||1)).map(t=>({title:t.title,actionTags:t.actionTags})))}. Do not reissue the same dismissed task or an equivalent same-action rewrite during this story day.
 When the visible daily board has fewer than 5 unfinished tasks, you SHOULD create one context-fitting replacement through dailyTaskOffers if the current plot offers a sensible mundane, appearance, hygiene, movement, social-presentation or practical challenge. Do not regenerate an already completed task under a synonym.
 CANONICAL VISIBLE TASK PROTOCOL: when MÉMÉ OS/the administrator truly publishes a NEW temporary daily/story task, you MUST show exactly one visible marker on its own line using this exact syntax: [TASK｜任务名｜任务要求]. This visible [TASK] marker is the canonical task source and the extension reads it immediately after the reply appears. Do NOT use 【DAILY · ...】, vague "new task card" narration, ordinary dialogue, or hidden dailyTaskOffers as the authoritative source. If no [TASK｜...｜...] marker appears, no new temporary daily/story task has been published. Ordinary commands or insults such as "去洗头" remain dialogue only.
 USER CORRECTION AUTHORITY: parenthetical user instructions beginning with （OS：...） or (OS:...) are out-of-story control directives. The extension may remove an incorrect generated task immediately. Never argue with, reinterpret or roleplay against these correction directives.
