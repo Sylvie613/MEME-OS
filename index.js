@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.40';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.40';
-import { isBoundCharacter } from './src/binding.js?v=0.10.40';
+} from './src/state.js?v=0.10.41';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.41';
+import { isBoundCharacter } from './src/binding.js?v=0.10.41';
 
 /**
- * MÉMÉ OS v0.10.40
+ * MÉMÉ OS v0.10.41
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -961,6 +961,41 @@ function extractVisibleStoryDay(raw=''){
     .map(match=>Math.max(1,Number(match[1])||0))
     .filter(Boolean);
   return days.length?Math.max(...days):null;
+}
+
+function detectNaturalStoryDayBoundary(raw=''){
+  const text=String(raw||'').replace(/<!--MEME_OS_EVENT[\s\S]*?-->/g,' ').slice(0,7000);
+  const explicit=/(?:^|[。！？!?\n\s])(次日|翌日|第二天(?:一早|清晨|早上|上午)?|隔天|又过了一夜|过了一夜|一夜过去|新的一天)(?:[，,。！？!?\s]|$)/u.test(text);
+  if(explicit) return {kind:'explicit'};
+
+  const wake=/(醒来|睡醒|醒过来|睁开眼|睁眼|从睡梦中醒|被[^。！？!?\n]{0,18}(?:憋醒|吵醒|惊醒|叫醒))/u.test(text);
+  const morning=/(晨光|清晨|早晨|早上|天亮|天色已经亮|大亮|朝阳|晨曦|窗外[^。！？!?\n]{0,20}(?:亮|晨光|日光))/u.test(text);
+  const nightBefore=/(昨晚|昨天晚上|夜里|后半夜|半夜|一整夜|整夜|睡了一夜|昨夜)/u.test(text);
+
+  if(wake && morning && nightBefore) return {kind:'wake-morning'};
+  if(wake && /(晨光|清晨|早晨|天亮|大亮)/u.test(text)) return {kind:'wake-morning'};
+  return null;
+}
+
+function naturalDayBoundaryKey(raw=''){
+  const text=String(raw||'')
+    .replace(/<!--MEME_OS_EVENT[\s\S]*?-->/g,' ')
+    .replace(/\s+/g,' ')
+    .trim()
+    .slice(0,1800);
+  return `nb_${hashId(text).toString(36)}`;
+}
+
+function naturalDayBoundarySeen(state,key){
+  return Array.isArray(state.tasks?.naturalDayBoundaryKeys)
+    && state.tasks.naturalDayBoundaryKeys.includes(key);
+}
+
+function markNaturalDayBoundarySeen(state,key,turn=0){
+  state.tasks=state.tasks||{};
+  const keys=Array.isArray(state.tasks.naturalDayBoundaryKeys)?state.tasks.naturalDayBoundaryKeys:[];
+  state.tasks.naturalDayBoundaryKeys=[...keys.filter(item=>item!==key),key].slice(-32);
+  state.tasks.lastNaturalDayBoundaryTurn=Math.max(0,Number(turn)||0);
 }
 
 function syncStoryDayTo(state,targetDay,{source='runtime',explicitDate=false}={}){
@@ -1933,6 +1968,30 @@ async function reconcileRecentVisibleTaskOffers(){
     if(syncStoryDayTo(state,latestVisibleDay,{source:'reconcile'})) changed=true;
   }
 
+  let latestUnseenNaturalBoundary=null;
+  for(let i=start;i<chat.length;i++){
+    const message=chat[i];
+    if(!message || message.is_user) continue;
+    const raw=String(message.mes||'');
+    const boundary=detectNaturalStoryDayBoundary(raw);
+    if(!boundary) continue;
+    const key=naturalDayBoundaryKey(raw);
+    if(naturalDayBoundarySeen(state,key)) continue;
+    latestUnseenNaturalBoundary={i,key,boundary};
+  }
+  if(
+    latestUnseenNaturalBoundary
+    && latestVisibleDay<=Math.max(1,Number(state.tasks?.storyDay)||1)
+  ){
+    const target=Math.max(1,Number(state.tasks?.storyDay)||1)+1;
+    if(syncStoryDayTo(state,target,{source:`reconcile-${latestUnseenNaturalBoundary.boundary.kind}`})){
+      markNaturalDayBoundarySeen(state,latestUnseenNaturalBoundary.key,Number(state.shop?.plotTurn)||0);
+      changed=true;
+      latestVisibleDay=target;
+      latestVisibleDayStart=latestUnseenNaturalBoundary.i;
+    }
+  }
+
   // Never resurrect plot-generated DAILY cards from an older story day.
   // If the newest day marker is visible in the recent window, only reconcile
   // task cards from that marker onward.
@@ -2097,10 +2156,29 @@ async function handleRuntimeEvent(messageId){
 
   const raw=String(message.mes||'');
   const visibleStoryDay=extractVisibleStoryDay(raw);
-  // The visible [DAY NNN] marker is authoritative for story chronology.
-  // This repairs missed hidden events and keeps TASK rotation aligned with the prose.
+  // The visible [DAY NNN] marker is authoritative when present.
   if(visibleStoryDay && visibleStoryDay>Math.max(1,Number(state.tasks?.storyDay)||1)){
     syncStoryDayTo(state,visibleStoryDay,{source:'visible'});
+  }
+
+  // Visible prose can prove a natural-day boundary even when the model omits
+  // both a DAY heading and the hidden timeline event.
+  const naturalBoundary=detectNaturalStoryDayBoundary(raw);
+  const naturalBoundaryKey=naturalBoundary ? naturalDayBoundaryKey(raw) : null;
+  const lastNaturalTurn=Math.max(-999,Number(state.tasks?.lastNaturalDayBoundaryTurn??-999));
+  const naturalCooldownOk=naturalBoundary?.kind==='explicit'
+    || (Number(state.shop?.plotTurn||0)-lastNaturalTurn>=2);
+  if(
+    !visibleStoryDay
+    && naturalBoundary
+    && naturalBoundaryKey
+    && !naturalDayBoundarySeen(state,naturalBoundaryKey)
+    && naturalCooldownOk
+  ){
+    const nextDay=Math.max(1,Number(state.tasks?.storyDay)||1)+1;
+    if(syncStoryDayTo(state,nextDay,{source:`prose-${naturalBoundary.kind}`})){
+      markNaturalDayBoundarySeen(state,naturalBoundaryKey,Number(state.shop?.plotTurn)||0);
+    }
   }
 
   const canonicalCards=extractCanonicalTaskMarkers(raw);
@@ -2632,7 +2710,7 @@ A completed task should disappear/cross out as soon as this reply is processed; 
 For sample, oral and drain: after their first-ever completion they become repeatable collection tasks, at most once per in-world story day. The extension automatically switches later payouts to SV-only repeat rewards. Never invent extra AP for repeated completions.
 
 STORY DAY:
-Current OS in-world story day=${Number(state.tasks?.storyDay)||1}. You must track the ACTUAL narrative day from the visible conversation even when the prose does NOT print "DAY 003" or any day label. A natural-day advance includes overnight sleep, waking the next morning, an explicit next/another day, or a date jump. Whenever the actual narrative day differs from the OS day, the hidden MÉMÉ_OS_EVENT is MANDATORY and timeline.storyDay MUST contain the absolute actual story-day number. Set timeline.dayAdvance=true when the narrative has advanced beyond the current OS day. If the narrative is still on the same day, timeline.storyDay may equal the current OS day. Never require a visible [DAY NNN] heading for synchronization and never advance merely because several turns passed.
+Current OS in-world story day=${Number(state.tasks?.storyDay)||1}. You must track the ACTUAL narrative day from the visible conversation even when the prose does NOT print "DAY 003" or any day label. The extension also independently detects strong visible day-boundary prose (for example waking into morning after the previous night), so keep the narrative chronology consistent with that visible evidence. A natural-day advance includes overnight sleep, waking the next morning, an explicit next/another day, or a date jump. Whenever the actual narrative day differs from the OS day, the hidden MÉMÉ_OS_EVENT is MANDATORY and timeline.storyDay MUST contain the absolute actual story-day number. Set timeline.dayAdvance=true when the narrative has advanced beyond the current OS day. If the narrative is still on the same day, timeline.storyDay may equal the current OS day. Never require a visible [DAY NNN] heading for synchronization and never advance merely because several turns passed.
 A natural-day advance reshuffles the visible fixed DAILY / DESIRE / SPECIAL candidate pools and removes unaccepted plot-generated candidates from the previous day. Accepted non-daily long-form desire/special contracts may persist; daily contracts expire at the day boundary. Repeatable collection milestones can pay again on a later story day.
 
 Current SHOP phase=${currentShopPhase(state).label} (${currentShopPhase(state).code}); appearance/presentation shop progress levels=${shopProgressLevels(state)}. Adult-response upgrades do not advance beauty-shelf phases.
