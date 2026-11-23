@@ -697,7 +697,7 @@ function plotTaskFrequency(state=runtimeState()){
   const count=sameDay?Math.max(0,Number(state.tasks?.plotTaskIssuedCount)||0):0;
   const last=sameDay?Number(state.tasks?.lastPlotTaskTurn??-999):-999;
   return {
-    day,turn,count,last,
+    day,turn,count,last,limit:2,
     canIssue:count===0 || (count===1 && turn-last>=8),
   };
 }
