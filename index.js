@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.12';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.12';
-import { isBoundCharacter } from './src/binding.js?v=0.10.12';
+} from './src/state.js?v=0.10.13';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.13';
+import { isBoundCharacter } from './src/binding.js?v=0.10.13';
 
 /**
- * MÉMÉ OS v0.10.12
+ * MÉMÉ OS v0.10.13
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -54,13 +54,59 @@ function dynamicDesireRewardLabel(tier=1){
 }
 
 const DYNAMIC_DAILY_REWARDS = {
-  light:{ap:70,label:'LIGHT'},
-  normal:{ap:100,label:'NORMAL'},
-  hard:{ap:150,label:'HARD'},
+  light:{base:60,min:40,max:90,gapShare:0.30,label:'LIGHT'},
+  normal:{base:90,min:60,max:130,gapShare:0.48,label:'NORMAL'},
+  hard:{base:130,min:90,max:180,gapShare:0.68,label:'HARD'},
 };
 
-function dynamicDailyRewardMeta(difficulty='normal'){
-  return DYNAMIC_DAILY_REWARDS[String(difficulty||'normal').toLowerCase()] || DYNAMIC_DAILY_REWARDS.normal;
+function roundEconomy(value,step=10){
+  return Math.max(0,Math.round(Number(value||0)/step)*step);
+}
+
+function clampEconomy(value,min,max){
+  return Math.max(min,Math.min(max,Number(value)||0));
+}
+
+function availableApPriceTargets(state=runtimeState()){
+  const prices=[];
+  for(const list of Object.values(SHOP_DATA)){
+    for(const item of list){
+      if(item.currency!=='AP' || item.currency==='LOCK') continue;
+      const view=staticShopView(item,state);
+      const req=shopRequirement(item,state);
+      if(view.soldOut || !req.ok) continue;
+      if(Number(view.price)>0) prices.push(Number(view.price));
+    }
+  }
+  for(const item of getDynamicShop(state)){
+    if(item.currency==='AP' && Number(item.price)>0) prices.push(Number(item.price));
+  }
+  return prices.sort((a,b)=>a-b);
+}
+
+function economyApReference(state=runtimeState()){
+  const balance=Math.max(0,Number(getSpendableResources(state).ap)||0);
+  const prices=availableApPriceTargets(state);
+  const next=prices.find(price=>price>balance);
+  if(next) return {balance,target:next,gap:Math.max(0,next-balance)};
+  if(prices.length){
+    const mid=prices[Math.floor(prices.length/2)];
+    return {balance,target:mid,gap:0};
+  }
+  const phase=currentShopPhase(state);
+  const fallback=Number(PLOT_PRICES.AP?.[phase.id]||220);
+  return {balance,target:fallback,gap:Math.max(0,fallback-balance)};
+}
+
+function dynamicDailyRewardMeta(difficulty='normal',state=runtimeState()){
+  const meta=DYNAMIC_DAILY_REWARDS[String(difficulty||'normal').toLowerCase()] || DYNAMIC_DAILY_REWARDS.normal;
+  const econ=economyApReference(state);
+  const wealthRatio=econ.target>0 ? econ.balance/econ.target : 0;
+  const wealthFactor=wealthRatio>=2.2 ? 0.72 : wealthRatio>=1.5 ? 0.82 : wealthRatio>=1.0 ? 0.92 : 1;
+  const gapSupport=econ.gap>0 ? econ.gap*meta.gapShare : 0;
+  const raw=Math.max(meta.base*wealthFactor,gapSupport);
+  const ap=roundEconomy(clampEconomy(raw,meta.min,meta.max),10);
+  return {...meta,ap,economy:{balance:econ.balance,target:econ.target,gap:econ.gap}};
 }
 
 const SHOP_DATA = {
@@ -258,6 +304,35 @@ const PLOT_PRICES = {
   SV: { rescue:45, refine:65, beauty:95, advanced:130 },
 };
 
+const PLOT_IMPACT_MULTIPLIERS = {
+  minor:0.82,
+  standard:1,
+  major:1.22,
+};
+
+function dynamicPlotPrice(state,currency='AP',impact='standard'){
+  const phase=currentShopPhase(state);
+  const base=Number(PLOT_PRICES[currency]?.[phase.id] || (currency==='SV'?45:220));
+  const spendable=getSpendableResources(state);
+  const balance=Math.max(0,Number(currency==='SV'?spendable.sv:spendable.ap)||0);
+  const impactMult=PLOT_IMPACT_MULTIPLIERS[String(impact||'standard').toLowerCase()] || 1;
+  const ratio=base>0 ? balance/base : 0;
+
+  // Balance affects the band, but never chases the user upward point-for-point.
+  // Poor hosts get a modest rescue discount; rich hosts pay a small premium.
+  const economyMult=ratio<0.35 ? 0.78
+    : ratio<0.75 ? 0.90
+    : ratio>2.25 ? 1.18
+    : ratio>1.40 ? 1.08
+    : 1;
+
+  const step=currency==='SV'?5:10;
+  const floor=currency==='SV'?20:80;
+  const ceiling=currency==='SV'?220:980;
+  const price=roundEconomy(clampEconomy(base*impactMult*economyMult,floor,ceiling),step);
+  return {price,base,balance,phase,impact:String(impact||'standard').toLowerCase()};
+}
+
 const PLOT_CHARM_AXES = new Set([
   'face','eyes','bodyShape','waistHip','legs','neckShoulders','bust',
 ]);
@@ -320,7 +395,7 @@ function sanitizeGeneratedDailyTask(raw,state=runtimeState()){
   const difficulty=['light','normal','hard'].includes(String(raw.difficulty||'').toLowerCase())
     ? String(raw.difficulty).toLowerCase()
     : 'normal';
-  const reward=dynamicDailyRewardMeta(difficulty);
+  const reward=dynamicDailyRewardMeta(difficulty,state);
   const source=String(raw.source||'当前剧情').replace(/\s+/g,' ').trim().slice(0,80);
   const fingerprint=`${title.toLowerCase()}|${desc.toLowerCase()}|${source.toLowerCase()}`;
   const id=`daily_${hashId(fingerprint).toString(36)}`;
@@ -384,12 +459,17 @@ function inferVisibleDailyTaskOffer(raw,state=runtimeState()){
     .trim();
   title=title.replace(/[，,；;：:].*$/,'').slice(0,28) || '剧情临时任务';
 
+  const actionCount=(desc.match(/[，,、；;]/g)||[]).length+1;
+  const hardCue=/(二十分钟|半小时|一小时|坚持|运动|出门|公共|社交|当众|长时间|彻底|完整完成)/.test(desc);
+  const lightCue=actionCount<=1 && /(扔|擦|关|拿|喝|换一件|刷牙|洗脸)/.test(desc);
+  const difficulty=hardCue?'hard':lightCue?'light':'normal';
+
   return sanitizeGeneratedDailyTask({
     title,
     desc,
     detail:'由当前可见剧情中的新任务卡自动同步；完成后按滚动任务规则退场。',
-    source:'可见剧情任务卡兜底',
-    difficulty:'normal',
+    source:'当前可见剧情直接触发',
+    difficulty,
   },state);
 }
 
@@ -400,8 +480,12 @@ function distinctEroticTaskCount(state=runtimeState()){
 function sanitizeDynamicItem(raw,state=runtimeState()){
   if(!raw || typeof raw!=='object') return null;
   const currency=raw.currency==='SV'?'SV':'AP';
-  const phase=currentShopPhase(state);
-  const price=Number(PLOT_PRICES[currency]?.[phase.id] || (currency==='SV'?45:220));
+  const impact=['minor','standard','major'].includes(String(raw.impact||'').toLowerCase())
+    ? String(raw.impact).toLowerCase()
+    : 'standard';
+  const economy=dynamicPlotPrice(state,currency,impact);
+  const phase=economy.phase;
+  const price=economy.price;
   const ttl=Math.max(1,Math.min(8,Math.round(Number(raw.ttl)||4)));
   const title=String(raw.title||'临时改造').slice(0,40);
   const desc=String(raw.desc||'系统临时上架。').slice(0,140);
@@ -426,6 +510,8 @@ function sanitizeDynamicItem(raw,state=runtimeState()){
     createdTurn:Number(state.shop?.plotTurn)||0,
     expiresTurn:(Number(state.shop?.plotTurn)||0)+ttl,
     source:String(raw.source||'剧情临时上架').slice(0,80),
+    impact,
+    economyBasis:{base:economy.base,balanceAtCreation:economy.balance,phase:economy.phase.id},
     bodyAxis,
     sourceIssueId:String(raw.sourceIssueId||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48) || null,
   };
@@ -706,7 +792,7 @@ function settleStoryRewardFromModel(state,rawReward,messageId){
   const difficulty=['light','normal','hard'].includes(String(rawReward.difficulty||'').toLowerCase())
     ? String(rawReward.difficulty).toLowerCase()
     : 'normal';
-  const reward=dynamicDailyRewardMeta(difficulty);
+  const reward=dynamicDailyRewardMeta(difficulty,state);
   const source=String(rawReward.source||'当前剧情').replace(/\s+/g,' ').trim().slice(0,80);
   const id=`story_${hashId((title+'|'+evidence+'|'+source).toLowerCase()).toString(36)}`;
   const historyId=`meme_story_reward_${messageId}_${id}`;
@@ -1544,7 +1630,10 @@ Current open starter dailies: ${JSON.stringify(TASK_DATA.daily.filter(t=>!state.
 Current generated daily/story tasks: ${JSON.stringify((state.tasks?.generatedDaily||[]).filter(t=>!state.tasks?.everCompleted?.[t.id]).map(t=>({id:t.id,title:t.title,desc:t.desc,difficulty:t.difficulty,source:t.source})))}.
 When the visible daily board has fewer than 5 unfinished tasks, you SHOULD create one context-fitting replacement through dailyTaskOffers if the current plot offers a sensible mundane, appearance, hygiene, movement, social-presentation or practical challenge. Do not regenerate an already completed task under a synonym.
 CRITICAL SYNC RULE: if your visible prose says or implies that MÉMÉ OS/the administrator actually creates, pops up, displays, throws out, assigns or reveals a NEW daily/story task or task card, dailyTaskOffers is REQUIRED in the same reply. Never visibly create a task card and omit its hidden event. If you are not going to emit dailyTaskOffers, do not claim that a new system task was created.
-dailyTaskOffers entries: maximum 1; fields {title,desc,detail,source,difficulty}. difficulty is only light|normal|hard. Never choose or print the AP reward; the extension maps difficulty to the reward.
+PLOT RELEVANCE RULE: every generated daily/story task must be caused by something concrete in the CURRENT visible scene: a mess that was just created, an unmet practical need, a body/presentation problem just noticed, a plan the host just stated, a location-specific opportunity, or a direct consequence of the immediately preceding action. Do not throw in generic self-improvement chores unrelated to what is happening now. source must briefly name the actual scene trigger.
+DIFFICULTY SEMANTICS: light = one quick low-effort action; normal = several linked actions or a sustained moderate effort; hard = substantial time, discomfort, persistence, social exposure/risk or a genuinely demanding multi-step requirement. Choose difficulty from the actual scene demand, not from the reward you want.
+ECONOMY RULE: never choose or display a numeric AP reward for generated tasks. MÉMÉ OS calculates the reward from difficulty plus the current spendable AP and nearby shop-price band. This keeps a task useful when the host is broke without letting trivial chores print money when the host is already rich.
+dailyTaskOffers entries: maximum 1; fields {title,desc,detail,source,difficulty}. difficulty is only light|normal|hard. Never include AP/SV reward values.
 If the current visible scene itself unexpectedly completes a sensible one-off system challenge that was not previously active, you MAY use storyRewards to let the extension recognize it retroactively. storyRewards entries: maximum 2; fields {title,evidence,source,difficulty}. Never put AP/SV numbers in storyRewards or visible prose; the extension calculates the real reward. Do not use storyRewards for trivial actions merely to farm AP.
 
 DYNAMIC DESIRE MISSION BOARD:
@@ -1631,12 +1720,12 @@ dailyTaskOffers: maximum 1 new rolling daily/story task; fields title,desc,detai
 taskOffers: maximum 1 new generated erotic mission; fields title,desc,detail,source. Never include tier, id or rewards.
 tasks: max 4 completed ACTIVE task entries; fields id,status("completed"),evidence. Never include rewards; the extension calculates them.
 storyRewards: max 2 one-off plot tasks that visibly became complete without prior acceptance; fields title,evidence,source,difficulty(light|normal|hard). Never include AP/SV numbers.
-shop: maximum 2 temporary items. Each item fields: title,desc,detail,currency("AP"|"SV"),ttl(1-8),icon,source,bodyAxis(optional),sourceIssueId(optional). Never include id, price or charmGain; the extension assigns all three. bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
+shop: maximum 2 temporary items. Each item fields: title,desc,detail,currency("AP"|"SV"),ttl(1-8),icon,source,impact("minor"|"standard"|"major"),bodyAxis(optional),sourceIssueId(optional). A temporary item must be a direct answer to something that just happened in the visible plot: a newly exposed problem, a consequence, a desire, a task outcome or a scene-specific opportunity. source must name that trigger. impact describes how substantial the item's actual effect is, not how expensive you want it to be. Never include id, price or charmGain; MÉMÉ OS derives price from current shelf phase, effect impact and current spendable balance. bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
 feedback.issues: max 2, only direct story evidence; fields id,axis(optional),source,note,severity(low|medium|high).
 feedback.reactions: max 2, only directly observed reactions to established state/change; fields id,axis(optional),source,note,valence(negative|neutral|positive|sexual).
 men: max 3 qualifying adult men updates; fields id(optional for new),name,meta,summary,relation,desire,lastContact,note,badges,present,contactDelta,qualifies.
 evolution: only when a visible, mechanically-ready one-step administrator form evolution actually happens; fields targetLevel(2|3|4),reason. Never use it for ordinary mood/relationship changes.
-Temporary shop items must arise from the just-written plot, not random catalog filler. Their names/descriptions are spoken by the male administrator in his current tone: ${voice.label}. Current CHARM=${state.host.charm}.
+Temporary shop items must arise from the just-written plot, not random catalog filler. Generated tasks and generated shop goods are two views of the same live scene: if a task exists because of a concrete problem or consequence, any related temporary good should address that same problem/consequence rather than introducing an unrelated catalog item. Their names/descriptions are spoken by the male administrator in his current tone: ${voice.label}. Current CHARM=${state.host.charm}.
 SYSTEM EVOLUTION LADDER:
 Current administrator system level=${state.system?.level||1}; current form=${evolution.form}.
 Current capability: ${evolution.capability}
