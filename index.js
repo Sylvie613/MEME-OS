@@ -2800,6 +2800,14 @@ function recentSceneText(chat=[],limit=4){
     .join(' ');
 }
 
+function chatThroughLatestUser(chat=[]){
+  const messages=Array.isArray(chat)?chat:[];
+  for(let i=messages.length-1;i>=0;i--){
+    if(messages[i]?.is_user) return messages.slice(0,i+1);
+  }
+  return messages;
+}
+
 function classifyNpcEncounterSource(source=''){
   const text=String(source||'').toLowerCase();
   if(/(交友软件|约会软件|相亲软件|交友平台|约会平台|探探|陌陌|tinder|bumble|hinge|grindr|soul|附近的人|滑卡|右滑|左滑|匹配.{0,8}(?:男人|男性|男生)|刷.{0,8}(?:男人|男性|男生))/iu.test(text)){
@@ -2824,7 +2832,7 @@ function classifyNpcEncounterSource(source=''){
 }
 
 function classifyNpcEncounterScene(context,state=runtimeState()){
-  const chat=Array.isArray(context?.chat)?context.chat:[];
+  const chat=chatThroughLatestUser(context?.chat);
   const user=latestUserTurnSeed(chat);
   const status=latestVisibleSceneStatus(chat);
   const explicit=classifyNpcEncounterSource(user.text);
@@ -2861,14 +2869,14 @@ function latestNewManTurn(state=runtimeState()){
 
 
 function userExplicitlyInvitesNewMaleInteraction(context){
-  const chat=Array.isArray(context?.chat)?context.chat:[];
+  const chat=chatThroughLatestUser(context?.chat);
   const user=latestUserTurnSeed(chat);
   const text=String(user.text||'');
   return /(想认识.{0,8}(?:新|别的|其他).{0,6}(?:男人|男的|男性|男生)|想找.{0,8}(?:男人|男的|男性|男生)|找个.{0,8}(?:男人|男的|男性|男生)|刷.{0,6}(?:交友|约会|男人|男的|男性|男生)|打开.{0,6}(?:交友|约会).{0,6}(?:软件|app|应用)|去.{0,6}(?:联谊|相亲|酒吧|夜店|聚会|派对)|想要.{0,8}(?:第三个|第三人|另一个|再来一个|多人)|叫.{0,8}(?:别人|另一个男人|其他男人).{0,8}(?:来|过来)|邀请.{0,8}(?:另一个|其他).{0,6}(?:男人|男性|男生))/iu.test(text);
 }
 
 function currentMaleSceneFocus(context,state=runtimeState()){
-  const chat=Array.isArray(context?.chat)?context.chat:[];
+  const chat=chatThroughLatestUser(context?.chat);
   const recent=recentSceneText(chat,3);
   const user=latestUserTurnSeed(chat);
   const userText=String(user.text||'');
@@ -2936,7 +2944,7 @@ function npcEncounterWheel(context,state=runtimeState()){
   const user=latestUserTurnSeed(context?.chat);
   const day=Math.max(1,Number(state.tasks?.storyDay)||1);
   const nextTurn=Math.max(1,(Number(state.shop?.plotTurn)||0)+1);
-  const roll=(hashId('npc-wheel-v3|'+day+'|'+user.seed)%10000)/100;
+  const roll=(hashId('npc-wheel-v4|'+user.seed)%10000)/100;
   const recordedHitTurn=Number(state.encounters?.randomMale?.lastHitTurn);
   const lastNewTurn=Math.max(
     Number.isFinite(recordedHitTurn) ? recordedHitTurn : -999,
