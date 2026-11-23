@@ -1,5 +1,5 @@
 name: Validate and build MÉMÉ OS
-# canonical: v0.4.1-alpha / extension 0.13.9 / hardened task verification
+# canonical: v0.4.1-alpha / extension 0.13.10 / hardened task verification
 
 on:
   workflow_dispatch:
