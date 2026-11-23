@@ -236,20 +236,23 @@ function mergeState(raw) {
         memory: {
             ...base.memory,
             ...(raw.memory ?? {}),
-            initialized: Boolean(raw.memory?.initialized),
-            bootstrappedAt: raw.memory?.bootstrappedAt || null,
-            sourceTurns: Math.max(0, Number(raw.memory?.sourceTurns) || 0),
-            short: Array.isArray(raw.memory?.short)
+            // Schema <33 used a different 10/5/CORE memory policy. Force one
+            // clean bootstrap from visible chat so legacy buckets do not pollute
+            // the new one-round / 15 / 10 ladder.
+            initialized: Number(raw.schemaVersion || 0) >= 33 ? Boolean(raw.memory?.initialized) : false,
+            bootstrappedAt: Number(raw.schemaVersion || 0) >= 33 ? (raw.memory?.bootstrappedAt || null) : null,
+            sourceTurns: Number(raw.schemaVersion || 0) >= 33 ? Math.max(0, Number(raw.memory?.sourceTurns) || 0) : 0,
+            short: Number(raw.schemaVersion || 0) >= 33 && Array.isArray(raw.memory?.short)
                 ? raw.memory.short.map(v => String(v).replace(/\s+/g,' ').trim()).filter(Boolean).slice(-15)
                 : [],
-            long: Array.isArray(raw.memory?.long)
+            long: Number(raw.schemaVersion || 0) >= 33 && Array.isArray(raw.memory?.long)
                 ? raw.memory.long.map(v => String(v).replace(/\s+/g,' ').trim()).filter(Boolean).slice(-10)
                 : [],
             permanent: [
                 ...(Array.isArray(raw.memory?.permanent) ? raw.memory.permanent : []),
                 ...(Array.isArray(raw.memory?.core) ? raw.memory.core : []),
             ].map(v => String(v).replace(/\s+/g,' ').trim()).filter((v,i,a)=>v && a.indexOf(v)===i),
-            lastUpdatedTurn: Math.max(0, Number(raw.memory?.lastUpdatedTurn) || 0),
+            lastUpdatedTurn: Number(raw.schemaVersion || 0) >= 33 ? Math.max(0, Number(raw.memory?.lastUpdatedTurn) || 0) : 0,
         },
         reactivity: {
             ...base.reactivity,
