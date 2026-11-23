@@ -113,12 +113,15 @@ function availableApPriceTargets(state=runtimeState()){
       if(item.currency!=='AP' || item.currency==='LOCK') continue;
       const view=staticShopView(item,state);
       const req=shopRequirement(item,state);
-      if(view.soldOut || !req.ok) continue;
-      if(Number(view.price)>0) prices.push(Number(view.price));
+      const payment=shopPaymentMeta(item,state,view);
+      if(view.soldOut || !req.ok || payment.currency!=='AP') continue;
+      if(Number(payment.price)>0) prices.push(Number(payment.price));
     }
   }
   for(const item of getDynamicShop(state)){
-    if(item.currency==='AP' && Number(item.price)>0) prices.push(Number(item.price));
+    const view=staticShopView(item,state);
+    const payment=shopPaymentMeta(item,state,view);
+    if(payment.currency==='AP' && Number(payment.price)>0) prices.push(Number(payment.price));
   }
   return prices.sort((a,b)=>a-b);
 }
