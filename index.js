@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.13.3';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.13.3';
-import { isBoundCharacter } from './src/binding.js?v=0.13.3';
+} from './src/state.js?v=0.13.4';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.13.4';
+import { isBoundCharacter } from './src/binding.js?v=0.13.4';
 
 /**
- * MÉMÉ OS v0.13.3
+ * MÉMÉ OS v0.13.4
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -20,6 +20,7 @@ const MEME_ID = 'meme-os-heart-launcher';
 const DIALOG_ID = 'meme-os-dialog';
 const MEME_SCENE_CLOCK_PROMPT_ID = 'meme-os-scene-clock';
 const MEME_NPC_WHEEL_PROMPT_ID = 'meme-os-npc-wheel';
+const MEME_LENGTH_LOCK_PROMPT_ID = 'meme-os-length-lock';
 
 
 const TASK_DATA = {
@@ -2903,7 +2904,7 @@ function installRuntimePrompt(){
   const previousSceneStatus=latestVisibleSceneStatus(context?.chat);
   const previousSceneStatusText=previousSceneStatus?.raw || 'NONE — establish a precise scene clock in this reply';
   const npcWheel=npcEncounterWheel(context,state);
-  const prompt=`[MÉMÉ OS runtime bridge · v0.13.3]
+  const prompt=`[MÉMÉ OS runtime bridge · v0.13.4]
 AUTHORITY / TONE:
 - Extension state is the only authority for AP, SV, CHARM, purchases, task settlement, MEN buckets, system access/evolution and unlocks. Never mentally add/subtract numbers or reuse stale balances.
 - The host persona comes from the active SillyTavern Persona + visible chat. Do not invent host identity/history beyond established system transformation facts.
@@ -3038,9 +3039,34 @@ HARD RULES:
 - Do not expose the roll, probability, seed or cooldown in visible prose unless the host explicitly asks the administrator/system about the mechanic in-story.
 `;
 
+  const lengthLockPrompt=`[MÉMÉ OS — FINAL LONG-REPLY GATE — HIGHEST LOCAL PRIORITY]
+This instruction is injected immediately before generation because Gemini 3.1 Pro has been ending replies too early. It overrides softer/older length suggestions but does NOT override character canon, user agency, safety, scene-clock format, or extension-owned state.
+
+HARD LENGTH:
+- Normal RP reply: target about 2600–3200 Chinese characters of VISIBLE story prose.
+- Very simple continuation: target about 2200–2600 Chinese characters.
+- Important turn / new NPC / major conflict / adult scene: target about 3200–4200 Chinese characters when the scene supports it.
+- Unless the host explicitly asks for a short reply, summary, or fast-forward, DO NOT END a normal RP reply before roughly 2300 visible Chinese characters.
+- The scene-clock line, TASK/reward cards, and hidden MEME_OS_EVENT comment do NOT count toward the prose target.
+
+STRUCTURAL ENFORCEMENT:
+- Aim for roughly 10–14 substantial natural paragraphs. Most paragraphs should contain multiple sentences and meaningful new detail; do not manufacture one-line paragraphs merely to hit a paragraph count.
+- Before ending, silently check whether the reply is obviously below the hard floor. If so, CONTINUE THE SAME LOCAL BEAT instead of stopping.
+- If the immediate action is small, expand through concrete continuity: body position and movement, objects being handled, environment, sensory detail, consequences of the previous action, another character's observable reaction, useful dialogue, and the next few seconds/minutes of the SAME scene.
+- Never solve the length problem by adding a second plot beat, skipping time, changing location, completing another task, spawning another NPC, or making the administrator talk excessively.
+- Short host input NEVER implies a short assistant reply.
+- Do not end immediately after a TASK/reward/system card. Return to the live scene and continue the local interaction unless the user's action genuinely ends the scene.
+- Do not pad with recaps, rule explanations, repeated adjectives, repeated dialogue, relationship summaries, or generic introspection.
+
+OUTPUT QUALITY:
+Write dense continuous Chinese fiction. Preserve two-full-width-space prose indentation and the mandatory scene-clock header. Keep the user playable: enrich the present without deciding the user's next key action.
+`;
+
   context.setExtensionPrompt(MEME_SCENE_CLOCK_PROMPT_ID,sceneClockPrompt,1,0,false,0);
   context.setExtensionPrompt(MEME_NPC_WHEEL_PROMPT_ID,npcWheelPrompt,1,0,false,0);
   context.setExtensionPrompt(MEME_RUNTIME_PROMPT_ID,prompt,1,2,false,0);
+  // Depth 0 + last registration makes this the final local generation gate.
+  context.setExtensionPrompt(MEME_LENGTH_LOCK_PROMPT_ID,lengthLockPrompt,1,0,false,0);
 }
 
 const RUDE_TASK_NAMES = {
@@ -4478,7 +4504,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
-        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.13.3</small>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.13.4</small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
