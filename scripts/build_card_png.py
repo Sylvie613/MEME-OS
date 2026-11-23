@@ -13,8 +13,10 @@ PNG_SIG = b"\x89PNG\r\n\x1a\n"
 DROP_TEXT_KEYS = {
     b"chara",
     b"ccv3",
-    "MÉMÉ-OS-Version".encode("utf-8"),
-    "MÉMÉ-OS-Min-Extension".encode("utf-8"),
+    b"MEME-OS-Version",
+    b"MEME-OS-Min-Extension",
+    "MÉMÉ-OS-Version".encode("utf-8"),  # legacy cleanup
+    "MÉMÉ-OS-Min-Extension".encode("utf-8"),  # legacy cleanup
 }
 
 
@@ -88,8 +90,8 @@ def main():
         [
             text_chunk("chara", chara),
             text_chunk("ccv3", ccv3),
-            text_chunk("MÉMÉ-OS-Version", card_version),
-            text_chunk("MÉMÉ-OS-Min-Extension", min_extension),
+            text_chunk("MEME-OS-Version", card_version),
+            text_chunk("MEME-OS-Min-Extension", min_extension),
         ],
     )
     PNG_PATH.write_bytes(final_png)
