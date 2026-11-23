@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.13.6';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.13.6';
-import { isBoundCharacter } from './src/binding.js?v=0.13.6';
+} from './src/state.js?v=0.13.7';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.13.7';
+import { isBoundCharacter } from './src/binding.js?v=0.13.7';
 
 /**
- * MÉMÉ OS v0.13.6
+ * MÉMÉ OS v0.13.7
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -445,6 +445,26 @@ function adminCopyText(value,fallback='',max=180){
   return text.slice(0,max) || String(fallback||'').slice(0,max);
 }
 
+function desireSexualityGate(raw){
+  const text=[
+    raw?.title,
+    raw?.desc,
+    raw?.detail,
+    raw?.source,
+  ].map(v=>String(v||'')).join(' ');
+
+  // Tier 1 is still pornography, not flirting. A task must contain either
+  // an explicit sex act/result or explicit sexual touching/exposure of
+  // genitals/breasts/anus. Mild teasing, accidental contact, cleavage,
+  // eye contact, kissing alone, or "make him want you" do not qualify.
+  const explicitAct=/(自慰|手交|口交|乳交|足交|性交|做爱|插入|抽插|骑乘|后庭|肛交|指交|舔阴|舔穴|舔龟头|含住.{0,6}(?:阴茎|鸡巴|肉棒|龟头)|吞精|颜射|内射|射精|精液|高潮|潮吹|SV\s*(?:采集|收集|获取)|采精|撸(?:动|弄|管)?|套弄)/iu.test(text);
+  const explicitBody=/(阴茎|鸡巴|肉棒|龟头|阴囊|睾丸|阴道|小穴|阴蒂|阴唇|乳房|乳头|奶头|肛门|屁眼)/iu.test(text);
+  const explicitContact=/(摸|揉|捏|舔|含|吸|咬|摩擦|蹭|插|塞|进入|套弄|撸|刺激|夹|挤|压|拍|亲|吻|暴露|露出|掀开|脱掉|脱下|扒开|张开|展示|让.{0,8}(?:摸|舔|含|看|碰|插))/iu.test(text);
+  const explicitOutcome=/(射精|精液|高潮|潮吹|体液|SV\s*(?:\+|采集|收集|获取)|弄湿|勃起)/iu.test(text);
+
+  return explicitAct || explicitOutcome || (explicitBody && explicitContact);
+}
+
 function sanitizeGeneratedDesireTask(raw,state=runtimeState()){
   if(!raw || typeof raw!=='object') return null;
   const title=adminCopyText(raw.title,'剧情欲望任务',48);
@@ -454,6 +474,10 @@ function sanitizeGeneratedDesireTask(raw,state=runtimeState()){
 
   const tier=dynamicDesireTierForState(state);
   if(tier<1) return null;
+  if(!desireSexualityGate(raw)){
+    console.warn('[MÉMÉ OS] rejected DESIRE: below explicit-sex minimum', {title,desc,detail});
+    return null;
+  }
 
   const fingerprint=`${title.toLowerCase()}|${desc.toLowerCase()}`;
   const id=`desire_${hashId(fingerprint).toString(36)}`;
@@ -2921,7 +2945,7 @@ function installRuntimePrompt(){
     ...(state.tasks?.generated||[]).map(t=>({title:t.title,desc:t.desc,tier:t.tier,status:'open'})),
     ...Object.values(state.tasks?.completed||{}).filter(t=>t?.category==='desire').map(t=>({title:t.title,desc:t.desc,tier:t.tier,status:'completed'})),
   ].slice(-6);
-  const prompt=`[MÉMÉ OS runtime bridge · v0.13.6]
+  const prompt=`[MÉMÉ OS runtime bridge · v0.13.7]
 AUTHORITY / TONE:
 - Extension state is the only authority for AP, SV, CHARM, purchases, task settlement, MEN buckets, system access/evolution and unlocks. Never mentally add/subtract numbers or reuse stale balances.
 - The host persona comes from the active SillyTavern Persona + visible chat. Do not invent host identity/history beyond established system transformation facts.
@@ -2975,7 +2999,7 @@ SCENE-FIT IS HARD:
 The task may develop across later turns, but it must be a genuine adult sexual/eroge objective tied to this adult man and this scene—not dating, compliments, ordinary flirting, affection farming, or exchanging contact info.
 When DESIRE_TRIGGER_REQUIRED_THIS_REPLY=false, do not invent a new DESIRE unless another explicit runtime rule says so.
 Mission formula: target man × current scene anchors × CHARM tier × unlocked host capability × sexual act/body part × constraint/control/presentation/risk × measurable completion/SV goal.
-Tier 1 (CHARM 8–17) is lower-entry but still clearly sexual and scene-specific; Tier 2/3/4 escalate explicitness, difficulty, exposure, control, collection/SV goals and complexity. Do not flatten every tier into the same task.
+Tier 1 (CHARM 8–17) is lower-complexity, NOT lower-sexuality. From the FIRST DESIRE onward, the task must already cross an explicit sexual threshold: explicit sex act, explicit genital/breast/anus exposure or stimulation, or a concrete sexual result such as orgasm/ejaculation/SV collection. Flirting, kissing alone, accidental touching, cleavage, pulling a neckline, making him look, teasing, exchanging contact info, or "make him want you" are NEVER enough to qualify as DESIRE. Tier 2/3/4 escalate difficulty, exposure, control, collection/SV goals, combinations, duration and complexity—not whether the content is genuinely sexual.
 Target men may be any adult archetype; public persona and private XP are independent axes.
 
 SHOP / REACTIVITY:
@@ -3087,7 +3111,7 @@ HARD EXECUTION:
 - If REQUIRED=true, this reply MUST append one hidden MEME_OS_EVENT whose taskOffers array contains EXACTLY ONE new DESIRE candidate.
 - Do not wait for CHARM 30. DESIRE unlock begins at CHARM 8.
 - Do not suppress the task merely because the current interaction has not become sexual yet. The task can set a sexual objective to be completed later while remaining grounded in the current adult male/scene.
-- It must be genuinely adult/sexual, not a disguised romance or social task. No “get his number”, “make him compliment you”, “go on a date”, or generic affection farming.
+- It must be genuinely adult/sexual from the FIRST DESIRE. Minimum qualification: an explicit sex act, explicit genital/breast/anus exposure or stimulation, or a concrete sexual result such as orgasm/ejaculation/SV collection. Mild flirting, kissing alone, accidental touching, cleavage/neckline teasing, "let him look", "make him hard", contact exchange, dating, compliments or affection farming do NOT qualify.
 - SCENE LOCK: task content must use at least two concrete facts from the recent visible scene (current man/role, exact place/object, immediate action/dialogue/body state, his observable reaction, clothing/position/opportunity). A task that could be copied unchanged into another scene is invalid.
 - NOVELTY LOCK: compare Recent DESIRE history. Do not repeat the same act + constraint + completion pattern with cosmetic wording changes.
 - STIMULATION LOCK: choose a provocative but scene-plausible angle that exploits what is actually happening now—proximity, embarrassment, a usable object/place, public/private tension, his specific role/personality, or an immediate physical opportunity. Do not invent nonexistent props/access or force unestablished actions.
@@ -4564,7 +4588,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
-        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.13.6</small>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.13.7</small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
