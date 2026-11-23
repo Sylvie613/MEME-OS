@@ -96,6 +96,14 @@ const DEFAULT_STATE = Object.freeze({
         recentIssues: [],
         recentReactions: [],
     },
+    encounters: {
+        randomMale: {
+            lastHitTurn: -999,
+            lastHitDay: 0,
+            lastSeed: null,
+            lastScene: null,
+        },
+    },
     runtime: {
         chatKey: null,
         processedAssistantMessages: [],
@@ -238,6 +246,20 @@ function mergeState(raw) {
             recentChanges: Array.isArray(raw.reactivity?.recentChanges) ? raw.reactivity.recentChanges.slice(0, 8) : [],
             recentIssues: Array.isArray(raw.reactivity?.recentIssues) ? raw.reactivity.recentIssues.slice(0, 8) : [],
             recentReactions: Array.isArray(raw.reactivity?.recentReactions) ? raw.reactivity.recentReactions.slice(0, 8) : [],
+        },
+        encounters: {
+            ...base.encounters,
+            ...(raw.encounters ?? {}),
+            randomMale: {
+                ...base.encounters.randomMale,
+                ...(raw.encounters?.randomMale ?? {}),
+                lastHitTurn: Number.isFinite(Number(raw.encounters?.randomMale?.lastHitTurn))
+                    ? Number(raw.encounters.randomMale.lastHitTurn)
+                    : -999,
+                lastHitDay: Math.max(0, Number(raw.encounters?.randomMale?.lastHitDay) || 0),
+                lastSeed: raw.encounters?.randomMale?.lastSeed ? String(raw.encounters.randomMale.lastSeed) : null,
+                lastScene: raw.encounters?.randomMale?.lastScene ? String(raw.encounters.randomMale.lastScene) : null,
+            },
         },
         runtime: {
             ...base.runtime,
