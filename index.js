@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.13.1';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.13.1';
-import { isBoundCharacter } from './src/binding.js?v=0.13.1';
+} from './src/state.js?v=0.13.2';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.13.2';
+import { isBoundCharacter } from './src/binding.js?v=0.13.2';
 
 /**
- * MÉMÉ OS v0.13.0
+ * MÉMÉ OS v0.13.2
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -21,8 +21,6 @@ const DIALOG_ID = 'meme-os-dialog';
 const MEME_SCENE_CLOCK_PROMPT_ID = 'meme-os-scene-clock';
 const MEME_NPC_WHEEL_PROMPT_ID = 'meme-os-npc-wheel';
 
-let memoryQuietSyncInFlight=false;
-let memoryQuietLastAttemptTurn=-999;
 
 const TASK_DATA = {
   daily: [
@@ -848,10 +846,6 @@ function getLifestyleShelf(state=runtimeState()){
   return Array.isArray(state.shop?.lifestyleShelf) ? state.shop.lifestyleShelf.slice(0,5) : [];
 }
 
-function cleanMemoryText(value,max=240){
-  return String(value||'').replace(/\s+/g,' ').trim().slice(0,max);
-}
-
 function escapeUiText(value){
   return String(value??'')
     .replace(/&/g,'&amp;')
@@ -859,137 +853,6 @@ function escapeUiText(value){
     .replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;')
     .replace(/'/g,'&#39;');
-}
-
-function uniqueMemoryList(values,maxItems,maxChars){
-  const out=[];
-  const seen=new Set();
-  for(const raw of Array.isArray(values)?values:[]){
-    const text=cleanMemoryText(raw,maxChars);
-    if(!text) continue;
-    const key=text.toLowerCase();
-    if(seen.has(key)) continue;
-    seen.add(key);
-    out.push(text);
-    if(out.length>=maxItems) break;
-  }
-  return out;
-}
-
-function memoryNeedsCompression(state=runtimeState()){
-  const memory=state.memory||{};
-  return (Array.isArray(memory.short) && memory.short.length>=15)
-    || (Array.isArray(memory.long) && memory.long.length>=10);
-}
-
-function applyMemoryEvent(state,raw,visibleTurns=0){
-  if(!raw || typeof raw!=='object') return false;
-  state.memory=state.memory||{
-    initialized:false,bootstrappedAt:null,sourceTurns:0,
-    short:[],long:[],permanent:[],lastUpdatedTurn:0,
-  };
-  state.memory.short=Array.isArray(state.memory.short)?state.memory.short:[];
-  state.memory.long=Array.isArray(state.memory.long)?state.memory.long:[];
-  state.memory.permanent=Array.isArray(state.memory.permanent)?state.memory.permanent:[];
-  const turn=Math.max(0,Number(state.shop?.plotTurn)||0);
-
-  if(raw.bootstrap===true && !state.memory.initialized){
-    state.memory.short=uniqueMemoryList(raw.short,15,28);
-    state.memory.long=uniqueMemoryList(raw.long,10,240);
-    const permanentRaw=Array.isArray(raw.permanent)
-      ? raw.permanent
-      : (Array.isArray(raw.core)?raw.core:[]);
-    state.memory.permanent=uniqueMemoryList(
-      [...state.memory.permanent,...permanentRaw],
-      9999,
-      340
-    );
-    state.memory.initialized=true;
-    state.memory.bootstrappedAt=Date.now();
-    state.memory.sourceTurns=Math.max(0,Number(visibleTurns)||0);
-    state.memory.lastUpdatedTurn=turn;
-    return true;
-  }
-
-  if(!state.memory.initialized) return false;
-
-  let changed=false;
-
-  // Exactly one SHORT may be recorded per plot turn.
-  if(turn>Number(state.memory.lastUpdatedTurn||0)){
-    const candidate=Array.isArray(raw.short)
-      ? cleanMemoryText(raw.short[0],28)
-      : cleanMemoryText(raw.short,28);
-    if(candidate){
-      state.memory.short=[...state.memory.short,candidate].slice(-15);
-      state.memory.lastUpdatedTurn=turn;
-      changed=true;
-    }
-  }
-
-  // The extension, not the model, owns the thresholds and clearing.
-  const longSummary=cleanMemoryText(
-    raw.longSummary || (Array.isArray(raw.long)?raw.long[0]:''),
-    260
-  );
-  if(state.memory.short.length>=15 && longSummary){
-    state.memory.long=[...state.memory.long,longSummary].slice(-10);
-    state.memory.short=[];
-    changed=true;
-  }
-
-  const permanentSummary=cleanMemoryText(
-    raw.permanentSummary
-      || (Array.isArray(raw.permanent)?raw.permanent[0]:'')
-      || (Array.isArray(raw.core)?raw.core[0]:''),
-    340
-  );
-  if(state.memory.long.length>=10 && permanentSummary){
-    if(!state.memory.permanent.includes(permanentSummary)){
-      state.memory.permanent.push(permanentSummary);
-    }
-    state.memory.long=[];
-    changed=true;
-  }
-
-  return changed;
-}
-
-function extractJsonObject(raw){
-  const text=String(raw||'').trim()
-    .replace(/^\`\`\`(?:json)?\s*/i,'')
-    .replace(/\s*\`\`\`$/,'');
-
-  // Quiet generation can still inherit other active prompts. Parse the first
-  // complete valid JSON object instead of assuming the last "}" belongs to it.
-  for(let start=0;start<text.length;start++){
-    if(text[start]!=='{') continue;
-    let depth=0;
-    let inString=false;
-    let escaped=false;
-    for(let i=start;i<text.length;i++){
-      const ch=text[i];
-      if(inString){
-        if(escaped) escaped=false;
-        else if(ch==='\\') escaped=true;
-        else if(ch==='"') inString=false;
-        continue;
-      }
-      if(ch==='"'){
-        inString=true;
-        continue;
-      }
-      if(ch==='{') depth++;
-      else if(ch==='}'){
-        depth--;
-        if(depth===0){
-          const candidate=text.slice(start,i+1);
-          try{return JSON.parse(candidate);}catch{break;}
-        }
-      }
-    }
-  }
-  return null;
 }
 
 function extractVisibleStoryDay(raw=''){
@@ -1180,134 +1043,6 @@ function syncStoryDayTo(state,targetDay,{source='timeline-scan',allowCorrection=
   }
   return true;
 }
-
-async function quietSyncMemory({force=false,bootstrapOnly=false}={}){
-  if(memoryQuietSyncInFlight || !isBoundCharacter() || !hasActiveChat()) return false;
-  const context=globalThis.SillyTavern?.getContext?.()||{};
-  const generateQuietPrompt=context?.generateQuietPrompt;
-  if(typeof generateQuietPrompt!=='function'){
-    console.warn('[MÉMÉ OS] generateQuietPrompt unavailable; memory quiet sync skipped');
-    return false;
-  }
-
-  const state=runtimeState();
-  state.memory=state.memory||{
-    initialized:false,bootstrappedAt:null,sourceTurns:0,
-    short:[],long:[],permanent:[],lastUpdatedTurn:0,
-  };
-  state.memory.short=Array.isArray(state.memory.short)?state.memory.short:[];
-  state.memory.long=Array.isArray(state.memory.long)?state.memory.long:[];
-  state.memory.permanent=Array.isArray(state.memory.permanent)?state.memory.permanent:[];
-
-  const turn=Math.max(0,Number(state.shop?.plotTurn)||0);
-  const bootstrap=!state.memory.initialized;
-  if(bootstrapOnly && !bootstrap) return false;
-
-  const needShort=!bootstrap && Number(state.memory.lastUpdatedTurn||0)<turn;
-  const shortCount=state.memory.short.length;
-  const longCount=state.memory.long.length;
-  const needShortCompression=!bootstrap && (shortCount>=15 || (needShort && shortCount===14));
-  const prospectiveLongCount=longCount+(needShortCompression?1:0);
-  const needLongCompression=!bootstrap && (longCount>=10 || prospectiveLongCount>=10);
-
-  if(!bootstrap && !force && !needShort && !needShortCompression && !needLongCompression) return false;
-  if(memoryQuietLastAttemptTurn===turn && !bootstrap && !force && !memoryNeedsCompression(state)) return false;
-
-  memoryQuietSyncInFlight=true;
-  memoryQuietLastAttemptTurn=turn;
-
-  const chatCount=Array.isArray(context.chat)?context.chat.length:0;
-  const chat=Array.isArray(context.chat)?context.chat:[];
-  let latestAssistantIndex=-1;
-  for(let i=chat.length-1;i>=0;i--){
-    if(chat[i] && !chat[i].is_user){ latestAssistantIndex=i; break; }
-  }
-  let latestUserIndex=-1;
-  for(let i=latestAssistantIndex-1;i>=0;i--){
-    if(chat[i]?.is_user){ latestUserIndex=i; break; }
-  }
-  const latestRound=latestAssistantIndex>=0
-    ? {
-        user: latestUserIndex>=0 ? visibleStoryText(chat[latestUserIndex]?.mes||'') : '',
-        assistant: visibleStoryText(chat[latestAssistantIndex]?.mes||''),
-      }
-    : {user:'',assistant:''};
-  const prompt=bootstrap
-    ? `你正在为持续角色扮演聊天建立第一次 MEMORY。请阅读当前能看到的完整聊天历史，并按“每一个 user+assistant 剧情回合对应一条短期记忆”的规则回填。
-
-只输出纯 JSON，不要代码块或解释：
-{"short":[],"long":[],"permanent":[]}
-
-严格规则：
-1. 每条 short 是一个完整剧情回合的摘要，约18-24个中文字符，最多28字。不要只挑“大事”；普通吃饭、洗澡、对话也照样按回合概括。
-2. 从最早到最新按回合整理。每满15个完整回合，把那15条内容压成1条约180-220字的 long，不再把那15条保留在 short。
-3. 最后不足15个回合的尾段，逐回合放进 short，最多14条。
-4. 每满10条 long，再把那10条压成1条约260-320字的 permanent，并从 long 中移除。permanent 永久保留。
-5. 不记录AP/SV/CHARM余额；系统结构化数值由扩展自己保存。
-6. 不凭空编造人物、事件或关系。`
-    : `你正在给 MÉMÉ OS 做本回合 MEMORY 同步。
-
-当前 SHORT（${shortCount}/15）：
-${JSON.stringify(state.memory.short)}
-当前 LONG（${longCount}/10）：
-${JSON.stringify(state.memory.long)}
-永久记忆：
-${JSON.stringify(state.memory.permanent)}
-
-最新完整剧情回合（只概括这一回合作为本轮 SHORT）：
-USER：${latestRound.user}
-ASSISTANT：${latestRound.assistant}
-
-只输出纯 JSON，不要代码块或解释：
-{"short":"","longSummary":"","permanentSummary":""}
-
-严格执行：
-1. needShort=${needShort}。若为 true，short 必须写且只能写1条，概括“最新一个 user+assistant 剧情回合”，约18-24个中文字符，最多28字。哪怕本回合只是普通日常也必须记。若为 false，short 留空。
-2. needShortCompression=${needShortCompression}。若为 true，longSummary 必须把构成本批次的15条 SHORT 压成约180-220字的一条长期记忆。若本次同时需要新short，必须把刚生成的这条也算进15条里。若为 false，longSummary 留空。
-3. needLongCompression=${needLongCompression}。若为 true，permanentSummary 必须把构成本批次的10条 LONG 压成约260-320字永久记忆；如果本次刚生成第10条 longSummary，也必须把它算进去。若为 false，permanentSummary 留空。
-4. LONG/永久总结要保留人物关系、重要变化、持续后果和关键剧情，不要写成空泛感想。
-5. 不写AP/SV/CHARM余额，不猜不存在的事实。`;
-
-  try{
-    const raw=await generateQuietPrompt({quietPrompt:prompt});
-    const parsed=extractJsonObject(raw);
-    if(!parsed) throw new Error('quiet memory response was not valid JSON');
-
-    const latest=runtimeState();
-    let changed=false;
-    const memoryRaw=bootstrap
-      ? {
-          bootstrap:true,
-          short:Array.isArray(parsed.short)?parsed.short:[],
-          long:Array.isArray(parsed.long)?parsed.long:[],
-          permanent:Array.isArray(parsed.permanent)?parsed.permanent:[],
-        }
-      : {
-          bootstrap:false,
-          short:parsed.short||'',
-          longSummary:parsed.longSummary||'',
-          permanentSummary:parsed.permanentSummary||'',
-        };
-
-    if(applyMemoryEvent(latest,memoryRaw,chatCount)) changed=true;
-
-    // If a summary was malformed/missing, leave the full bucket intact and try
-    // again on the next assistant event rather than deleting memories.
-    if(changed){
-      await saveState(latest);
-      renderView(currentView(),false);
-      installRuntimePrompt();
-      console.info(`[MÉMÉ OS] memory ${bootstrap?'bootstrap':'rolling sync'} completed`);
-    }
-    return changed;
-  }catch(error){
-    console.warn('[MÉMÉ OS] quiet memory sync failed',error);
-    return false;
-  }finally{
-    memoryQuietSyncInFlight=false;
-  }
-}
-
 
 function lifestyleShelfDisposition(state=runtimeState()){
   const day=Math.max(1,Number(state.tasks?.storyDay)||1);
@@ -2007,7 +1742,7 @@ function markRuntimeMessageProcessed(state,messageKey){
 }
 
 const TURN_SNAPSHOT_KEYS=[
-  'resources','host','system','permission','shop','inventory','memory','reactivity','encounters','upgrades','tasks','men','history',
+  'resources','host','system','permission','shop','inventory','reactivity','encounters','upgrades','tasks','men','history',
 ];
 
 function cloneTurnValue(value){
@@ -3062,7 +2797,7 @@ function installRuntimePrompt(){
   const previousSceneStatus=latestVisibleSceneStatus(context?.chat);
   const previousSceneStatusText=previousSceneStatus?.raw || 'NONE — establish a precise scene clock in this reply';
   const npcWheel=npcEncounterWheel(context,state);
-  const prompt=`[MÉMÉ OS runtime bridge · v0.13.1]
+  const prompt=`[MÉMÉ OS runtime bridge · v0.13.2]
 AUTHORITY / TONE:
 - Extension state is the only authority for AP, SV, CHARM, purchases, task settlement, MEN buckets, system access/evolution and unlocks. Never mentally add/subtract numbers or reuse stale balances.
 - The host persona comes from the active SillyTavern Persona + visible chat. Do not invent host identity/history beyond established system transformation facts.
@@ -3076,12 +2811,6 @@ LIVE STATE:
 DAY=${Number(state.tasks?.storyDay)||1}; AP=${Number(state.resources?.ap)||0}; SV=${Number(state.resources?.sv)||0}; CHARM=${Number(state.host?.charm)||0}.
 Spendable after pending: AP=${getSpendableResources(state).ap}; SV=${getSpendableResources(state).sv}.
 Body/upgrades=${JSON.stringify(state.host?.body||{})}.
-
-MEMORY / NARRATIVE CONTINUITY:
-PERMANENT=${JSON.stringify(state.memory?.permanent||[])}.
-LONG=${JSON.stringify(state.memory?.long||[])}.
-SHORT=${JSON.stringify(state.memory?.short||[])}.
-Rules: these are established past-story facts distilled by the extension. Use them silently to preserve continuity, identities, relationships, promises, consequences and prior events; do not quote or recap the memory lists unless the host asks. Newer visible chat overrides an older compressed wording when they conflict. Extension structured state still overrides memory for AP/SV/CHARM/DAY/tasks/shop/MEN/system permissions and other runtime facts. Never invent facts to fill a memory gap.
 
 TASK BOARD:
 Base DAILY today=${JSON.stringify(currentStaticTaskPool('daily',state).map(t=>({id:t.id,title:t.title,desc:t.desc,reward:t.reward})))}.
@@ -3130,7 +2859,7 @@ Relationship signals are sparse state changes, not running mood captions. Intere
 HIDDEN EVENT:
 Append at most ONE invisible comment at the very end ONLY when this reply changes structured MÉMÉ OS state, or when a MEN presence heartbeat/exit is required.
 Exact container: <!--MEME_OS_EVENT {"taskOffers":[],"tasks":[],"storyRewards":[],"shop":[],"lifestyleShop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{}} -->
-Do NOT add retired compatibility fields. MEMORY and scene chronology are owned by separate extension paths.
+Do NOT add retired compatibility fields. Scene chronology is owned by the dedicated extension path.
 taskOffers: max 1 new DESIRE; fields title,desc,detail,source,targetManId(optional). Never include id/tier/reward. If it introduces a new relevant man, include matching men entry and link targetManId.
 tasks: max 4 ACTIVE completions; fields id,status:"completed",evidence. Extension calculates rewards.
 storyRewards: max 1 substantial unexpected non-routine achievement; fields title,evidence,source,difficulty(light|normal|hard).
@@ -3144,7 +2873,6 @@ permission.love=true only for a genuinely established love change involving mean
 permission.systemAccess may request peek|open|private only when the corresponding readiness above is satisfied and the administrator actually chooses to grant it.
 identity is only for real administrator identity/name state changes supported by the story.
 
-MEMORY is NOT part of the main reply event. The extension's quiet memory sync owns bootstrap + one SHORT (~20 Chinese characters) per plot round + 15 SHORT -> 1 LONG (~200 Chinese characters) + 10 LONG -> 1 PERMANENT (~300 Chinese characters). Stored SHORT/LONG/PERMANENT are injected back into the next story prompt as narrative continuity.
 `;
 
   const sceneClockPrompt=`[MÉMÉ OS — SCENE CLOCK — ABSOLUTE OUTPUT FORMAT]
@@ -3913,43 +3641,6 @@ function statsMarkup(compact = false) {
   `;
 }
 
-function memoryLayerMarkup(title,code,items,emptyText,open=false){
-  const list=Array.isArray(items)?items:[];
-  return `
-    <details class="meme-memory-layer" ${open?'open':''}>
-      <summary><span><small>${code}</small><b>${title}</b></span><em>${list.length}</em></summary>
-      <div class="meme-memory-body">
-        ${list.length
-          ? list.map((item,index)=>`<article><i>${String(index+1).padStart(2,'0')}</i><p>${escapeUiText(item)}</p></article>`).join('')
-          : `<p class="meme-memory-empty">${emptyText}</p>`}
-      </div>
-    </details>
-  `;
-}
-
-function memoryMarkup(){
-  const state=runtimeState();
-  const memory=state.memory||{};
-  const initialized=Boolean(memory.initialized);
-  return `
-    ${pageHeader('CONTEXT VAULT','MEMORY · 我替你记着',initialized?'SYNCED':'BOOTSTRAP')}
-    <section class="meme-page-card">
-      <div class="meme-card-title">
-        <small>MEMORY STATUS</small>
-        <h3>${initialized?'旧账已经接上了':'等下一轮自动巡查旧聊天'}</h3>
-      </div>
-      ${labelValue('回填状态',initialized?'BOOTSTRAPPED':'PENDING',initialized?`首次回填参考了约 ${Number(memory.sourceTurns)||0} 条可见消息`:'第一次生成回复时，会回看当前模型能看到的旧聊天后再建档。')}
-      ${labelValue('滚动规则',`SHORT ${(memory.short||[]).length}/15 · LONG ${(memory.long||[]).length}/10`,'每回合一条短记忆；15条压1条长期，10条长期压1条永久。永久记忆不清空。')}
-    </section>
-
-    <section class="meme-memory-stack">
-      ${memoryLayerMarkup('近期','SHORT',memory.short,'下一回合会记下第一条短期记忆。',true)}
-      ${memoryLayerMarkup('长期','LONG',memory.long,'每满15条短期记忆，会压成约200字长期记忆。')}
-      ${memoryLayerMarkup('永久','PERMANENT',memory.permanent,'每满10条长期记忆，会压成约300字永久记忆；这里不会因滚动压缩而消失。')}
-    </section>
-  `;
-}
-
 function homeMarkup() {
   const state=runtimeState();
   const voice=attitude(state);
@@ -3987,7 +3678,7 @@ function homeMarkup() {
     <section class="meme-modules">
       <div class="meme-section-head">
         <div><small>PRIVATE ACCESS</small><h3>想看什么自己点</h3></div>
-        <span>8 / 8</span>
+        <span>7 / 7</span>
       </div>
       <div class="meme-module-grid">
         ${moduleCard('me','ME','看看这副身子还剩多少能救')}
@@ -3996,7 +3687,6 @@ function homeMarkup() {
         ${moduleCard('men','MEN','睡过你、想睡你的男人')}
         ${moduleCard('system','SYSTEM','看我干什么')}
         ${moduleCard('record','RECORD','你干过的脏事我都记着')}
-        ${moduleCard('memory','MEMORY','前面的事别指望我忘')}
         ${moduleCard('home','HOME','滚回总览')}
       </div>
     </section>
@@ -4644,7 +4334,6 @@ function renderView(view='home', animate=true) {
     men: menMarkup,
     system: () => systemAccessStage(runtimeState())==='locked' ? lockedSystemMarkup() : systemMarkup(),
     record: recordMarkup,
-    memory: memoryMarkup,
   };
 
   const paint=()=>{
@@ -4679,7 +4368,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
-        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.13.0</small>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.13.2</small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
@@ -4840,14 +4529,7 @@ function bindSillyTavernEvents(){
     await handleRuntimeEvent(messageId);
     installRuntimePrompt();
 
-    const state=runtimeState();
-    const turn=Math.max(0,Number(state.shop?.plotTurn)||0);
-    if(!state.memory?.initialized){
-      await quietSyncMemory({force:true});
-    }else if(Number(state.memory?.lastUpdatedTurn||0)<turn || memoryNeedsCompression(state)){
-      // Every round needs exactly one SHORT. Compression is also extension-owned.
-      await quietSyncMemory({force:true});
-    }
+
   };
   if(events.MESSAGE_RECEIVED) source.on(events.MESSAGE_RECEIVED,handleAssistantVariant);
   if(events.MESSAGE_SWIPED) source.on(events.MESSAGE_SWIPED,handleAssistantVariant);
@@ -4860,7 +4542,6 @@ function bindSillyTavernEvents(){
     await reconcileRecentVisibleTaskOffers();
     renderView('home',false);
     installRuntimePrompt();
-    await quietSyncMemory({bootstrapOnly:true});
   });
   globalThis.__meme_os_events_bound__=true;
 }
@@ -5027,7 +4708,6 @@ async function start() {
   }
   bindSillyTavernEvents();
   installRuntimePrompt();
-  setTimeout(()=>quietSyncMemory({bootstrapOnly:true}),900);
   globalThis.__meme_os_probe_timer__ = setInterval(mount, 1000);
   window.addEventListener('resize', mount, { passive:true });
   window.addEventListener('orientationchange', () => setTimeout(mount,150), { passive:true });
