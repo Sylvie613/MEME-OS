@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.21';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.21';
-import { isBoundCharacter } from './src/binding.js?v=0.10.21';
+} from './src/state.js?v=0.10.22';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.22';
+import { isBoundCharacter } from './src/binding.js?v=0.10.22';
 
 /**
- * MÉMÉ OS v0.10.21
+ * MÉMÉ OS v0.10.22
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -2027,6 +2027,11 @@ His mouth can be very dirty without implying sexual attraction. Before attractio
 GAME IDENTITY / TASK PRIORITY:
 MÉMÉ OS is first and foremost a vulgar erotic game / 黄油 transformation system, NOT a conventional romance card and NOT an administrator-dating simulator. Erotic missions, sexual progression, dirty body challenges, SV collection and the host's transformation are the gameplay spine.
 Even before DESIRE missions unlock, the game should already feel indecent: locked erotic task previews, blunt adult terminology, future SV mechanics, dirty shop/record copy, MEN placeholders and the administrator's crude jokes may foreshadow where the system is going. Do NOT make early gameplay feel like a wholesome hygiene/fitness app merely because CHARM is still low. The administrator himself does not need to be sexually attracted to the host for the OS to be vulgar. The administrator romance is only a possible long-term side axis and must never replace the erotic-game loop.
+
+EARLY EROTIC AMBIENCE:
+CHARM 0-7 means formal DESIRE missions are locked, NOT that sexuality disappears from the story. Across several ordinary early turns, when the current scene naturally supports it, let at least one adult-coded OS element surface: a locked DESIRE preview, SV/精液机制提示, a dirty system label, masturbation aftermath that is ALREADY established, underwear/body-state cleanup that is ALREADY established, porn/sexual-media context already present, a crude adult joke, or a future adult SHOP/mission teaser.
+Do not force one into every reply. Do not invent wet underwear, toys, semen, arousal, nudity or masturbation that the visible scene did not establish. Do not make random men horny for the host before the relevant CHARM/plot conditions. The goal is persistent 黄油 atmosphere, not premature sexual success.
+Mundane tasks can carry sexual or humiliating framing only when the scene gives a real reason. Example: cleaning up directly after the opening masturbation can be vulgar; an unrelated later walk should not magically become a sex task just to make the game dirtier.
 Do not turn TASK into "date him", "make him like you", "get praised", "raise affection", "have a sweet moment" or other romance-game objectives. The administrator may issue or verify missions, but he does NOT need to comment on every task, every system change or every user message. Silence, a single curse, or letting the OS panel speak for itself are valid responses. He is not the default erotic mission target. If later plot and his physical form naturally make him relevant, that may happen organically, but never because the task generator is trying to push an admin route.
 
 ADULT MALE NPC POOL:
@@ -2178,7 +2183,7 @@ storyRewards: max 2 one-off plot tasks that visibly became complete without prio
 shop: maximum 2 temporary items. Each item fields: title,desc,detail,currency("AP"|"SV"),ttl(1-8),icon,source,impact("minor"|"standard"|"major"),bodyAxis(optional),sourceIssueId(optional). title/desc/detail/source are administrator-authored OS copy: they may use his first-person voice, insults, dirty jokes and current-stage attitude when natural. A temporary item must be a direct answer to something that just happened in the visible plot: a newly exposed problem, a consequence, a desire, a task outcome or a scene-specific opportunity. source must name that trigger. impact describes how substantial the item's actual effect is, not how expensive you want it to be. Never include id, price or charmGain; MÉMÉ OS derives price from current shelf phase, effect impact and current spendable balance. bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
 feedback.issues: max 2, only direct story evidence; fields id,axis(optional),source,note,severity(low|medium|high). source/note are his OS notes: short and specific, with his personal wording allowed.
 feedback.reactions: max 2, only directly observed reactions to established state/change; fields id,axis(optional),source,note,valence(negative|neutral|positive|sexual). source/note are SYSTEM log copy.
-men: max 3 qualifying adult men updates; fields id(optional for new),name,meta,summary,relation,desire,lastContact,note,badges,present,contactDelta,qualifies. MEN is a SYSTEM archive: summary/relation/desire/lastContact/note/badges must read like concise archive fields, not administrator commentary.
+men: max 3 qualifying adult men updates; fields id(optional for new),name,meta,summary,relation,desire,lastContact,note,badges,present,contactDelta,qualifies. MEN is the administrator's own archive: factual identity fields may stay concise, but summary/relation/desire/lastContact/note/badges should sound like he personally wrote them, including crude, mocking or sexual wording when the established facts support it.
 evolution: only when a visible, mechanically-ready one-step administrator form evolution actually happens; fields targetLevel(2|3|4),reason. reason should be one short concrete sentence in his own OS wording. Never use it for ordinary mood/relationship changes.
 Temporary shop items must arise from the just-written plot, not random catalog filler. Generated tasks and generated shop goods are two views of the same live scene: if a task exists because of a concrete problem or consequence, any related temporary good should address that same problem/consequence rather than introducing an unrelated catalog item. Their names/descriptions/details are written by the same male administrator in his current OS voice: ${voice.label}. They should feel personally named and judged by him, not catalog-generated. Current CHARM=${state.host.charm}.
 SYSTEM EVOLUTION LADDER:
@@ -2437,6 +2442,10 @@ function taskVoiceName(task,state=runtimeState()){
 
 function taskVoiceDesc(task,state=runtimeState()){
   if(task.dynamicTask || task.dynamicDailyTask || task.canonicalMarker || task.legacyMigrated) return task.desc;
+  const storyDay=Math.max(1,Number(state.tasks?.storyDay)||1);
+  if(task.id==='clean' && storyDay===1 && !state.tasks?.everCompleted?.clean){
+    return '刚才还在床上摸自己，手都没洗就别跟我谈改造。先洗头、洗澡、刷牙、换掉这身衣服。至少先把自慰现场和自己收拾得像个人。';
+  }
   const i=toneIndex(state);
   if(i===0) return RUDE_TASK_DESCS[task.id] || task.desc;
   const pools={
@@ -2799,6 +2808,29 @@ function statsMarkup(compact = false) {
   `;
 }
 
+function adultProtocolPreviewMarkup(state=runtimeState()){
+  const charm=Math.max(0,Number(state.host?.charm)||0);
+  const rows=[
+    {need:8, code:'CHARM 8', title:'先让个男人看着你硬起来', sub:'明确性唤起才算，嘴上夸你好看不算。'},
+    {need:12, code:'CHARM 12', title:'第一次精液别空手回来', sub:'射出来、收得到，才算第一次可结算采集。'},
+    {need:15, code:'CHARM 15', title:'这张嘴终于有别的用途', sub:'口交完成并拿到射精结算，才算正式过关。'},
+  ];
+  return `
+    <section class="meme-page-card meme-adult-protocol">
+      <div class="meme-card-title">
+        <small>ADULT PROTOCOL · ${charm<8?'LOCKED':'ACTIVE'}</small>
+        <h3>${charm<8?'别急着骚。正菜你现在还没资格吃。':'欲望协议已经开始开锁。'}</h3>
+      </div>
+      ${rows.map(row=>labelValue(
+        row.code,
+        row.title,
+        charm>=row.need ? `OPEN · ${row.sub}` : `LOCKED · ${row.sub}`
+      )).join('')}
+      ${labelValue('SV','精液值','以后拿别人的精液，换你自己的成人反应改造。')}
+    </section>
+  `;
+}
+
 function homeMarkup() {
   const state=runtimeState();
   const voice=attitude(state);
@@ -2827,6 +2859,8 @@ function homeMarkup() {
       <article><small>CURRENT TASK</small><b>${activeCount ? `已挂上 ${activeCount} 项` : '一项都没接'}</b><em>${activeCount ? '做完再回来邀功' : '去 TASK，别装忙'}</em></article>
       <article><small>NEXT UNLOCK</small><b>${nextUnlock}</b><em>我说开才开</em></article>
     </section>
+
+    ${adultProtocolPreviewMarkup(state)}
 
     <section class="meme-whisper-card">
       <span>♛</span>
