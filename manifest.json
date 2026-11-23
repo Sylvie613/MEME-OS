@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.11.3",
+  "version": "0.11.4",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS 0.11.3: fixes character binding compatibility for cards that omit enabled:true, restoring full-chat DAY sync, daily AP rotation, and current-day [TASK] synchronization.",
-  "js": "index-v0.11.3.js",
-  "css": "style.css?v=0.11.3",
+  "description": "MÉMÉ OS 0.11.4: visible TASK completion markers settle rewards, persist daily completion, retire completed tasks, and backfill existing replies without hidden-event dependence.",
+  "js": "index-v0.11.4.js",
+  "css": "style.css?v=0.11.4",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
