@@ -1321,49 +1321,6 @@ html.meme-os-open body{
   font-weight:600;
 }
 
-.meme-story-status{
-  display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:6px;
-  margin-top:8px;
-  padding:8px 9px;
-  border:1px solid rgba(232,116,171,.11);
-  border-radius:14px;
-  background:rgba(14,5,17,.16);
-}
-.meme-story-status span{
-  min-width:0;
-}
-.meme-story-status span.is-wide{
-  grid-column:span 3;
-  display:grid;
-  grid-template-columns:64px minmax(0,1fr);
-  align-items:center;
-  gap:8px;
-  padding-top:5px;
-  border-top:1px solid rgba(235,122,174,.07);
-}
-.meme-story-status small{
-  display:block;
-  color:#8d687c;
-  font-size:6px;
-  font-weight:900;
-  letter-spacing:.15em;
-}
-.meme-story-status b{
-  display:block;
-  margin-top:3px;
-  color:#ead7e2;
-  font-size:8px;
-  font-weight:650;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-.meme-story-status .is-wide b{
-  margin-top:0;
-}
-
 .meme-memory-stack{
   display:grid;
   gap:8px;
