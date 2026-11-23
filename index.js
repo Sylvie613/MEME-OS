@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.14';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.14';
-import { isBoundCharacter } from './src/binding.js?v=0.10.14';
+} from './src/state.js?v=0.10.15';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.15';
+import { isBoundCharacter } from './src/binding.js?v=0.10.15';
 
 /**
- * MÉMÉ OS v0.10.14
+ * MÉMÉ OS v0.10.15
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -517,30 +517,59 @@ function sanitizeGeneratedDailyTask(raw,state=runtimeState()){
   };
 }
 
+function extractFormalVisibleDailyCards(raw=''){
+  const text=String(raw||'');
+  const cards=[];
+  const re=/【\s*(?:DAILY|日常)\s*[·•・⋅∙:：|｜-]\s*([^】\n]{2,48})】/gi;
+  const matches=[...text.matchAll(re)];
+  for(let i=0;i<matches.length;i++){
+    const match=matches[i];
+    const title=String(match[1]||'').replace(/\s+/g,' ').trim().slice(0,48);
+    const start=Number(match.index||0)+String(match[0]||'').length;
+    const nextIndex=i+1<matches.length ? Number(matches[i+1].index||text.length) : text.length;
+    const after=text.slice(start,nextIndex);
+    const lines=after.split(/\r?\n/);
+    const requirement=[];
+    for(const rawLine of lines){
+      const line=String(rawLine||'').trim();
+      if(!line){
+        if(requirement.length) break;
+        continue;
+      }
+      if(/^【/.test(line)) break;
+      if(/^(?:你|他|男人|管理员|系统)(?:[：:“"”]|.{0,6}(?:说|看|盯|笑|冷笑|顿|停|问|答|开口|声音|视线))/u.test(line) && requirement.length) break;
+      requirement.push(line);
+      if(requirement.join(' ').length>=220) break;
+    }
+    const desc=requirement.join(' ').replace(/\s+/g,' ').trim().slice(0,180);
+    if(title && desc) cards.push({title,desc});
+  }
+  return cards;
+}
+
 function inferVisibleDailyTaskOffer(raw,state=runtimeState()){
   const text=String(raw||'');
 
-  // Highest priority: a visibly formatted system task card such as
-  // 【DAILY · 别睡猪窝】 followed by the actual requirement paragraph.
-  const formal=[...text.matchAll(/【\s*(?:DAILY|日常)(?:\s*[·:：|｜-]\s*|\s+)([^】\n]{2,48})】\s*([\s\S]{0,320})/gi)];
+  // Highest priority: visible structured task cards. When one exists, its
+  // own title + requirement text are the source of truth; nearby dialogue
+  // must never be promoted into a competing task.
+  const formal=extractFormalVisibleDailyCards(text);
   if(formal.length){
-    const match=formal[formal.length-1];
-    const title=String(match[1]||'').replace(/\s+/g,' ').trim().slice(0,48);
-    const after=String(match[2]||'');
-    const paragraph=after.split(/\n\s*\n|(?=【)|(?=你(?:盯|看|愣|僵|抬|低|下意识|沉默|咬|攥))/)[0]||'';
-    const desc=paragraph.replace(/\s+/g,' ').trim().slice(0,180);
-    if(title && desc){
-      const actionCount=(desc.match(/[，,、；;]/g)||[]).length+1;
-      const hardCue=/(二十分钟|半小时|一小时|坚持|运动|出门|公共|社交|当众|长时间|彻底|完整完成)/.test(desc);
-      const lightCue=actionCount<=1 && /(扔|擦|关|拿|喝|换一件|刷牙|洗脸)/.test(desc);
-      const difficulty=hardCue?'hard':lightCue?'light':'normal';
-      return sanitizeGeneratedDailyTask({
-        title,desc,
-        detail:'由当前可见剧情中的正式任务卡同步；完成后按滚动任务规则退场。',
-        source:'当前剧情正式任务卡',
-        difficulty,
-      },state);
-    }
+    const card=formal[formal.length-1];
+    const title=card.title;
+    const desc=card.desc;
+    const actionCount=(desc.match(/[，,、；;]/g)||[]).length+1;
+    const hardCue=/(二十分钟|半小时|一小时|坚持|运动|出门|公共|社交|当众|长时间|彻底|完整完成)/.test(desc);
+    const lightCue=actionCount<=1 && /(扔|擦|关|拿|喝|换一件|刷牙|洗脸)/.test(desc);
+    const difficulty=hardCue?'hard':lightCue?'light':'normal';
+    const task=sanitizeGeneratedDailyTask({
+      title,desc,
+      detail:'由当前可见剧情中的正式任务卡同步；完成后按滚动任务规则退场。',
+      source:'当前剧情正式任务卡',
+      difficulty,
+    },state);
+    if(task) task.formalVisibleCard=true;
+    return task;
   }
 
   const cue=/(?:一张|新的?|弹出|出现|生成|砸下|亮起)[^。\n]{0,28}(?:日常|剧情)?任务卡|(?:新的?|临时)(?:日常|剧情)?任务(?:出现|生成|弹出|亮起)/i.exec(text);
@@ -1189,6 +1218,31 @@ function resolveAssistantMessageId(ref){
 
 
 
+function removeFallbackTasksCompetingWithFormalCard(state,formalTask){
+  if(!formalTask) return false;
+  state.tasks=state.tasks||{};
+  state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
+  const formalTags=new Set(taskActionTags(formalTask));
+  let changed=false;
+  state.tasks.generatedDaily=state.tasks.generatedDaily.filter(task=>{
+    if(task.id===formalTask.id) return true;
+    if(state.tasks?.active?.[task.id]) return true;
+    const source=String(task.source||'');
+    const lowConfidence=/可见剧情任务卡兜底|当前可见剧情直接触发/.test(source);
+    if(!lowConfidence) return true;
+
+    const tags=taskActionTags(task);
+    const overlaps=tags.length && tags.some(tag=>formalTags.has(tag));
+    const generic=/先把自己收拾干净|现在先把头洗了|先把头洗了|收拾干净/.test(String(task.title||''));
+    if(overlaps || generic){
+      changed=true;
+      return false;
+    }
+    return true;
+  });
+  return changed;
+}
+
 async function reconcileRecentVisibleTaskOffers(){
   if(!isBoundCharacter() || !hasActiveChat()) return;
   const context=globalThis.SillyTavern?.getContext?.()||{};
@@ -1206,6 +1260,7 @@ async function reconcileRecentVisibleTaskOffers(){
     if(/<!--MEME_OS_EVENT\s+[\s\S]*?"dailyTaskOffers"\s*:\s*\[[^\]]+\]/.test(raw)) continue;
     const task=inferVisibleDailyTaskOffer(raw,state);
     if(!task) continue;
+    if(task.formalVisibleCard && removeFallbackTasksCompetingWithFormalCard(state,task)) changed=true;
     const historyId=`meme_visible_task_reconcile_${i}_${task.id}`;
     if((state.history||[]).some(entry=>entry.id===historyId)) continue;
     if(state.tasks.everCompleted?.[task.id] || state.tasks.active?.[task.id] || state.tasks.generatedDaily.some(old=>old.id===task.id)){
@@ -1641,6 +1696,7 @@ async function handleRuntimeEvent(messageId){
     state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
     const fallbackTask=inferVisibleDailyTaskOffer(raw,state);
     if(fallbackTask){
+      if(fallbackTask.formalVisibleCard) removeFallbackTasksCompetingWithFormalCard(state,fallbackTask);
       state.tasks.generatedDaily=[
         fallbackTask,
         ...state.tasks.generatedDaily.filter(old=>old.id!==fallbackTask.id),
