@@ -3,7 +3,7 @@
   "version": "0.10.19",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS: pinned DAY 001 onboarding task, natural-day rotating task pools, rare OS-priced plot-gift tasks, user correction controls, adaptive economy, and swipe-safe authoritative state.",
+  "description": "MÉMÉ OS: DAY 001 onboarding task pinned before rotating daily pools, with canonical TASK sync, adaptive economy, user correction controls, and swipe-safe authoritative state.",
   "js": "index.js?v=0.10.19",
   "css": "style.css?v=0.10.19",
   "auto_update": true,
