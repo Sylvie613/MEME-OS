@@ -138,6 +138,15 @@ function cloneDefaultState() {
     return clone(DEFAULT_STATE);
 }
 
+function normalizeResource(value) {
+    return Math.max(0, Math.round(Number(value) || 0));
+}
+
+function normalizeCharm(value) {
+    const n = Math.min(100, Math.max(0, Number(value) || 0));
+    return Math.round((n + Number.EPSILON) * 10) / 10;
+}
+
 function charmToStage(charm) {
     const n = Number(charm) || 0;
     if (n < 10) return { attitudeStage: 0, stage: '灾难抢救阶段' };
@@ -276,10 +285,10 @@ function mergeState(raw) {
     const tone = charmToStage(merged.host.charm);
     merged.host.stage = tone.stage;
     merged.system.attitudeStage = tone.attitudeStage;
-    merged.resources.ap = Math.max(0, Number(merged.resources.ap) || 0);
-    merged.resources.sv = Math.max(0, Number(merged.resources.sv) || 0);
-    merged.host.charm = Math.min(100, Math.max(0, Number(merged.host.charm) || 0));
-    merged.host.progress = Math.min(100, Math.max(0, merged.host.charm));
+    merged.resources.ap = normalizeResource(merged.resources.ap);
+    merged.resources.sv = normalizeResource(merged.resources.sv);
+    merged.host.charm = normalizeCharm(merged.host.charm);
+    merged.host.progress = merged.host.charm;
     const allowedAccessStages = ['locked','peek','open','private'];
     if (!allowedAccessStages.includes(merged.system.accessStage)) {
         merged.system.accessStage = merged.system.pageUnlocked ? 'open' : 'locked';
@@ -451,15 +460,15 @@ function applyEffect(state, effect) {
     if (!effect || typeof effect !== 'object') return;
 
     if (Number.isFinite(effect.apDelta)) {
-        state.resources.ap = Math.max(0, state.resources.ap + effect.apDelta);
+        state.resources.ap = normalizeResource(state.resources.ap + effect.apDelta);
     }
 
     if (Number.isFinite(effect.svDelta)) {
-        state.resources.sv = Math.max(0, state.resources.sv + effect.svDelta);
+        state.resources.sv = normalizeResource(state.resources.sv + effect.svDelta);
     }
 
     if (Number.isFinite(effect.charmDelta)) {
-        state.host.charm = Math.min(100, Math.max(0, state.host.charm + effect.charmDelta));
+        state.host.charm = normalizeCharm(state.host.charm + effect.charmDelta);
     }
 
     if (effect.bodyDelta && typeof effect.bodyDelta === 'object') {
@@ -531,7 +540,7 @@ function applyEffect(state, effect) {
                 title: item.title,
                 level: nextLevel,
                 axes: changedAxes,
-                charmDelta: Number(effect.charmDelta) || 0,
+                charmDelta: normalizeCharm(Number(effect.charmDelta) || 0),
                 storyDay: Number(state.tasks?.storyDay) || 1,
                 committedAt: Date.now(),
             },
@@ -553,7 +562,10 @@ function applyEffect(state, effect) {
     const tone = charmToStage(state.host.charm);
     state.host.stage = tone.stage;
     state.system.attitudeStage = tone.attitudeStage;
-    state.host.progress = Math.min(100, Math.max(0, Number(state.host.charm) || 0));
+    state.host.charm = normalizeCharm(state.host.charm);
+    state.resources.ap = normalizeResource(state.resources.ap);
+    state.resources.sv = normalizeResource(state.resources.sv);
+    state.host.progress = state.host.charm;
 
     const milestones = state.permission.milestones;
     state.permission.systemEligible =
