@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.10.37",
+  "version": "0.10.38",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS: closed 0-100 CHARM progression with final seal, full AP threshold crossing, one-round SHORT memory with 15-to-LONG and 10-to-PERMANENT compaction, legacy-memory rebuild, background sync, summer STATUS and AP/SV economy.",
-  "js": "index.js?v=0.10.37",
-  "css": "style.css?v=0.10.37",
+  "description": "MÉMÉ OS: visible DAY marker synchronization, rolling daily refresh, closed 0-100 CHARM progression, AP/SV economy, memory compaction, and plot-linked task state.",
+  "js": "index.js?v=0.10.38",
+  "css": "style.css?v=0.10.38",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
