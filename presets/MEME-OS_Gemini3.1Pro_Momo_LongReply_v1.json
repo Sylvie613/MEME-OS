@@ -383,13 +383,13 @@
   "extensions": {
     "meme_os_preset": {
       "name": "MÉMÉ OS · Gemini 3.1 Pro · 嬷嬷文风连续正文·日期时间天气修复版",
-      "version": "1.9.3",
+      "version": "1.9.4",
       "target_model": "Gemini 3.1 Pro",
       "source_style": "嬷嬷文风by吐舌娃 / 我在末世很恶俗 3.1轻量版结构",
       "target_body_chars": "1700-2000",
       "complex_body_chars": "2100-2600",
       "hard_minimum": true,
-      "meme_os_min_extension": "0.13.2",
+      "meme_os_min_extension": "0.13.3",
       "economy_sync": "plot-linked adaptive rewards/pricing",
       "task_semantic_dedupe": true,
       "simple_body_chars": "1400-1700",
@@ -406,7 +406,8 @@
       "task_rule": "3 base daily tasks; plot tasks 0-1/day normally, max2 with >=8-turn gap; dedupe and day refresh",
       "header_rule": "every RP reply begins with in-story date|time|weather; continuity-preserving; prose indentation starts after header",
       "prompt_order_fix": "restored character_id 100001 custom prompt chain including mechanics and header blocks",
-      "minimum_extension_version": "0.13.2"
+      "minimum_extension_version": "0.13.3",
+      "reward_capture_rule": "visible retroactive TASK + 判定 + 奖励 cards are extension-authoritative and deduped against hidden storyRewards"
     }
   }
 }
