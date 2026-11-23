@@ -82,8 +82,9 @@ for token in required_visible:
 verify = section(index, "function taskCompletionEvidenceValid", "function extractVisibleTaskCompletions")
 for token in [
     "evidence itself",
-    "visible/current scene",
-    "requiredAxes.every",
+    "visible story",
+    "for(const axis of requiredAxes)",
+    "required DESIRE condition missing",
 ]:
     assert token in verify, f"completion verifier weakened: missing {token}"
 
