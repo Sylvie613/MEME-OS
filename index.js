@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.11.1';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.11.1';
-import { isBoundCharacter } from './src/binding.js?v=0.11.1';
+} from './src/state.js?v=0.11.2';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.11.2';
+import { isBoundCharacter } from './src/binding.js?v=0.11.2';
 
 /**
- * MÉMÉ OS v0.11.1
+ * MÉMÉ OS v0.11.2
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -2192,6 +2192,28 @@ async function handleRuntimeEvent(messageId){
   if(!message || message.is_user) return;
 
   const state=runtimeState();
+
+  // Chronology repair is independent of per-turn settlement replay. Run it
+  // BEFORE the legacy processed-message early return so old chats can still
+  // repair DAY / daily-board state when a visible reply proves a later day.
+  const preflightTimeline=reconstructStoryTimeline(Array.isArray(context.chat)?context.chat:[]);
+  const preflightTimelineChanged=syncStoryDayTo(
+    state,
+    preflightTimeline.day,
+    {source:'runtime-preflight',allowCorrection:true}
+  );
+  state.tasks.timelineAudit={
+    storyDay:preflightTimeline.day,
+    dayStartIndex:preflightTimeline.dayStartIndex,
+    boundaries:preflightTimeline.boundaries.slice(-16),
+    scannedMessages:preflightTimeline.scannedMessages,
+    updatedAt:Date.now(),
+  };
+  if(preflightTimelineChanged){
+    await saveState(state);
+    renderView(currentView(),false);
+  }
+
   const messageKey=assistantTurnKey(context,messageId,message);
   const variantKey=assistantVariantKey(message);
   state.runtime=state.runtime||{processedAssistantMessages:[],lastTurnKey:null,lastTurnVariant:null,lastTurnBase:null};
@@ -2235,16 +2257,6 @@ async function handleRuntimeEvent(messageId){
   });
 
   const raw=String(message.mes||'');
-
-  const timeline=reconstructStoryTimeline(Array.isArray(context.chat)?context.chat:[]);
-  syncStoryDayTo(state,timeline.day,{source:'full-chat-runtime',allowCorrection:true});
-  state.tasks.timelineAudit={
-    storyDay:timeline.day,
-    dayStartIndex:timeline.dayStartIndex,
-    boundaries:timeline.boundaries.slice(-16),
-    scannedMessages:timeline.scannedMessages,
-    updatedAt:Date.now(),
-  };
 
   const canonicalCards=extractCanonicalTaskMarkers(raw);
   const canonicalTasks=canonicalCards
@@ -4363,6 +4375,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.11.2</small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
@@ -4660,8 +4673,14 @@ function ensureDialog() {
   return dialog;
 }
 
-function openMemeOS() {
+async function openMemeOS() {
   const dialog=ensureDialog();
+  try{
+    // Never show a stale DAY/task board. Rebuild from the visible chat before paint.
+    await reconcileRecentVisibleTaskOffers();
+  }catch(error){
+    console.warn('[MÉMÉ OS] open-time timeline/task repair failed',error);
+  }
   renderView(currentView(),false);
   if(!dialog.open) dialog.showModal();
   document.documentElement.classList.add('meme-os-open');
@@ -4678,7 +4697,7 @@ function mount() {
   positionLauncher(button);
 }
 
-function start() {
+async function start() {
   mount();
   ensureDialog();
   {
@@ -4686,13 +4705,20 @@ function start() {
     const purged=purgeKnownLegacyWrongGeneratedTasks(state);
     const migrated=migrateLegacyCharmLadder(state);
     if(purged || migrated){
-      saveState(state)
-        .then(()=>renderView('home',false))
-        .catch(error=>console.warn('[MÉMÉ OS] startup migration failed',error));
+      try{
+        await saveState(state);
+        renderView('home',false);
+      }catch(error){
+        console.warn('[MÉMÉ OS] startup migration failed',error);
+      }
     }
   }
-  reconcileRecentVisibleSettlements().catch(error=>console.warn('[MÉMÉ OS] legacy settlement sync failed',error));
-  reconcileRecentVisibleTaskOffers().catch(error=>console.warn('[MÉMÉ OS] visible task sync failed',error));
+  try{
+    await reconcileRecentVisibleSettlements();
+    await reconcileRecentVisibleTaskOffers();
+  }catch(error){
+    console.warn('[MÉMÉ OS] startup state reconciliation failed',error);
+  }
   bindSillyTavernEvents();
   installRuntimePrompt();
   setTimeout(()=>quietSyncMemory({bootstrapOnly:true}),900);
