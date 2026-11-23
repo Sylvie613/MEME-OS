@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.20';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.20';
-import { isBoundCharacter } from './src/binding.js?v=0.10.20';
+} from './src/state.js?v=0.10.21';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.21';
+import { isBoundCharacter } from './src/binding.js?v=0.10.21';
 
 /**
- * MÉMÉ OS v0.10.20
+ * MÉMÉ OS v0.10.21
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -390,11 +390,38 @@ function dynamicDesireTierForState(state=runtimeState()){
 
 const MEME_RUNTIME_PROMPT_ID='meme_os_runtime_bridge';
 
+function systemCopyText(value,fallback='',max=180){
+  let text=String(value??fallback??'')
+    .replace(/[“”"']/g,'')
+    .replace(/\s+/g,' ')
+    .trim();
+
+  const replacements=[
+    [/本管理员/g,'系统'],
+    [/老子/g,'系统'],
+    [/我会验收/g,'由系统验收'],
+    [/让我(?:看看|看结果)/g,'提交结果供系统验收'],
+    [/给我看看/g,'提交结果供系统验收'],
+    [/给我/g,''],
+    [/别让我/g,'不得'],
+    [/我想/g,'系统要求'],
+    [/我允许/g,'权限允许'],
+    [/我懒得/g,'系统不予'],
+    [/乖一点/g,'按要求执行'],
+    [/做完再来邀功/g,'完成后提交系统验收'],
+    [/回来给我看结果/g,'完成后提交系统验收'],
+    [/我会看结果/g,'由系统验收结果'],
+  ];
+  for(const [pattern,replacement] of replacements) text=text.replace(pattern,replacement);
+
+  return text.replace(/\s+/g,' ').trim().slice(0,max) || String(fallback||'').slice(0,max);
+}
+
 function sanitizeGeneratedDesireTask(raw,state=runtimeState()){
   if(!raw || typeof raw!=='object') return null;
-  const title=String(raw.title||'').replace(/\s+/g,' ').trim().slice(0,48);
-  const desc=String(raw.desc||'').replace(/\s+/g,' ').trim().slice(0,180);
-  const detail=String(raw.detail||'').replace(/\s+/g,' ').trim().slice(0,180);
+  const title=systemCopyText(raw.title,'剧情欲望任务',48);
+  const desc=systemCopyText(raw.desc,'',180);
+  const detail=systemCopyText(raw.detail,'',180);
   if(!title || !desc) return null;
 
   const tier=dynamicDesireTierForState(state);
@@ -420,7 +447,7 @@ function sanitizeGeneratedDesireTask(raw,state=runtimeState()){
     locked:false,
     createdDay:Number(state.tasks?.storyDay)||1,
     createdTurn:Number(state.shop?.plotTurn)||0,
-    source:String(raw.source||'当前剧情').replace(/\s+/g,' ').trim().slice(0,80),
+    source:systemCopyText(raw.source,'当前剧情',80),
   };
 }
 
@@ -560,9 +587,9 @@ function rememberDismissedTask(state,task){
 
 function sanitizeGeneratedDailyTask(raw,state=runtimeState()){
   if(!raw || typeof raw!=='object') return null;
-  const title=String(raw.title||'').replace(/\s+/g,' ').trim().slice(0,48);
-  const desc=String(raw.desc||'').replace(/\s+/g,' ').trim().slice(0,180);
-  const detail=String(raw.detail||'').replace(/\s+/g,' ').trim().slice(0,180);
+  const title=systemCopyText(raw.title,'剧情任务',48);
+  const desc=systemCopyText(raw.desc,'',180);
+  const detail=systemCopyText(raw.detail,'',180);
   if(!title || !desc) return null;
 
   const difficulty=['light','normal','hard'].includes(String(raw.difficulty||'').toLowerCase())
@@ -691,9 +718,9 @@ function sanitizeDynamicItem(raw,state=runtimeState()){
   const phase=economy.phase;
   const price=economy.price;
   const ttl=Math.max(1,Math.min(8,Math.round(Number(raw.ttl)||4)));
-  const title=String(raw.title||'临时改造').slice(0,40);
-  const desc=String(raw.desc||'系统临时上架。').slice(0,140);
-  const detail=String(raw.detail||'根据当前剧情临时出现，过期后自动撤架。').slice(0,180);
+  const title=systemCopyText(raw.title,'临时改造',40);
+  const desc=systemCopyText(raw.desc,'系统临时上架。',140);
+  const detail=systemCopyText(raw.detail,'根据当前剧情临时出现，过期后自动撤架。',180);
   const bodyAxis=BODY_AXES.has(String(raw.bodyAxis||'')) ? String(raw.bodyAxis) : null;
   const fingerprint=`${title.toLowerCase()}|${desc.toLowerCase()}|${bodyAxis||'none'}|${currency}|${String(raw.source||'')}`;
   const id=`plot_${hashId(fingerprint).toString(36)}`;
@@ -713,7 +740,7 @@ function sanitizeDynamicItem(raw,state=runtimeState()){
     charmGain,
     createdTurn:Number(state.shop?.plotTurn)||0,
     expiresTurn:(Number(state.shop?.plotTurn)||0)+ttl,
-    source:String(raw.source||'剧情临时上架').slice(0,80),
+    source:systemCopyText(raw.source,'剧情临时上架',80),
     impact,
     economyBasis:{base:economy.base,balanceAtCreation:economy.balance,phase:economy.phase.id},
     bodyAxis,
@@ -728,10 +755,10 @@ function getDynamicShop(state=runtimeState()){
 
 function sanitizeSceneIssue(raw,state=runtimeState()){
   if(!raw || typeof raw!=='object') return null;
-  const note=String(raw.note||'').trim().slice(0,120);
+  const note=systemCopyText(raw.note,'',120);
   if(!note) return null;
   const axis=BODY_AXES.has(String(raw.axis||'')) ? String(raw.axis) : null;
-  const source=String(raw.source||'当前剧情').trim().slice(0,60);
+  const source=systemCopyText(raw.source,'当前剧情',60);
   const severity=['low','medium','high'].includes(String(raw.severity||'')) ? String(raw.severity) : 'medium';
   const key=String(raw.id||raw.key||`issue_${hashId(axis+'|'+source+'|'+note)}`).replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48);
   return {
@@ -751,7 +778,7 @@ function sanitizeSceneReaction(raw,state=runtimeState()){
   const note=String(raw.note||'').trim().slice(0,120);
   if(!note) return null;
   const axis=BODY_AXES.has(String(raw.axis||'')) ? String(raw.axis) : null;
-  const source=String(raw.source||'剧情人物').trim().slice(0,60);
+  const source=systemCopyText(raw.source,'剧情人物',60);
   const valence=['negative','neutral','positive','sexual'].includes(String(raw.valence||'')) ? String(raw.valence) : 'neutral';
   const key=String(raw.id||raw.key||`reaction_${hashId(axis+'|'+source+'|'+note)}`).replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48);
   return {
@@ -782,12 +809,12 @@ function sanitizeMenUpdate(raw,state=runtimeState()){
     id,
     name,
     meta,
-    summary:String(raw.summary||'').trim().slice(0,100),
-    relation:String(raw.relation||'未判定').trim().slice(0,60),
-    desire:String(raw.desire||'未记录').trim().slice(0,80),
-    lastContact:String(raw.lastContact||'').trim().slice(0,100),
-    note:String(raw.note||'').trim().slice(0,140),
-    badges,
+    summary:systemCopyText(raw.summary,'',100),
+    relation:systemCopyText(raw.relation,'未判定',60),
+    desire:systemCopyText(raw.desire,'未记录',80),
+    lastContact:systemCopyText(raw.lastContact,'',100),
+    note:systemCopyText(raw.note,'',140),
+    badges:badges.map(badge=>systemCopyText(badge,'',20)).filter(Boolean),
     present:raw.present!==false,
     contactDelta:Math.max(0,Math.min(5,Math.round(Number(raw.contactDelta)||0))),
     storyDay:Number(state.tasks?.storyDay)||1,
@@ -3448,7 +3475,7 @@ async function handleTaskAction(id){
   const state=runtimeState();
   const unlock=taskUnlock(task,state);
   if(!unlock.ok){
-    globalThis.toastr?.warning?.(`没资格。先把 ${unlock.reason} 做到。`);
+    globalThis.toastr?.warning?.(`任务未解锁：${unlock.reason}。`);
     return;
   }
 
@@ -3458,29 +3485,30 @@ async function handleTaskAction(id){
   const completedToday=dailyLike && Number(state.tasks?.dailyCompleted?.[id]?.day||0)===storyDay;
   const completedPermanent=!dailyLike && task.category!=='daily' && Boolean(state.tasks?.completed?.[id]);
   if(completedToday || completedPermanent){
-    globalThis.toastr?.info?.(completedToday?'今天已经结算过了。':'这份任务已经结算过了。');
+    globalThis.toastr?.info?.(completedToday?'系统记录：本任务今日已结算。':'系统记录：本任务已完成结算。');
     return;
   }
   if(state.tasks?.active?.[id]){
-    globalThis.toastr?.info?.('任务已经挂着了。什么时候真正做到，什么时候再验收。');
+    globalThis.toastr?.info?.('任务状态：已接取，等待完成条件与系统验收。');
     return;
   }
   if(pendingFor('taskAccept',id,state)){
-    globalThis.toastr?.info?.('接取信息已经在输入框里了。发出去后任务就会挂起。');
+    globalThis.toastr?.info?.('任务接取指令已写入输入框，发送后生效。');
     return;
   }
 
-  const voiced=taskVoiceName(task,state);
+  const systemTitle=systemCopyText(task.title,'未命名任务',48);
+  const systemDesc=systemCopyText(task.desc,'按任务条件完成。',180);
   const dayTag=dailyLike?`DAY ${String(storyDay).padStart(3,'0')}｜`:'';
-  const text=`【MÉMÉ OS｜任务接取】${dayTag}TASK_ID:${task.id}｜「${voiced}」\n任务要求：${taskVoiceDesc(task,state)}`;
+  const text=`【MÉMÉ OS｜任务接取】${dayTag}TASK_ID:${task.id}｜「${systemTitle}」\n任务要求：${systemDesc}`;
 
   await queueAction(createPendingAction({
     type:'task_accept',
     recordType:'task',
-    title:`接取：${voiced}`,
-    summary:`接取任务「${voiced}」，等待剧情完成与系统验收。`,
+    title:`任务接取：${systemTitle}`,
+    summary:`任务已接取：${systemTitle}。状态：等待完成条件与系统验收。`,
     text,
-    effect:{taskAccept:{id:task.id,title:voiced,category:task.category}},
+    effect:{taskAccept:{id:task.id,title:systemTitle,category:task.category}},
   }));
 }
 async function handleShopAction(id){
@@ -3490,26 +3518,28 @@ async function handleShopAction(id){
   const view=staticShopView(item,state);
   const req=shopRequirement(item,state);
   if(view.soldOut){
-    globalThis.toastr?.info?.('这项已经改满了。再戳也不会长出第五级。');
+    globalThis.toastr?.info?.('改造状态：当前项目已达到版本上限。');
     return;
   }
   if(!req.ok){
-    globalThis.toastr?.warning?.(`锁着呢。先做到：${req.reason}。`);
+    globalThis.toastr?.warning?.(`商品未解锁：${req.reason}。`);
     return;
   }
   if(pendingFor('purchase',id,state)){
-    globalThis.toastr?.info?.('这一层已经在输入框里等你发送。');
+    globalThis.toastr?.info?.('购买指令已写入输入框，等待发送。');
     return;
   }
 
   const spendable=getSpendableResources(state);
   const balance=item.currency==='AP'?spendable.ap:spendable.sv;
   if(balance<view.price){
-    globalThis.toastr?.warning?.(`穷。还差 ${view.price-balance} ${item.currency}。`);
+    globalThis.toastr?.warning?.(`余额不足：缺少 ${view.price-balance} ${item.currency}。`);
     return;
   }
 
-  const voiced=shopVoiceName(item,state);
+  const systemTitle=item.dynamic
+    ? systemCopyText(item.title,'临时改造',40)
+    : levelledShopTitle(item,state);
   const charmGain=Number(item.dynamic ? item.charmGain : (CHARM_GAIN[item.id]||0));
   const bodyDelta=item.dynamic
     ? (item.bodyAxis ? {[item.bodyAxis]:1} : {})
@@ -3517,20 +3547,20 @@ async function handleShopAction(id){
   const apDelta=item.currency==='AP'?-view.price:0;
   const svDelta=item.currency==='SV'?-view.price:0;
   const levelText=item.dynamic?'剧情临时改造':`LV.${view.nextLevel}`;
-  const text=`【MÉMÉ OS｜已结算｜勿重复结算】购入「${voiced}」· ${levelText}；${item.currency} -${view.price}${charmGain?`；CHARM +${charmGain}`:''}。扩展已完成扣款、等级与身体轴结算，正文只描写改造后的结果。`;
+  const text=`【MÉMÉ OS｜已结算｜勿重复结算】购买完成：「${systemTitle}」· ${levelText}；${item.currency} -${view.price}${charmGain?`；CHARM +${charmGain}`:''}。状态已写入，正文仅承接改造结果。`;
 
   await queueAction(createPendingAction({
     type:'purchase',
     recordType:'change',
-    title:`购入：${voiced}`,
-    summary:`购入「${voiced}」· ${levelText}；${item.currency} -${view.price}${charmGain?`；CHARM +${charmGain}`:''}。`,
+    title:`购买完成：${systemTitle}`,
+    summary:`系统结算：「${systemTitle}」· ${levelText}；${item.currency} -${view.price}${charmGain?`；CHARM +${charmGain}`:''}。`,
     text,
     effect:{
       apDelta,
       svDelta,
       charmDelta:charmGain,
       bodyDelta,
-      purchase:{id:item.id,title:voiced,category:item.category,level:view.nextLevel},
+      purchase:{id:item.id,title:systemTitle,category:item.category,level:view.nextLevel},
     },
   }));
 }
