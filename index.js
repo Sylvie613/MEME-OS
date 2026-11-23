@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.13.2';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.13.2';
-import { isBoundCharacter } from './src/binding.js?v=0.13.2';
+} from './src/state.js?v=0.13.3';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.13.3';
+import { isBoundCharacter } from './src/binding.js?v=0.13.3';
 
 /**
- * MÉMÉ OS v0.13.2
+ * MÉMÉ OS v0.13.3
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -1405,6 +1405,105 @@ function settleVisibleTaskCompletionsFromMessage(state,raw,messageId){
   return changed;
 }
 
+
+function extractVisibleStoryRewardMarkers(raw=''){
+  const text=String(raw||'');
+  const rewards=[];
+  // Retroactive reward syntax for an action the host already completed:
+  // 【TASK｜把该洗的都洗了】
+  // 【判定：宿主独立完成全部鞋履与衣物深度清洁。】
+  // 【奖励：AP +110】
+  const re=/[【\[]\s*TASK\s*[｜|]\s*([^｜|\]】\n]{1,60})\s*[】\]][\s\S]{0,480}?[【\[]\s*判定\s*[:：]\s*([^】\]\n]{2,220})\s*[】\]][\s\S]{0,260}?[【\[]\s*奖励\s*[:：]\s*AP\s*\+\s*(\d{1,4})\s*[】\]]/giu;
+  for(const match of text.matchAll(re)){
+    const title=String(match[1]||'').replace(/\s+/g,' ').trim().slice(0,60);
+    const evidence=String(match[2]||'').replace(/\s+/g,' ').trim().slice(0,220);
+    const shownReward=Math.max(0,Number(match[3])||0);
+    if(title && evidence && shownReward>0){
+      rewards.push({title,evidence,shownReward,index:Number(match.index)||0});
+    }
+  }
+  return rewards;
+}
+
+function settleVisibleStoryReward(state,rewardCard,messageId){
+  if(!rewardCard || !Number.isInteger(messageId)) return false;
+
+  const title=String(rewardCard.title||'').replace(/\s+/g,' ').trim().slice(0,60);
+  const evidence=String(rewardCard.evidence||'').replace(/\s+/g,' ').trim().slice(0,220);
+  const shownReward=Math.max(0,Math.min(1000,Math.round(Number(rewardCard.shownReward)||0)));
+  if(!title || !evidence || shownReward<=0) return false;
+
+  state.history=Array.isArray(state.history)?state.history:[];
+  const visiblePrefix=`meme_visible_story_reward_${messageId}_`;
+  const hiddenPrefix=`meme_story_reward_${messageId}_`;
+
+  // One retroactive story reward max per assistant message. If the hidden event
+  // already settled it, reconciliation must not pay it again; if the visible
+  // card settles first, the hidden event will likewise be ignored.
+  if(state.history.some(entry=>{
+    const id=String(entry?.id||'');
+    return id.startsWith(visiblePrefix) || id.startsWith(hiddenPrefix);
+  })) return false;
+
+  const fingerprint=`${title}|${evidence}|${shownReward}`.toLowerCase();
+  const id=`story_visible_${hashId(fingerprint).toString(36)}`;
+  const historyId=`${visiblePrefix}${id}`;
+
+  state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],dismissed:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
+  state.tasks.dailyCompleted=state.tasks.dailyCompleted||{};
+  state.tasks.everCompleted=state.tasks.everCompleted||{};
+
+  // The reward is already visible in the canonical story reply, so OS honors
+  // the exact published AP amount instead of silently recalculating it.
+  state.resources.ap=Math.max(0,Number(state.resources.ap||0)+shownReward);
+
+  const day=Math.max(1,Number(state.tasks.storyDay)||1);
+  state.tasks.dailyCompleted[id]={
+    id,
+    title,
+    category:'daily',
+    day,
+    count:1,
+    evidence,
+    completedAt:Date.now(),
+    completedTurn:Number(state.shop?.plotTurn)||0,
+    actionTags:extractDailyActionTags(title+' '+evidence),
+  };
+  state.tasks.everCompleted[id]={
+    id,
+    title,
+    category:'daily',
+    actionTags:extractDailyActionTags(title+' '+evidence),
+    firstCompletedAt:Date.now(),
+  };
+
+  state.permission.milestones.taskSettlements=Math.max(0,Number(state.permission.milestones.taskSettlements)||0)+1;
+  state.permission.milestones.completedTasks=Math.max(0,Number(state.permission.milestones.completedTasks)||0)+1;
+
+  // A visible retroactive reward consumes the plot-reward budget after the
+  // fact, but budget exhaustion can never erase an already-published reward.
+  markPlotTaskIssued(state);
+
+  state.history.push({
+    id:historyId,
+    type:'visible_story_reward',
+    recordType:'task',
+    title:`正文额外奖励：${title}`,
+    summary:`正文已经明确判定这件事完成并奖励 AP +${shownReward}；OS 按屏幕上的数字补进账本。依据：${evidence}`,
+    text:`VISIBLE STORY REWARD SETTLED: ${id}`,
+    committedAt:Date.now(),
+  });
+  if(state.history.length>240) state.history=state.history.slice(-240);
+  return true;
+}
+
+function settleVisibleStoryRewardsFromMessage(state,raw,messageId){
+  const rewards=extractVisibleStoryRewardMarkers(raw);
+  if(!rewards.length) return false;
+  // Visible contract allows at most one retroactive reward per reply.
+  return settleVisibleStoryReward(state,rewards[0],messageId);
+}
+
 function settleTaskFromModel(state,rawTask,messageId){
   if(!rawTask || typeof rawTask!=='object') return false;
   const id=String(rawTask.id||'').trim();
@@ -1501,6 +1600,9 @@ function settleTaskFromModel(state,rawTask,messageId){
 
 function settleStoryRewardFromModel(state,rawReward,messageId){
   if(!rawReward || typeof rawReward!=='object') return false;
+
+  const visiblePrefix=`meme_visible_story_reward_${messageId}_`;
+  if((state.history||[]).some(entry=>String(entry?.id||'').startsWith(visiblePrefix))) return false;
 
   // Retroactive story rewards share the exact same "system favor" budget as
   // published plot [TASK] cards. They are not a second AP faucet.
@@ -2091,6 +2193,7 @@ async function reconcileRecentVisibleSettlements(){
   recent.forEach((message,offset)=>{
     if(!message || message.is_user) return;
     const raw=String(message.mes||'');
+    if(settleVisibleStoryRewardsFromMessage(state,raw,baseIndex+offset)) changed=true;
     const re=/【(?:DAILY|STORY)\s*TASK\s*ID:([a-zA-Z0-9_-]+)[^】]*?(?:「([^」]+)」)?[^】]*?已结算】[\s\S]{0,500}?【奖励\s*[:：]\s*AP\s*\+(\d+)[^】]*】/g;
     for(const match of raw.matchAll(re)){
       const originalId=String(match[1]||'').trim();
@@ -2226,6 +2329,7 @@ async function handleRuntimeEvent(messageId){
   }
 
   const visibleCompletionChanged=settleVisibleTaskCompletionsFromMessage(state,raw,messageId);
+  const visibleStoryRewardChanged=settleVisibleStoryRewardsFromMessage(state,raw,messageId);
 
   const canonicalCards=extractCanonicalTaskMarkers(raw);
   const canonicalTasks=canonicalCards
@@ -2254,7 +2358,7 @@ async function handleRuntimeEvent(messageId){
 
   const allMatches=[...raw.matchAll(/<!--MEME_OS_EVENT\s+([\s\S]*?)-->/g)];
   const matches=allMatches.length ? [allMatches[allMatches.length-1]] : [];
-  let changed=true;
+  let changed=Boolean(visibleCompletionChanged || visibleStoryRewardChanged || canonicalTasks.length || encounterCooldownChanged || preflightTimelineChanged);
   const touchedMenIds=new Set();
 
   for(const match of matches){
@@ -2797,7 +2901,7 @@ function installRuntimePrompt(){
   const previousSceneStatus=latestVisibleSceneStatus(context?.chat);
   const previousSceneStatusText=previousSceneStatus?.raw || 'NONE — establish a precise scene clock in this reply';
   const npcWheel=npcEncounterWheel(context,state);
-  const prompt=`[MÉMÉ OS runtime bridge · v0.13.2]
+  const prompt=`[MÉMÉ OS runtime bridge · v0.13.3]
 AUTHORITY / TONE:
 - Extension state is the only authority for AP, SV, CHARM, purchases, task settlement, MEN buckets, system access/evolution and unlocks. Never mentally add/subtract numbers or reuse stale balances.
 - The host persona comes from the active SillyTavern Persona + visible chat. Do not invent host identity/history beyond established system transformation facts.
@@ -2822,6 +2926,11 @@ Plot-task budget today=${plotTaskFreq.count}/${plotTaskFreq.limit||2}; current t
 Allowed visible plot-task AP rewards: light=${plotTaskRewards.light}, normal=${plotTaskRewards.normal}, hard=${plotTaskRewards.hard}.
 Rules: base DAILY is extension-owned and must not be republished as extra plot tasks. A new plot task must be caused by the current visible scene, require an unfinished action, and not duplicate an open/completed semantic action.
 If publishing a plot task, visible canonical format is EXACTLY [TASK｜title｜requirement｜AP +N] and N must equal one allowed reward above. Visible TASK cards are authoritative and may be backfilled by the extension.
+If the host ALREADY completed a meaningful unassigned action and you decide it deserves a retroactive story reward, do NOT publish it as a new open task. Use EXACTLY these three visible lines:
+【TASK｜title】
+【判定：concrete evidence of what was already completed】
+【奖励：AP +N】
+N must equal one allowed visible plot-task reward above. Also include the matching storyRewards hidden event. This retroactive form is for genuinely completed, non-routine achievements; never reward an action already settled by another task/reward.
 
 DESIRE:
 CHARM < 8 => DESIRE is fully SEALED. Do not reveal task names, targets, acts, rewards or future conditions.
@@ -2862,7 +2971,7 @@ Exact container: <!--MEME_OS_EVENT {"taskOffers":[],"tasks":[],"storyRewards":[]
 Do NOT add retired compatibility fields. Scene chronology is owned by the dedicated extension path.
 taskOffers: max 1 new DESIRE; fields title,desc,detail,source,targetManId(optional). Never include id/tier/reward. If it introduces a new relevant man, include matching men entry and link targetManId.
 tasks: max 4 ACTIVE completions; fields id,status:"completed",evidence. Extension calculates rewards.
-storyRewards: max 1 substantial unexpected non-routine achievement; fields title,evidence,source,difficulty(light|normal|hard).
+storyRewards: max 1 substantial unexpected non-routine achievement; fields title,evidence,source,difficulty(light|normal|hard). If the visible reply uses the three-line retroactive reward card 【TASK｜title】/【判定：...】/【奖励：AP +N】, this hidden storyRewards entry is mandatory and must describe the same completed action.
 shop: max 2 temporary BODY/PLOT candidates; fields title,desc,detail,currency(AP|SV),ttl,icon,source,impact(minor|standard|major),bodyAxis(optional),sourceIssueId(optional). No price/charmGain.
 lifestyleShop: [] to keep shelf, or exactly 5 full items after unlock; fields title,desc,detail,icon,source,impact,kind,consumable. No price/currency/charmGain.
 feedback.issues: max 2 direct observed issues {id,axis?,source,note,severity}; feedback.reactions: max 2 direct reactions {id,axis?,source,note,valence}.
@@ -4367,7 +4476,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
-        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.13.2</small>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.13.3</small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
