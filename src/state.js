@@ -229,15 +229,15 @@ function mergeState(raw) {
             bootstrappedAt: Number(raw.schemaVersion || 0) >= 33 ? (raw.memory?.bootstrappedAt || null) : null,
             sourceTurns: Number(raw.schemaVersion || 0) >= 33 ? Math.max(0, Number(raw.memory?.sourceTurns) || 0) : 0,
             short: Number(raw.schemaVersion || 0) >= 33 && Array.isArray(raw.memory?.short)
-                ? raw.memory.short.map(v => String(v).replace(/\s+/g,' ').trim()).filter(Boolean).slice(-15)
+                ? raw.memory.short.map(v => String(v).replace(/\s+/g,' ').trim().slice(0,28)).filter(Boolean).slice(-15)
                 : [],
             long: Number(raw.schemaVersion || 0) >= 33 && Array.isArray(raw.memory?.long)
-                ? raw.memory.long.map(v => String(v).replace(/\s+/g,' ').trim()).filter(Boolean).slice(-10)
+                ? raw.memory.long.map(v => String(v).replace(/\s+/g,' ').trim().slice(0,240)).filter(Boolean).slice(-10)
                 : [],
             permanent: [
                 ...(Array.isArray(raw.memory?.permanent) ? raw.memory.permanent : []),
                 ...(Array.isArray(raw.memory?.core) ? raw.memory.core : []),
-            ].map(v => String(v).replace(/\s+/g,' ').trim()).filter((v,i,a)=>v && a.indexOf(v)===i),
+            ].map(v => String(v).replace(/\s+/g,' ').trim().slice(0,340)).filter((v,i,a)=>v && a.indexOf(v)===i),
             lastUpdatedTurn: Number(raw.schemaVersion || 0) >= 33 ? Math.max(0, Number(raw.memory?.lastUpdatedTurn) || 0) : 0,
         },
         reactivity: {
