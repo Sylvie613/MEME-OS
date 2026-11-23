@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.13.5",
+  "version": "0.13.6",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS 0.13.5 makes DESIRE triggering extension-authoritative: once CHARM>=8 and a current adult male target exists, an eligible day requires a DESIRE offer instead of leaving it to model discretion.",
-  "js": "index-v0.13.5.js",
-  "css": "style.css?v=0.13.5",
+  "description": "MÉMÉ OS 0.13.6 makes DESIRE offers scene-locked, provocative, and novelty-aware using the current adult target, recent scene facts, and recent DESIRE history.",
+  "js": "index-v0.13.6.js",
+  "css": "style.css?v=0.13.6",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
