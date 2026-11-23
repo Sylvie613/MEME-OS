@@ -2420,6 +2420,7 @@ async function handleRuntimeEvent(messageId){
 
   const visibleCompletionChanged=settleVisibleTaskCompletionsFromMessage(state,raw,messageId);
   const visibleStoryRewardChanged=settleVisibleStoryRewardsFromMessage(state,raw,messageId);
+  let verifiedTaskSettled=Boolean(visibleCompletionChanged);
 
   const canonicalCards=extractCanonicalTaskMarkers(raw);
   const canonicalTasks=canonicalCards
@@ -2483,7 +2484,10 @@ async function handleRuntimeEvent(messageId){
       if(Array.isArray(event.tasks)){
         const taskVerificationScene=recentSceneText(Array.isArray(context.chat)?context.chat:[],4);
         for(const rawTask of event.tasks.slice(0,4)){
-          if(settleTaskFromModel(state,rawTask,messageId,taskVerificationScene)) changed=true;
+          if(settleTaskFromModel(state,rawTask,messageId,taskVerificationScene)){
+            changed=true;
+            verifiedTaskSettled=true;
+          }
         }
       }
 
@@ -2749,6 +2753,9 @@ async function handleRuntimeEvent(messageId){
   if(changed || visibleCompletionChanged || encounterCooldownChanged || matches.length || state.shop.dynamic.length){
     await saveState(state);
     renderView(currentView(),false);
+    if(verifiedTaskSettled){
+      globalThis.toastr?.success?.('MÉMÉ OS 已验收任务，AP / SV 奖励已入账。');
+    }
   }
 }
 
