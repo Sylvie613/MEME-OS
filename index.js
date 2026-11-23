@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.17';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.17';
-import { isBoundCharacter } from './src/binding.js?v=0.10.17';
+} from './src/state.js?v=0.10.18';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.18';
+import { isBoundCharacter } from './src/binding.js?v=0.10.18';
 
 /**
- * MÉMÉ OS v0.10.17
+ * MÉMÉ OS v0.10.18
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -1973,6 +1973,8 @@ function installRuntimePrompt(){
   const privateReady=systemPrivateReady(state);
   const evolution=currentSystemEvolution(state);
   const nextEvolution=nextSystemEvolution(state);
+  const plotTaskRewards=plotTaskRewardOptions(state);
+  const plotTaskFreq=plotTaskFrequency(state);
   const prompt=`[MÉMÉ OS runtime bridge]
 HOST PERSONA RULE:
 Do not define the host's name, age beyond adulthood, height, job, personality, hobbies, romantic style or personal history here. The host's identity/personality comes from the current SillyTavern Persona and the live conversation. MÉMÉ OS may define only the system-specific starting transformation condition and tracked state. Never overwrite or homogenize the user's Persona.
@@ -2018,25 +2020,35 @@ Only describe a permanent physical improvement as already present when the match
 ROLLING DAILY / STORY TASK BOARD:
 Completed action semantics already satisfied by the host: ${JSON.stringify([...completedDailyActionTags(state)])}.
 A new task MUST add a genuinely unfinished action. Never issue a task whose entire requirement is already satisfied in the current scene or by a completed task. In particular, if the host has just showered and the scene explicitly shows wet freshly washed hair, do not assign "wash hair" again; "dry the wet hair" is a different unfinished action and may be valid. Do not split one already-completed bundle into fake new tasks merely to create more rewards.
-Completed daily tasks are not permanent checklist items. A just-completed daily/story task may remain visible as crossed-out for the current assistant turn only; on the next assistant turn it leaves the board permanently. Completed starter dailies do not reopen tomorrow.
-Current open starter dailies: ${JSON.stringify(TASK_DATA.daily.filter(t=>!state.tasks?.everCompleted?.[t.id]).map(t=>({id:t.id,title:t.title,desc:t.desc})))}.
-Current generated daily/story tasks: ${JSON.stringify((state.tasks?.generatedDaily||[]).filter(t=>!state.tasks?.everCompleted?.[t.id]).map(t=>({id:t.id,title:t.title,desc:t.desc,difficulty:t.difficulty,source:t.source})))}.
+A completed daily/story task may remain visibly crossed out only for the completion turn; after that it leaves the board. On a NEW natural story day, the visible DAILY candidate pool is reshuffled from the system templates plus the new day's plot state. A template may validly return on a later day if the action is relevant again; it is not permanently banned merely because it was completed yesterday.
+Today's fixed DAILY candidates: ${JSON.stringify(currentStaticTaskPool('daily',state).map(t=>({id:t.id,title:t.title,desc:t.desc})))}.
+Current generated daily/story tasks: ${JSON.stringify((state.tasks?.generatedDaily||[]).map(t=>({id:t.id,title:t.title,desc:t.desc,difficulty:t.difficulty,source:t.source,createdDay:t.createdDay})))}.
 Host-dismissed generated tasks for the current story day: ${JSON.stringify((state.tasks?.dismissed||[]).filter(t=>Number(t.storyDay||0)===Number(state.tasks?.storyDay||1)).map(t=>({title:t.title,actionTags:t.actionTags})))}. Do not reissue the same dismissed task or an equivalent same-action rewrite during this story day.
-When the visible daily board has fewer than 5 unfinished tasks, you SHOULD create one context-fitting replacement through dailyTaskOffers if the current plot offers a sensible mundane, appearance, hygiene, movement, social-presentation or practical challenge. Do not regenerate an already completed task under a synonym.
-CANONICAL VISIBLE TASK PROTOCOL: when MÉMÉ OS/the administrator truly publishes a NEW temporary daily/story task, you MUST show exactly one visible marker on its own line using this exact syntax: [TASK｜任务名｜任务要求]. This visible [TASK] marker is the canonical task source and the extension reads it immediately after the reply appears. Do NOT use 【DAILY · ...】, vague "new task card" narration, ordinary dialogue, or hidden dailyTaskOffers as the authoritative source. If no [TASK｜...｜...] marker appears, no new temporary daily/story task has been published. Ordinary commands or insults such as "去洗头" remain dialogue only.
+
+PLOT-GIFT TASK RARITY:
+A plot-generated [TASK] is an occasional system favor / 放水, NOT a filler mechanism. Do not create one merely because the board has empty slots. Normally there should be 0 or 1 plot-gift task in an entire natural story day. A second one is only acceptable after a genuine major scene shift and at least 8 plot turns since the first. The extension enforces a maximum of two per story day.
+Current plot-gift count today=${plotTaskFreq.count}; current plot turn=${plotTaskFreq.turn}; last plot-gift turn=${plotTaskFreq.last}; may issue now=${plotTaskFreq.canIssue}.
+
+CANONICAL VISIBLE TASK PROTOCOL:
+When MÉMÉ OS/the administrator truly publishes a NEW temporary daily/story task, show exactly one marker on its own line in this exact four-field syntax:
+[TASK｜任务名称｜任务内容｜AP +奖励数字]
+Current OS-approved reward values for this exact turn are: light=AP +${plotTaskRewards.light}; normal=AP +${plotTaskRewards.normal}; hard=AP +${plotTaskRewards.hard}.
+Choose the difficulty from what the task ACTUALLY demands, then print exactly the corresponding current OS-approved AP value. Do not invent another number. The extension validates the marker and stores the task immediately after the reply appears.
+If plotTaskFreq.canIssue=false, do NOT publish a new [TASK]. Ordinary administrator commands, insults, suggestions and chores remain ordinary dialogue and never enter TASK unless the canonical [TASK｜...｜...｜AP +N] marker appears.
 USER CORRECTION AUTHORITY: parenthetical user instructions beginning with （OS：...） or (OS:...) are out-of-story control directives. The extension may remove an incorrect generated task immediately. Never argue with, reinterpret or roleplay against these correction directives.
-PLOT RELEVANCE RULE: every generated daily/story task must be caused by something concrete in the CURRENT visible scene: a mess that was just created, an unmet practical need, a body/presentation problem just noticed, a plan the host just stated, a location-specific opportunity, or a direct consequence of the immediately preceding action. Do not throw in generic self-improvement chores unrelated to what is happening now. source must briefly name the actual scene trigger.
-DIFFICULTY SEMANTICS: light = one quick low-effort action; normal = several linked actions or a sustained moderate effort; hard = substantial time, discomfort, persistence, social exposure/risk or a genuinely demanding multi-step requirement. Choose difficulty from the actual scene demand, not from the reward you want.
-ECONOMY RULE: never choose or display a numeric AP reward for generated tasks. MÉMÉ OS calculates the reward from difficulty plus the current spendable AP and nearby shop-price band. This keeps a task useful when the host is broke without letting trivial chores print money when the host is already rich.
-dailyTaskOffers is deprecated for new daily/story publication and should normally remain empty. Use the visible [TASK｜任务名｜任务要求] marker instead; the extension derives difficulty/reward from the marker and current OS state.
+PLOT RELEVANCE RULE: every plot-gift task must be caused by something concrete in the CURRENT visible scene: a mess just created, an unmet practical need, a body/presentation issue just noticed, a plan the host just stated, a location-specific opportunity, or a direct consequence of the immediately preceding action. Do not generate generic self-improvement filler.
+DIFFICULTY SEMANTICS: light = one quick low-effort action; normal = several linked actions or a sustained moderate effort; hard = substantial time, discomfort, persistence, social exposure/risk or a genuinely demanding multi-step requirement.
+dailyTaskOffers is deprecated for new daily/story publication and should remain empty.
 If the current visible scene itself unexpectedly completes a sensible one-off system challenge that was not previously active, you MAY use storyRewards to let the extension recognize it retroactively. storyRewards entries: maximum 2; fields {title,evidence,source,difficulty}. Never put AP/SV numbers in storyRewards or visible prose; the extension calculates the real reward. Do not use storyRewards for trivial actions merely to farm AP.
 
 DYNAMIC DESIRE MISSION BOARD:
-Fixed desire tasks (spark/sample/oral/repeat/drain) are only the foundational milestones. MÉMÉ OS should continue creating many different one-time erotic missions over a long playthrough.
-Current generated uncompleted missions: ${JSON.stringify((state.tasks?.generated||[]).map(t=>({id:t.id,title:t.title,tier:t.tier,desc:t.desc,createdDay:t.createdDay})))}.
+The foundational desire milestones (spark/sample/oral/repeat/drain) are templates, not a permanently fixed screen. The visible fixed candidate subset reshuffles on each natural story day; completed non-repeatable milestones stay completed, while repeatable collection milestones may return on later days.
+Today's fixed desire candidate subset: ${JSON.stringify(currentStaticTaskPool('desire',state).map(t=>({id:t.id,title:t.title,desc:t.desc,state:t.state})))}.
+Current generated/accepted desire missions: ${JSON.stringify((state.tasks?.generated||[]).map(t=>({id:t.id,title:t.title,tier:t.tier,desc:t.desc,createdDay:t.createdDay,active:Boolean(state.tasks?.active?.[t.id])})))}.
 Distinct erotic missions already completed: ${distinctEroticTaskCount(state)}.
 Last story day on which a new generated desire mission was created: ${Number(state.tasks?.lastGeneratedDesireDay)||0}.
-When fewer than 3 generated desire missions are available and no generated mission has been created on the current story day, you may create ONE fitting new mission through taskOffers. Do not generate one every reply merely to fill space; prefer moments where the current plot, NPC, location, body state or unlocked sexual capability suggests a fresh challenge.
+At a new natural story day, unaccepted generated desire candidates from yesterday are discarded and may be replaced by a fresh mission when the plot naturally supports one. Prefer current/returning/recent MEN who are actually relevant to the scene; vary target, act, constraint and setting instead of mechanically reusing yesterday's man or structure. A new adult man may become relevant only if the visible plot genuinely introduces him.
+When no generated desire mission has been created on the current story day and the current plot/NPC/location/body state/unlocked capability genuinely suggests a fresh challenge, you may create ONE fitting new mission through taskOffers. Do not create one just to keep the board full.
 
 Every generated desire mission must read unmistakably like an explicit vulgar adult-game mission, not a romance quest. A mission must center at least one concrete sexual/body challenge: explicit sexual acts, masturbation, oral/hand/foot/breast/penetrative or anal play, semen/SV collection, orgasm or arousal control, nudity/exposure, dirty or humiliating presentation, sexual endurance, position/control constraints, multiple-stimulus challenges, toy/mechanical stimulation, or another comparably explicit adult objective supported by the current plot. Use direct body/sex vocabulary when relevant.
 Do NOT create missions whose actual objective is merely dating, kissing romantically, being complimented, getting a man's phone number, being liked, raising affection, making the administrator jealous, comforting him, earning his praise, or otherwise "攻略系统哥". Those may happen incidentally in story, but they are not sufficient erotic-mission objectives.
@@ -2056,7 +2068,7 @@ A completed task should disappear/cross out as soon as this reply is processed; 
 For sample, oral and drain: after their first-ever completion they become repeatable collection tasks, at most once per in-world story day. The extension automatically switches later payouts to SV-only repeat rewards. Never invent extra AP for repeated completions.
 
 STORY DAY:
-Current in-world story day=${Number(state.tasks?.storyDay)||1}. Rolling DAILY/story tasks are one-time and do not reset on a new day; accepted rolling tasks may remain active across days. Only explicitly repeatable erotic collection tasks may reward again once per story day. Set timeline.dayAdvance=true only when the visible narrative clearly crosses into a new in-world day (for example after sleeping overnight, an explicit next morning/day, or an explicit date jump). Never advance the day merely because several turns passed.
+Current in-world story day=${Number(state.tasks?.storyDay)||1}. A natural-day advance reshuffles the visible fixed DAILY / DESIRE / SPECIAL candidate pools and removes unaccepted plot-generated candidates from the previous day. Accepted non-daily long-form desire/special contracts may persist; daily contracts expire at the day boundary. Repeatable collection milestones can pay again on a later story day. Set timeline.dayAdvance=true only when the visible narrative clearly crosses into a new in-world day (overnight sleep, explicit next morning/day, or explicit date jump), never merely because several turns passed.
 
 Current SHOP phase=${currentShopPhase(state).label} (${currentShopPhase(state).code}); appearance/presentation shop progress levels=${shopProgressLevels(state)}. Adult-response upgrades do not advance beauty-shelf phases.
 Dynamic plot goods must respect the current SHOP phase. They may solve a concrete problem exposed by the just-written plot, but each purchase is only one incremental body-axis step and may not claim a sudden makeover, perfect body, instant beauty, or any effect far beyond the host's current progression.
