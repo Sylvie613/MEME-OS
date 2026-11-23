@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.13.4",
+  "version": "0.13.5",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS 0.13.4 adds a final hard long-reply gate for Gemini 3.1 Pro so short user input no longer collapses normal RP replies.",
-  "js": "index-v0.13.4.js",
-  "css": "style.css?v=0.13.4",
+  "description": "MÉMÉ OS 0.13.5 makes DESIRE triggering extension-authoritative: once CHARM>=8 and a current adult male target exists, an eligible day requires a DESIRE offer instead of leaving it to model discretion.",
+  "js": "index-v0.13.5.js",
+  "css": "style.css?v=0.13.5",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
