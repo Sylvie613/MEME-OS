@@ -450,7 +450,7 @@ function hasOpenSemanticDuplicate(task,state=runtimeState()){
   return open.some(existing=>{
     if(existing.id===task.id) return false;
     const other=taskActionTags(existing);
-    return other.length>0 && other.every(tag=>tagSet.has(tag)) && tags.every(tag=>other.includes(tag));
+    return other.length>0 && tags.every(tag=>other.includes(tag));
   });
 }
 
