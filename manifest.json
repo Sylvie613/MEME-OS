@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.11.2",
+  "version": "0.11.3",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS 0.11.2: forced fresh entry module; open-time and preflight full-chat timeline repair; unified DAY, daily AP rotation, and current-day [TASK] synchronization.",
-  "js": "index-v0.11.2.js",
-  "css": "style.css?v=0.11.2",
+  "description": "MÉMÉ OS 0.11.3: fixes character binding compatibility for cards that omit enabled:true, restoring full-chat DAY sync, daily AP rotation, and current-day [TASK] synchronization.",
+  "js": "index-v0.11.3.js",
+  "css": "style.css?v=0.11.3",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
