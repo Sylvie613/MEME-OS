@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.25';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.25';
-import { isBoundCharacter } from './src/binding.js?v=0.10.25';
+} from './src/state.js?v=0.10.26';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.26';
+import { isBoundCharacter } from './src/binding.js?v=0.10.26';
 
 /**
- * MÉMÉ OS v0.10.25
+ * MÉMÉ OS v0.10.26
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -697,25 +697,45 @@ function distinctEroticTaskCount(state=runtimeState()){
   return Object.values(state.tasks?.completed||{}).filter(task=>task?.category==='desire').length;
 }
 
+const LIFESTYLE_SHOP_KINDS=new Set([
+  'skincare','food','daily','clothing','electronics','home','entertainment','service','plot',
+]);
+
 function sanitizeDynamicItem(raw,state=runtimeState()){
   if(!raw || typeof raw!=='object') return null;
+  const rawKind=String(raw.kind||'').toLowerCase();
+  const requestedKind=LIFESTYLE_SHOP_KINDS.has(rawKind) ? rawKind : 'body';
   const bodyAxis=BODY_AXES.has(String(raw.bodyAxis||'')) ? String(raw.bodyAxis) : null;
+  const lifestyle=requestedKind!=='body' && !bodyAxis;
+
+  // Lifestyle goods are a post-rescue AP sink. Before CHARM 30, dynamic shop
+  // stays focused on rescue/body progression rather than becoming a mall.
+  if(lifestyle && (Number(state.host?.charm)||0)<AP_CHARM_CAP) return null;
+
   const requestedCurrency=raw.currency==='SV'?'SV':'AP';
   const appearanceAxis=PLOT_CHARM_AXES.has(bodyAxis) || PLOT_POLISH_AXES.has(bodyAxis);
-  const currency=(Number(state.host?.charm)||0)>=AP_CHARM_CAP && appearanceAxis ? 'SV' : requestedCurrency;
+  const currency=lifestyle
+    ? 'AP'
+    : ((Number(state.host?.charm)||0)>=AP_CHARM_CAP && appearanceAxis ? 'SV' : requestedCurrency);
   const impact=['minor','standard','major'].includes(String(raw.impact||'').toLowerCase())
     ? String(raw.impact).toLowerCase()
     : 'standard';
   const economy=dynamicPlotPrice(state,currency,impact);
   const phase=economy.phase;
   const price=economy.price;
-  const ttl=Math.max(1,Math.min(8,Math.round(Number(raw.ttl)||4)));
-  const title=adminCopyText(raw.title,'临时改造',40);
+  const ttl=lifestyle
+    ? Math.max(4,Math.min(24,Math.round(Number(raw.ttl)||12)))
+    : Math.max(1,Math.min(8,Math.round(Number(raw.ttl)||4)));
+  const title=adminCopyText(raw.title,lifestyle?'临时杂货':'临时改造',40);
   const desc=adminCopyText(raw.desc,'系统临时上架。',140);
-  const detail=adminCopyText(raw.detail,'根据当前剧情临时出现，过期后自动撤架。',180);
-  const fingerprint=`${title.toLowerCase()}|${desc.toLowerCase()}|${bodyAxis||'none'}|${currency}|${String(raw.source||'')}`;
-  const id=`plot_${hashId(fingerprint).toString(36)}`;
-  const charmGain=PLOT_CHARM_AXES.has(bodyAxis) ? 0.5 : PLOT_POLISH_AXES.has(bodyAxis) ? 0.25 : 0;
+  const detail=adminCopyText(raw.detail,lifestyle?'买了就是你的，别问我售后。':'根据当前剧情临时出现，过期后自动撤架。',180);
+  const kind=lifestyle?requestedKind:'body';
+  const consumable=lifestyle
+    ? (raw.consumable===undefined ? ['skincare','food','daily','service'].includes(kind) : Boolean(raw.consumable))
+    : false;
+  const fingerprint=`${title.toLowerCase()}|${desc.toLowerCase()}|${bodyAxis||'none'}|${kind}|${currency}|${String(raw.source||'')}`;
+  const id=`${lifestyle?'life':'plot'}_${hashId(fingerprint).toString(36)}`;
+  const charmGain=lifestyle ? 0 : (PLOT_CHARM_AXES.has(bodyAxis) ? 0.5 : PLOT_POLISH_AXES.has(bodyAxis) ? 0.25 : 0);
   return {
     id,
     icon:String(raw.icon||'✦').slice(0,4),
@@ -724,24 +744,34 @@ function sanitizeDynamicItem(raw,state=runtimeState()){
     detail,
     price,
     currency,
-    level:'PLOT',
-    req:'剧情触发',
-    category:'plot',
+    level:lifestyle?'LIFE':'PLOT',
+    req:lifestyle?'商城刷新':'剧情触发',
+    category:lifestyle?'life':'plot',
+    kind,
+    consumable,
     dynamic:true,
     charmGain,
     createdTurn:Number(state.shop?.plotTurn)||0,
+    createdDay:Number(state.tasks?.storyDay)||1,
     expiresTurn:(Number(state.shop?.plotTurn)||0)+ttl,
-    source:adminCopyText(raw.source,'剧情临时上架',80),
+    source:adminCopyText(raw.source,lifestyle?'日常货架刷新':'剧情临时上架',80),
     impact,
     economyBasis:{base:economy.base,balanceAtCreation:economy.balance,phase:economy.phase.id},
-    bodyAxis,
+    bodyAxis:lifestyle?null:bodyAxis,
     sourceIssueId:String(raw.sourceIssueId||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48) || null,
   };
 }
 
 function getDynamicShop(state=runtimeState()){
   const turn=Number(state.shop?.plotTurn)||0;
-  return (state.shop?.dynamic||[]).filter(item=>Number(item.expiresTurn||0)>=turn && !state.upgrades?.[item.id]);
+  return (state.shop?.dynamic||[]).filter(item=>{
+    if(Number(item.expiresTurn||0)<turn) return false;
+    if(item.category==='life'){
+      if(item.consumable) return true;
+      return !state.inventory?.items?.[item.id];
+    }
+    return !state.upgrades?.[item.id];
+  });
 }
 
 function sanitizeSceneIssue(raw,state=runtimeState()){
@@ -1244,7 +1274,7 @@ function markRuntimeMessageProcessed(state,messageKey){
 }
 
 const TURN_SNAPSHOT_KEYS=[
-  'resources','host','system','permission','shop','reactivity','upgrades','tasks','men','history',
+  'resources','host','system','permission','shop','inventory','reactivity','upgrades','tasks','men','history',
 ];
 
 function cloneTurnValue(value){
@@ -1753,14 +1783,23 @@ async function handleRuntimeEvent(messageId){
       }
 
       if(Array.isArray(event.shop)){
+        const targetShopDay=Math.max(1,(Number(state.tasks?.storyDay)||1)+(event.timeline?.dayAdvance===true?1:0));
+        const lifestyleRefreshOpen=(Number(state.shop?.lastLifestyleRefreshDay)||0)!==targetShopDay;
+        let lifestyleAccepted=0;
+
         for(const candidate of event.shop.slice(0,2)){
           const item=sanitizeDynamicItem(candidate,state);
           if(!item) continue;
+          if(item.category==='life' && !lifestyleRefreshOpen) continue;
+          if(item.category==='life') lifestyleAccepted+=1;
+
+          item.createdDay=targetShopDay;
           state.shop.dynamic=state.shop.dynamic.filter(old=>old.id!==item.id);
           state.shop.dynamic.unshift(item);
-          state.shop.dynamic=state.shop.dynamic.slice(0,6);
+          state.shop.dynamic=state.shop.dynamic.slice(0,8);
           changed=true;
         }
+        if(lifestyleAccepted>0) state.shop.lastLifestyleRefreshDay=targetShopDay;
       }
 
       if(event.timeline?.dayAdvance===true){
@@ -2073,6 +2112,7 @@ Current body-axis levels: ${JSON.stringify(state.host?.body||{})}.
 Only describe a permanent physical improvement as already present when the matching body axis / purchased upgrade supports it. Unmodified areas stay at their established baseline.
 
 ROLLING DAILY / STORY TASK BOARD:
+NON-EROTIC REWARD RULE: ordinary DAILY, hygiene, habit, presentation, practical, work, social and other non-sexual tasks always reward AP only, regardless of current CHARM. They continue refreshing every natural story day even after CHARM 30. Never stop issuing normal daily life tasks merely because the host has entered the SV refinement stage. Non-erotic tasks never directly award SV.
 Completed action semantics already satisfied by the host: ${JSON.stringify([...completedDailyActionTags(state)])}.
 A new task MUST add a genuinely unfinished action. Never issue a task whose entire requirement is already satisfied in the current scene or by a completed task. In particular, if the host has just showered and the scene explicitly shows wet freshly washed hair, do not assign "wash hair" again; "dry the wet hair" is a different unfinished action and may be valid. Do not split one already-completed bundle into fake new tasks merely to create more rewards.
 A completed daily/story task may remain visibly crossed out only for the completion turn; after that it leaves the board. On a NEW natural story day, the visible DAILY candidate pool is reshuffled from the system templates plus the new day's plot state. A template may validly return on a later day if the action is relevant again; it is not permanently banned merely because it was completed yesterday.
@@ -2189,12 +2229,19 @@ dailyTaskOffers: deprecated compatibility field; normally leave [] for new daily
 taskOffers: maximum 1 new generated erotic mission; fields title,desc,detail,source. title/desc/detail/source are written in the administrator's current OS voice and may be personal, rude, obscene or judgmental when appropriate. Never include tier, id or rewards.
 tasks: max 4 completed ACTIVE task entries; fields id,status("completed"),evidence. Never include rewards; the extension calculates them.
 storyRewards: max 2 one-off plot tasks that visibly became complete without prior acceptance; fields title,evidence,source,difficulty(light|normal|hard). Never include AP/SV numbers.
-shop: maximum 2 temporary items. Each item fields: title,desc,detail,currency("AP"|"SV"),ttl(1-8),icon,source,impact("minor"|"standard"|"major"),bodyAxis(optional),sourceIssueId(optional). At CHARM ${AP_CHARM_CAP} or above, any temporary item that improves an outward body/appearance axis is forcibly repriced by the extension in SV even if you request AP. title/desc/detail/source are administrator-authored OS copy: they may use his first-person voice, insults, dirty jokes and current-stage attitude when natural. A temporary item must be a direct answer to something that just happened in the visible plot: a newly exposed problem, a consequence, a desire, a task outcome or a scene-specific opportunity. source must name that trigger. impact describes how substantial the item's actual effect is, not how expensive you want it to be. Never include id, price or charmGain; MÉMÉ OS derives price from current shelf phase, effect impact and current spendable balance. bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
+shop: maximum 2 dynamic items. Each item fields: title,desc,detail,currency("AP"|"SV"),ttl,icon,source,impact("minor"|"standard"|"major"),kind(optional: body|skincare|food|daily|clothing|electronics|home|entertainment|service|plot),consumable(optional boolean),bodyAxis(optional),sourceIssueId(optional). Lifestyle kinds are available only after CHARM ${AP_CHARM_CAP}, are forced to AP, must omit bodyAxis and never raise CHARM. At CHARM ${AP_CHARM_CAP} or above, body/appearance goods are forcibly repriced in SV even if you request AP. title/desc/detail/source are administrator-authored OS copy: they may use his first-person voice, insults, dirty jokes and current-stage attitude when natural. A temporary item must be a direct answer to something that just happened in the visible plot: a newly exposed problem, a consequence, a desire, a task outcome or a scene-specific opportunity. source must name that trigger. impact describes how substantial the item's actual effect is, not how expensive you want it to be. Never include id, price or charmGain; MÉMÉ OS derives price from current shelf phase, effect impact and current spendable balance. bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
 feedback.issues: max 2, only direct story evidence; fields id,axis(optional),source,note,severity(low|medium|high). source/note are his OS notes: short and specific, with his personal wording allowed.
 feedback.reactions: max 2, only directly observed reactions to established state/change; fields id,axis(optional),source,note,valence(negative|neutral|positive|sexual). source/note are SYSTEM log copy.
 men: max 3 qualifying adult men updates; fields id(optional for new),name,meta,summary,relation,desire,lastContact,note,badges,present,contactDelta,qualifies. MEN is the administrator's own archive: factual identity fields may stay concise, but summary/relation/desire/lastContact/note/badges should sound like he personally wrote them, including crude, mocking or sexual wording when the established facts support it.
 evolution: only when a visible, mechanically-ready one-step administrator form evolution actually happens; fields targetLevel(2|3|4),reason. reason should be one short concrete sentence in his own OS wording. Never use it for ordinary mood/relationship changes.
-Temporary shop items must arise from the just-written plot, not random catalog filler. Generated tasks and generated shop goods are two views of the same live scene: if a task exists because of a concrete problem or consequence, any related temporary good should address that same problem/consequence rather than introducing an unrelated catalog item. Their names/descriptions/details are written by the same male administrator in his current OS voice: ${voice.label}. They should feel personally named and judged by him, not catalog-generated. Current CHARM=${state.host.charm}.
+Dynamic SHOP has TWO channels.
+
+BODY/PLOT GOODS: body-changing temporary goods still arise from concrete visible plot needs. At CHARM ${AP_CHARM_CAP}+ any outward body/appearance improvement is SV-gated by the extension.
+
+LIFESTYLE AP SHELF: once CHARM reaches ${AP_CHARM_CAP}, MÉMÉ OS additionally opens a broad AP lifestyle market. On a new natural story day, or the first suitable reply of a day whose lifestyle shelf has not refreshed yet, you SHOULD offer 1-2 fresh lifestyle goods through event.shop. These do NOT need to solve a current body problem and may simply be things the administrator decided to stock that day. Valid kind values: skincare, food, daily, clothing, electronics, home, entertainment, service, plot. Examples include ordinary skincare products, meals/snacks/drinks, toiletries, clothes/accessories, headphones/phones/tablets/small electronics, bedding/furniture/decor, tickets/subscriptions/convenience services, gifts, or scene-useful everyday objects. The catalog may be eclectic; “what can this system sell?” has a deliberately broad answer.
+Lifestyle goods MUST use AP, MUST NOT include bodyAxis, MUST NOT raise CHARM, and MUST NOT masquerade as a permanent magical body upgrade. Set consumable=true for things meant to be bought repeatedly (food, disposable daily goods, ordinary skincare/services) and false for durable ownership (electronics, clothing, furniture, etc.).
+Current CHARM=${state.host.charm}; current story day=${Number(state.tasks?.storyDay)||1}; last lifestyle refresh day=${Number(state.shop?.lastLifestyleRefreshDay)||0}; current inventory=${JSON.stringify(inventoryItems(state).map(item=>({title:item.title,kind:item.kind,count:item.count,consumable:item.consumable})))}.
+All dynamic item names/descriptions/details are written by the same male administrator in his current OS voice: ${voice.label}.
 SYSTEM EVOLUTION LADDER:
 Current administrator system level=${state.system?.level||1}; current form=${evolution.form}.
 Current capability: ${evolution.capability}
@@ -2319,6 +2366,7 @@ function svRefinementPriceFromAp(apPrice){
 function shopPaymentMeta(item,state=runtimeState(),view=null){
   const resolved=view||staticShopView(item,state);
   if(item.currency==='LOCK') return {currency:'LOCK',price:0,switched:false};
+  if(item.category==='life') return {currency:'AP',price:resolved.price,switched:false,reason:'生活商品只收 AP'};
   const charm=Math.max(0,Number(state.host?.charm)||0);
   const switchToSv=item.currency==='AP' && itemImprovesAppearance(item) && charm>=AP_CHARM_CAP;
   if(switchToSv){
@@ -2396,11 +2444,14 @@ function shopPhaseForLevel(level=1){
 
 function staticShopView(item,state=runtimeState()){
   if(item.dynamic){
+    const ownedLifestyle=Boolean(state.inventory?.items?.[item.id]);
     return {
-      currentLevel:0,
+      currentLevel:item.category==='life' && ownedLifestyle ? 1 : 0,
       nextLevel:1,
       maxLevel:1,
-      soldOut:Boolean(state.upgrades?.[item.id]),
+      soldOut:item.category==='life'
+        ? Boolean(ownedLifestyle && !item.consumable)
+        : Boolean(state.upgrades?.[item.id]),
       price:Number(item.price)||0,
       phase:currentShopPhase(state),
       phaseUnlocked:true,
@@ -2507,7 +2558,7 @@ function currentView(){
 
 function pendingFor(kind,id,state=runtimeState()){
   return state.pending?.some(action=>{
-    if(kind==='purchase') return action.effect?.purchase?.id===id;
+    if(kind==='purchase') return action.effect?.purchase?.id===id || action.effect?.inventoryAdd?.id===id;
     if(kind==='taskAccept') return action.effect?.taskAccept?.id===id;
     return false;
   }) || false;
@@ -3101,6 +3152,32 @@ function taskMarkup() {
   `;
 }
 
+function inventoryItems(state=runtimeState()){
+  return Object.values(state.inventory?.items||{})
+    .filter(item=>Number(item.count||0)>0)
+    .sort((a,b)=>Number(b.lastPurchasedAt||b.acquiredAt||0)-Number(a.lastPurchasedAt||a.acquiredAt||0));
+}
+
+function inventoryItemCard(item){
+  const kindLabels={
+    skincare:'护肤',food:'食物',daily:'日用',clothing:'穿搭',electronics:'电子',
+    home:'家居',entertainment:'娱乐',service:'服务',plot:'剧情',
+  };
+  return `
+    <article class="meme-shop-card">
+      <span class="meme-shop-icon">◇</span>
+      <div class="meme-shop-copy">
+        <b>${item.title||'未命名物品'}</b>
+        <p>${item.consumable?'消耗品，可以继续买。':'已经归你了。后面剧情要用的时候别装没买过。'}</p>
+        <small>INVENTORY · ${kindLabels[item.kind]||'物品'} · 持有 ${Math.max(1,Number(item.count)||1)}</small>
+      </div>
+      <div class="meme-shop-buy">
+        <strong>×${Math.max(1,Number(item.count)||1)}</strong><em>OWNED</em>
+      </div>
+    </article>
+  `;
+}
+
 function shopItem(item,category) {
   const state=runtimeState();
   const view=staticShopView(item,state);
@@ -3112,15 +3189,15 @@ function shopItem(item,category) {
   const soldOut=view.soldOut;
   let button=soldOut?'改满了':pending?'待发送':!req.ok?'锁着':!enough?'穷':'买';
   const levelMeta=item.dynamic
-    ? 'PLOT · 临时货'
+    ? (item.category==='life' ? `LIFE · ${String(item.kind||'daily').toUpperCase()}` : 'PLOT · 临时货')
     : `${view.phase.code} · ${view.currentLevel}/${view.maxLevel} → ${ROMAN_LEVELS[Math.max(0,view.nextLevel-1)]}`;
 
   return `
     <article class="meme-shop-card ${(!req.ok||soldOut)?'is-locked':''}" data-shop-id="${item.id}" data-shop-category="${category}">
       <span class="meme-shop-icon" data-shop-detail>${item.icon}</span>
       <div class="meme-shop-copy" data-shop-detail>
-        <b>${soldOut ? (state.upgrades?.[item.id]?.title || item.title) : shopVoiceName(item,state)}</b>
-        <p>${soldOut ? '这项已经被你改到当前版本上限。再点也榨不出第五层。' : shopVoiceDesc(item,state)}</p>
+        <b>${soldOut ? (state.upgrades?.[item.id]?.title || state.inventory?.items?.[item.id]?.title || item.title) : shopVoiceName(item,state)}</b>
+        <p>${soldOut ? (item.category==='life'?'买过了。耐用品又不是让你一天买八个。':'这项已经被你改到当前版本上限。再点也榨不出第五层。') : shopVoiceDesc(item,state)}</p>
         <small>${levelMeta} · ${req.ok ? (payment.switched ? '精液阶段 · AP 抢救上限已到' : (view.nextLevel===1 ? item.req : view.phase.label)) : req.reason}</small>
         <div class="meme-shop-detail">${item.detail}</div>
       </div>
@@ -3133,7 +3210,21 @@ function shopItem(item,category) {
 }
 
 function renderShopList(category='appearance') {
-  if(category==='plot') return getDynamicShop().map(item=>shopItem(item,'plot')).join('') || '<div class="meme-men-empty"><small>NO PLOT GOODS</small><b>现在没什么值得临时上架</b><p>剧情真发生点有意思的事，我自然会塞东西进来。</p></div>';
+  if(category==='life'){
+    const items=getDynamicShop().filter(item=>item.category==='life');
+    return items.map(item=>shopItem(item,'life')).join('')
+      || '<div class="meme-men-empty"><small>LIFE SHELF</small><b>今天还没刷到新杂货</b><p>过了普通人那道坎以后，这里每天会换点能花 AP 的东西。</p></div>';
+  }
+  if(category==='plot'){
+    const items=getDynamicShop().filter(item=>item.category!=='life');
+    return items.map(item=>shopItem(item,'plot')).join('')
+      || '<div class="meme-men-empty"><small>NO PLOT GOODS</small><b>现在没什么值得临时上架</b><p>剧情真发生点有意思的事，我自然会塞东西进来。</p></div>';
+  }
+  if(category==='inventory'){
+    const items=inventoryItems();
+    return items.map(inventoryItemCard).join('')
+      || '<div class="meme-men-empty"><small>INVENTORY</small><b>空的</b><p>买点东西再来翻。</p></div>';
+  }
   return (SHOP_DATA[category] || SHOP_DATA.appearance).map(item=>shopItem(item,category)).join('');
 }
 
@@ -3150,7 +3241,8 @@ function shopMarkup() {
       <div class="meme-card-title"><small>CURRENT SHELF</small><h3>${phase.label}</h3></div>
       ${labelValue('外观进度',`${levels} 级`,nextPhase?`再完成 ${Math.max(0,nextPhase.minLevels-levels)} 级外观/感官改造开 ${nextPhase.label}`:'固定商城已到最高货架')}
       ${labelValue('货架规则','同一项目可以继续升Ⅱ / Ⅲ / Ⅳ级。','CHARM 30 前 AP 负责抢救；到 30 后外貌与身体精修自动改收 SV。')}
-      ${labelValue('普通人上限',`CHARM ${AP_CHARM_CAP}`,Number(state.host?.charm||0)>=AP_CHARM_CAP?'AP 已经没法继续把你往漂亮方向推了。想再变好看，去弄精液。':'日常和 AP 只能先把你救到普通、能看、有人愿意碰的程度。')}
+      ${labelValue('普通人上限',`CHARM ${AP_CHARM_CAP}`,Number(state.host?.charm||0)>=AP_CHARM_CAP?'身体精修改收 SV；AP 留着买生活货、便利和别的乱七八糟东西。':'日常和 AP 只能先把你救到普通、能看、有人愿意碰的程度。')}
+      ${Number(state.host?.charm||0)>=AP_CHARM_CAP ? labelValue('生活货架','每日自然日刷新','护肤、吃的、日用品、衣服、电子产品、家居、服务……我想卖什么就卖什么。') : ''}
     </section>
     <div class="meme-shop-balance">
       <span><small>AP 可用</small><b>${String(spendable.ap).padStart(3,'0')}</b></span>
@@ -3163,7 +3255,9 @@ function shopMarkup() {
       <button type="button" data-shop-filter="sensory">感官</button>
       <button type="button" data-shop-filter="desire">欲望</button>
       <button type="button" data-shop-filter="special">特殊</button>
-      ${getDynamicShop(state).length ? '<button type="button" data-shop-filter="plot">剧情 · '+getDynamicShop(state).length+'</button>' : ''}
+      ${getDynamicShop(state).filter(item=>item.category==='life').length ? '<button type="button" data-shop-filter="life">杂货 · '+getDynamicShop(state).filter(item=>item.category==='life').length+'</button>' : ''}
+      ${getDynamicShop(state).filter(item=>item.category!=='life').length ? '<button type="button" data-shop-filter="plot">剧情 · '+getDynamicShop(state).filter(item=>item.category!=='life').length+'</button>' : ''}
+      ${inventoryItems(state).length ? '<button type="button" data-shop-filter="inventory">持有 · '+inventoryItems(state).length+'</button>' : ''}
     </div>
     <section class="meme-shop-list" data-shop-list>${renderShopList('appearance')}</section>
     <p class="meme-preview-note">价格是我定的。买不起就去做任务，别一边穷一边对着改造项目发骚。</p>
@@ -3596,18 +3690,19 @@ async function handleShopAction(id){
   const systemTitle=item.dynamic
     ? adminCopyText(item.title,'临时改造',40)
     : levelledShopTitle(item,state);
-  const baseCharmGain=Number(item.dynamic ? item.charmGain : (CHARM_GAIN[item.id]||0));
+  const lifestyle=item.category==='life';
+  const baseCharmGain=lifestyle ? 0 : Number(item.dynamic ? item.charmGain : (CHARM_GAIN[item.id]||0));
   const currentCharm=Math.max(0,Number(state.host?.charm)||0);
   const charmGain=payment.currency==='AP' && baseCharmGain>0
     ? Math.max(0,Math.min(baseCharmGain,AP_CHARM_CAP-currentCharm))
     : baseCharmGain;
-  const bodyDelta=item.dynamic
-    ? (item.bodyAxis ? {[item.bodyAxis]:1} : {})
-    : (BODY_EFFECTS[item.id] || {});
+  const bodyDelta=lifestyle
+    ? {}
+    : (item.dynamic ? (item.bodyAxis ? {[item.bodyAxis]:1} : {}) : (BODY_EFFECTS[item.id] || {}));
   const apDelta=payment.currency==='AP'?-payment.price:0;
   const svDelta=payment.currency==='SV'?-payment.price:0;
-  const levelText=item.dynamic?'剧情临时改造':`LV.${view.nextLevel}`;
-  const text=`【MÉMÉ OS｜已结算｜勿重复结算】购买完成：「${systemTitle}」· ${levelText}；${payment.currency} -${payment.price}${charmGain?`；CHARM +${charmGain}`:''}。状态已写入，正文仅承接改造结果。`;
+  const levelText=lifestyle?'生活商品':(item.dynamic?'剧情临时改造':`LV.${view.nextLevel}`);
+  const text=`【MÉMÉ OS｜已结算｜勿重复结算】购买完成：「${systemTitle}」· ${levelText}；${payment.currency} -${payment.price}${charmGain?`；CHARM +${charmGain}`:''}。状态已写入，正文仅承接购买结果。`;
 
   await queueAction(createPendingAction({
     type:'purchase',
@@ -3620,7 +3715,9 @@ async function handleShopAction(id){
       svDelta,
       charmDelta:charmGain,
       bodyDelta,
-      purchase:{id:item.id,title:systemTitle,category:item.category,level:view.nextLevel},
+      ...(lifestyle
+        ? {inventoryAdd:{id:item.id,title:systemTitle,kind:item.kind||'daily',consumable:Boolean(item.consumable),quantity:1}}
+        : {purchase:{id:item.id,title:systemTitle,category:item.category,level:view.nextLevel}}),
     },
   }));
 }
