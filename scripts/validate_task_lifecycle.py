@@ -84,7 +84,9 @@ for token in [
     "evidence itself",
     "visible story",
     "for(const axis of requiredAxes)",
-    "required DESIRE condition missing",
+    "progressAxes",
+    "completion evidence does not name required condition",
+    "required DESIRE condition never appeared in visible task progress",
 ]:
     assert token in verify, f"completion verifier weakened: missing {token}"
 
@@ -95,13 +97,30 @@ generate = section(index, "function sanitizeGeneratedDesireTask", "const DAILY_A
 assert "rejected DESIRE: missing targetManId" in generate, "DESIRE may be created without target binding"
 assert "presentMen.length===1" in generate, "single-present-man auto-bind missing"
 
-# 7) Swipe/regeneration rollback must rewind the money, task state, and audit history together.
+# 7) Multi-turn DESIRE progress must persist from acceptance until final settlement.
+multi = section(index, "function taskAcceptanceMessageIndex", "function desireTargetMatches")
+for token in (
+    "TASK_ID:",
+    "completionVerificationScene",
+    "updateActiveTaskProgressFromScene",
+    "progressAxes",
+    "slice(-60000)",
+):
+    assert token in multi, f"multi-turn task support missing: {token}"
+assert "progressAxes:t.progressAxes||[]" in index, "runtime prompt does not expose accumulated task progress"
+assert "ACTIVE tasks may span any number of turns" in index, "runtime completion contract lost multi-turn semantics"
+
+active_state = section(state, "if (effect.taskAccept", "const tone = charmToStage")
+for token in ("progressAxes: []", "lastProgressMessageId: null", "progressUpdatedAt: null"):
+    assert token in active_state, f"accepted task does not initialize persistent progress: {token}"
+
+# 8) Swipe/regeneration rollback must rewind the money, task state, and audit history together.
 snap = section(index, "const TURN_SNAPSHOT_KEYS", "function removeFallbackTasksCompetingWithFormalCard")
 for key in ("'resources'", "'tasks'", "'history'", "'men'"):
     assert key in snap, f"turn snapshot missing {key}; swipe could duplicate or desync settlement"
 assert "function captureTurnBase" in snap and "function restoreTurnBase" in snap, "turn rollback helpers missing"
 
-# 8) Runtime contract must keep completion reporting strict.
+# 9) Runtime contract must keep completion reporting strict.
 assert 'tasks: max 4 ACTIVE completions' in index
 assert 'vague completion labels are invalid' in index
 assert 'Extension independently validates evidence and calculates rewards' in index
