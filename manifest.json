@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS 0.11.0: one full-chat visible narrative timeline owns storyDay, daily AP rotation, and current-day [TASK] synchronization.",
-  "js": "index.js?v=0.11.0",
-  "css": "style.css?v=0.11.0",
+  "description": "MÉMÉ OS 0.11.1: full-chat narrative timeline reconstruction with self-contained morning rollover detection, same-morning dedupe, unified daily AP rotation, and current-day [TASK] synchronization.",
+  "js": "index.js?v=0.11.1",
+  "css": "style.css?v=0.11.1",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
