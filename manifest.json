@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.13.7",
+  "version": "0.13.8",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS 0.13.7 enforces an explicit-sex minimum for DESIRE from Tier 1 onward; flirt-only or teasing-only tasks are rejected before entering TASK.",
-  "js": "index-v0.13.7.js",
-  "css": "style.css?v=0.13.7",
+  "description": "MÉMÉ OS 0.13.8 hardens task verification: accepted-task criteria are frozen, DESIRE completion must be grounded in visible story evidence, payout is auditable, and verified AP/SV issuance is explicitly confirmed.",
+  "js": "index-v0.13.8.js",
+  "css": "style.css?v=0.13.8",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
