@@ -7,18 +7,19 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.12.3';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.12.3';
-import { isBoundCharacter } from './src/binding.js?v=0.12.3';
+} from './src/state.js?v=0.12.4';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.12.4';
+import { isBoundCharacter } from './src/binding.js?v=0.12.4';
 
 /**
- * MÉMÉ OS v0.12.3
+ * MÉMÉ OS v0.12.4
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
 const MEME_ID = 'meme-os-heart-launcher';
 const DIALOG_ID = 'meme-os-dialog';
 const MEME_SCENE_CLOCK_PROMPT_ID = 'meme-os-scene-clock';
+const MEME_NPC_WHEEL_PROMPT_ID = 'meme-os-npc-wheel';
 
 let memoryQuietSyncInFlight=false;
 let memoryQuietLastAttemptTurn=-999;
@@ -961,7 +962,7 @@ function applyMemoryEvent(state,raw,visibleTurns=0){
 }
 
 function applyStoryStatusEvent(){
-  // Retired in v0.12.3. Scene date/time/weather/location live in visible prose only.
+  // Retired in v0.12.4. Scene date/time/weather/location live in visible prose only.
   return false;
 }
 
@@ -1467,6 +1468,7 @@ function applyMenUpdate(raw,state=runtimeState()){
     returnCount,
     firstSeenAt:existing?.firstSeenAt||Date.now(),
     firstSeenDay:existing?.firstSeenDay||incoming.storyDay,
+    firstSeenTurn:Number.isFinite(Number(existing?.firstSeenTurn)) ? Number(existing.firstSeenTurn) : incoming.plotTurn,
     lastSeenAt:Date.now(),
     lastSeenDay:incoming.storyDay,
     lastSeenTurn:incoming.plotTurn,
@@ -2824,6 +2826,112 @@ async function handleRuntimeEvent(messageId){
   }
 }
 
+
+function latestUserTurnSeed(chat=[]){
+  const messages=Array.isArray(chat)?chat:[];
+  for(let i=messages.length-1;i>=0;i--){
+    const message=messages[i];
+    if(!message?.is_user) continue;
+    const date=messageDateKey(message);
+    const text=String(message.mes||'').trim();
+    return {
+      index:i,
+      text,
+      seed:date ? ('u:'+date) : ('u:'+i+':'+hashId(text).toString(36)),
+    };
+  }
+  return {index:-1,text:'',seed:'u:none'};
+}
+
+function recentSceneText(chat=[],limit=4){
+  const messages=Array.isArray(chat)?chat:[];
+  return messages
+    .slice(Math.max(0,messages.length-Math.max(1,Number(limit)||4)))
+    .map(message=>visibleStoryText(message?.mes||''))
+    .filter(Boolean)
+    .join(' ');
+}
+
+function classifyNpcEncounterScene(context,state=runtimeState()){
+  const chat=Array.isArray(context?.chat)?context.chat:[];
+  const user=latestUserTurnSeed(chat);
+  const status=latestVisibleSceneStatus(chat);
+  const location=String(status?.location||'').trim();
+  const recent=recentSceneText(chat,4);
+  const source=(location+' '+user.text+' '+recent).toLowerCase();
+
+  if(/(交友软件|约会软件|相亲软件|交友平台|约会平台|探探|陌陌|tinder|bumble|hinge|grindr|soul|附近的人|滑卡|右滑|左滑|匹配.{0,8}(?:男人|男性|男生)|刷.{0,8}(?:男人|男性|男生))/iu.test(source)){
+    return {id:'dating',label:'线上交友',multiplier:1.45};
+  }
+  if(/(酒吧|夜店|club|派对|聚会|联谊|ktv|livehouse|酒会|舞会|相亲局|社交局|朋友局|聚餐|蹦迪)/iu.test(source)){
+    return {id:'social',label:'主动社交场',multiplier:1.25};
+  }
+  if(/(街上|街边|路上|人行道|公园|广场|步行街|景区|户外|室外|河边|江边|海边|商圈|夜市|菜市场|小吃街|校园里|操场)/iu.test(source)){
+    return {id:'outdoor',label:'户外公共场景',multiplier:1.00};
+  }
+  if(/(商场|超市|便利店|咖啡店|咖啡馆|餐厅|饭店|电影院|健身房|图书馆|医院|诊所|学校|教室|公司|办公室|写字楼|地铁|公交|车站|机场|高铁|火车|酒店大堂|前台|理发店|美发店|美甲店|店里|门店)/iu.test(source)){
+    return {id:'public_indoor',label:'室内公共场景',multiplier:0.90};
+  }
+  if(/(小区|楼道|走廊|电梯|楼下|门口|快递柜|物业|停车场|地下车库|公寓公共区|宿舍楼)/iu.test(source)){
+    return {id:'residential',label:'住宅公共区',multiplier:0.55};
+  }
+  if(/(家里|家中|卧室|客厅|厨房|浴室|卫生间|阳台|床上|房间里|宿舍里|公寓里|在家)/iu.test(source)){
+    return {id:'home',label:'私人住宅',multiplier:0.35};
+  }
+  return {id:'unknown',label:'一般剧情场景',multiplier:0.65};
+}
+
+function npcCharmReactionGuide(charm){
+  const value=Math.max(0,Math.min(100,Number(charm)||0));
+  if(value<10) return '0-9 纯嫌弃/明显难看阶段：命中只代表男性NPC有合理介入机会，不代表审美兴趣。默认更可能是事务性、礼貌性、中性或无兴趣互动；不能因为轮盘命中就突然性吸引。';
+  if(value<30) return '10-29 抢救阶段：外观有所改善但仍不算顺眼。男性NPC可以正常交流、偶尔注意或产生个体化兴趣，但主动搭讪和明显性欲仍应少见。';
+  if(value<55) return '30-54 顺眼阶段：已跨普通人线。成年男性出现普通好感、注意、多看、搭话或轻度性兴趣都合理，但仍取决于个人审美与情境。';
+  if(value<70) return '55-69 漂亮阶段：客观漂亮。男性NPC主动注意、找话题、搭讪、试探联系方式或产生较明确性兴趣更自然，但不能人人同一种反应。';
+  if(value<85) return '70-84 美女阶段：明显美女。较强注意、主动接近、调情与成人性兴趣可更常见；仍保留个人偏好、已有伴侣、性格和场合约束。';
+  if(value<93) return '85-92 高魅力美女阶段：外貌高度出众。陌生男性注意和主动介入的社会反馈明显增强，但仍不能让所有男人失去人格或自动发情。';
+  if(value<100) return '93-99 近完成体：极高外貌完成度。高注意率和强烈第一印象合理，男性NPC仍需保持独立动机、边界与个人审美。';
+  return '100 魅力完成体：系统魅力达到上限。命中时高度容易引起注意，但依旧不是精神控制；男性NPC仍是独立成年人，不保证喜欢、搭讪、性同意或持续关系。';
+}
+
+function latestNewManTurn(state=runtimeState()){
+  const archive=state.men?.archive||{};
+  let latest=-999;
+  for(const person of Object.values(archive)){
+    const turn=Number(person?.firstSeenTurn);
+    if(Number.isFinite(turn)) latest=Math.max(latest,turn);
+  }
+  return latest;
+}
+
+function npcEncounterWheel(context,state=runtimeState()){
+  const charm=Math.max(0,Math.min(100,Number(state.host?.charm)||0));
+  const baseChance=Math.max(10,charm);
+  const scene=classifyNpcEncounterScene(context,state);
+  const chance=Math.min(95,Math.max(0,Math.round(baseChance*scene.multiplier*10)/10));
+  const user=latestUserTurnSeed(context?.chat);
+  const day=Math.max(1,Number(state.tasks?.storyDay)||1);
+  const nextTurn=Math.max(1,(Number(state.shop?.plotTurn)||0)+1);
+  const roll=(hashId('npc-wheel-v1|'+day+'|'+user.seed)%10000)/100;
+  const lastNewTurn=latestNewManTurn(state);
+  const blockedByCooldown=lastNewTurn>-999 && nextTurn-lastNewTurn<=2;
+  const cooldownRemaining=blockedByCooldown ? Math.max(0,3-(nextTurn-lastNewTurn)) : 0;
+  const hit=!blockedByCooldown && roll<chance;
+  return {
+    day,
+    nextTurn,
+    charm,
+    baseChance,
+    scene,
+    chance,
+    roll:Math.round(roll*100)/100,
+    hit,
+    blockedByCooldown,
+    cooldownRemaining,
+    reactionGuide:npcCharmReactionGuide(charm),
+    seed:user.seed,
+  };
+}
+
 function latestVisibleSceneStatus(chat=[]){
   const messages=Array.isArray(chat)?chat:[];
   for(let i=messages.length-1;i>=0;i--){
@@ -2867,6 +2975,7 @@ function installRuntimePrompt(){
   const visibleChatTurns=Array.isArray(context?.chat)?context.chat.length:0;
   const previousSceneStatus=latestVisibleSceneStatus(context?.chat);
   const previousSceneStatusText=previousSceneStatus?.raw || 'NONE — establish a precise scene clock in this reply';
+  const npcWheel=npcEncounterWheel(context,state);
   const memoryNeedsBootstrap=!Boolean(state.memory?.initialized);
   const prompt=`[MÉMÉ OS runtime bridge]
 HOST PERSONA RULE:
@@ -2892,6 +3001,7 @@ His mouth can be very dirty without implying sexual attraction. Before attractio
 GAME IDENTITY / TASK PRIORITY:
 MÉMÉ OS is first and foremost a vulgar erotic game / 黄油 transformation system, NOT a conventional romance card and NOT an administrator-dating simulator. Erotic missions, sexual progression, dirty body challenges, SV collection and the host's transformation are the gameplay spine.
 GLOBAL TONE LOCK: the card's baseline atmosphere is adult, erotic, vulgar, trashy-in-a-deliberate-game-way, shameless and sexually charged. Do not sanitize the card into a wholesome self-improvement simulator, polite romance game or tasteful dating drama. This applies to OS copy, DESIRE mission names, erotic mechanics, MEN notes and sexually relevant story beats. However, "vulgar erotic game tone" describes the GAME and its sexual layer — it does NOT require every man to speak crudely, act sleazy, or share one personality. Contrast between civilized public behavior and filthy/private sexual tastes is explicitly desirable.
+RANDOM-MALE ENCOUNTER WHEEL is separate from DESIRE generation. Every story turn receives one deterministic encounter result from the extension. A hit creates only an opportunity for one new adult male NPC to enter naturally; sexual escalation still depends on CHARM, personality, scene and later choices.
 Even before DESIRE missions unlock, the game should already feel indecent: locked erotic task previews, blunt adult terminology, future SV mechanics, dirty shop/record copy, MEN placeholders and the administrator's crude jokes may foreshadow where the system is going. Do NOT make early gameplay feel like a wholesome hygiene/fitness app merely because CHARM is still low. The administrator himself does not need to be sexually attracted to the host for the OS to be vulgar. The administrator romance is only a possible long-term side axis and must never replace the erotic-game loop.
 
 EARLY EROTIC AMBIENCE:
@@ -3220,7 +3330,32 @@ NON-NEGOTIABLE:
 - Output this header BEFORE any narration, dialogue, TASK card, or other text.
 `;
 
+  const npcWheelPrompt=`[MÉMÉ OS — RANDOM ADULT MALE NPC WHEEL]
+This is a BACKEND-authoritative encounter roll for the next story reply. Do not reroll it yourself.
+
+CHARM=${npcWheel.charm}; public-scene base chance=${npcWheel.baseChance}%.
+Scene=${npcWheel.scene.label}; scene multiplier=${npcWheel.scene.multiplier}.
+Final encounter chance=${npcWheel.chance}%.
+Deterministic roll=${npcWheel.roll}.
+Two-turn newcomer cooldown active=${npcWheel.blockedByCooldown}.
+RESULT=${npcWheel.hit?'HIT — introduce one new adult male NPC naturally in this reply':'MISS — do not introduce a new random male NPC solely because of the wheel'}.
+
+REACTION RULE FOR CURRENT CHARM:
+${npcWheel.reactionGuide}
+
+HARD RULES:
+- One wheel result per user-story turn. Same user turn / swipe / regeneration keeps the same result.
+- HIT means ONE new explicit-adult male NPC gets a plausible opportunity to enter/intervene in the story. It does NOT mean attraction, sex, consent, romance, a DESIRE task, or long-term importance.
+- On HIT, fit the entry method to the scene: home can use courier/delivery/building staff/neighbor/doorbell/phone/social contact; public scenes can use passersby/staff/customers/classmates/coworkers/etc.; online dating/social scenes can use a match/message/profile interaction.
+- Generate the man's public personality from the full unrestricted adult archetype range. His private sexuality/XP is a separate axis and may contrast strongly with his public persona.
+- If the scene already requires a male NPC for an independent plot reason, that required NPC is allowed regardless of MISS; the wheel only governs extra RANDOM incidental male intervention.
+- On MISS, do not force a random newcomer into the scene. Existing/returning MEN and plot-required men may still act normally.
+- A wheel-spawned man enters MEN only if the interaction becomes memorable, relevant, sexual, repeated, or otherwise meets MEN archive rules. A courier who says one line and leaves does not need a permanent MEN entry.
+- Do not expose the roll, probability, seed or cooldown in visible prose unless the host explicitly asks the administrator/system about the mechanic in-story.
+`;
+
   context.setExtensionPrompt(MEME_SCENE_CLOCK_PROMPT_ID,sceneClockPrompt,1,0,false,0);
+  context.setExtensionPrompt(MEME_NPC_WHEEL_PROMPT_ID,npcWheelPrompt,1,0,false,0);
   context.setExtensionPrompt(MEME_RUNTIME_PROMPT_ID,prompt,1,2,false,0);
 }
 
@@ -4713,7 +4848,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
-        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.12.3</small>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.12.4</small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
