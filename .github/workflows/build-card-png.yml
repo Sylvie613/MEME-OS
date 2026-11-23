@@ -1,5 +1,5 @@
 name: Validate and build MÉMÉ OS
-# canonical: v0.4.1-alpha / extension 0.13.1 / memory-repair
+# canonical: v0.4.1-alpha / extension 0.13.2 / no automatic memory subsystem
 
 on:
   workflow_dispatch:
