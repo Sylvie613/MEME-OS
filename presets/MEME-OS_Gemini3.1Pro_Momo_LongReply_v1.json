@@ -1,5 +1,5 @@
 {
-  "temperature": 1.0,
+  "temperature": 1,
   "frequency_penalty": 0,
   "presence_penalty": 0,
   "top_p": 0.95,
@@ -188,7 +188,7 @@
       "marker": false,
       "name": "[MÉMÉ OS][Gemini 3.1 Pro] State / Continuity Lock",
       "role": "system",
-      "content": "# 状态与连续性\nAP、SV、CHARM、商品价格、购买结果、任务奖励、MEN档案、管理员形态与所有解锁状态，只认MÉMÉ OS扩展/系统当前注入的真实状态。模型不得自己加减数值、猜余额、宣布购买成功、重复结算、擅自开锁或因为剧情“看起来应该”就修改状态。带有【MÉMÉ OS｜已结算】的操作直接视为已经完成的世界事实，只承接后果，绝不再扣一次或奖一次。\n\nCHARM是宿主综合魅力/改造进度，不是管理员好感度。漂亮、管理员欲望、个人情感、爱情彼此分轴，不要自动连锁。\n\n持续追踪当前时间、地点、人物站位、衣物、身体状态、已经发生的改造、疲劳、疼痛、湿意、污迹、红痕、道具位置、手机/房间状态及人物已知信息；没有明确恢复、清理、换衣、移动或治疗，就不要无故复原。\n\n不要另造与扩展竞争的状态栏、商城、任务栏、记忆区、小手机或变量表；只有角色卡/世界书/扩展明确要求输出的结构才输出。",
+      "content": "# 状态与连续性\nAP、SV、CHARM、商品价格、购买结果、任务奖励、MEN档案、管理员形态与所有解锁状态，只认MÉMÉ OS扩展/系统当前注入的实时状态。模型不得自己加减数值、猜余额、沿用旧回合余额、宣布购买成功、重复结算、擅自开锁或因为剧情“看起来应该”就修改状态。只要正文中出现具体AP/SV/CHARM数字，就必须与当前扩展快照完全一致。\n\n剧情临时任务、系统奖励和剧情商品都不能由模型自己决定实际数值。需要新增任务、结算奖励或上架商品时，只负责在剧情中自然呈现并按扩展协议提交状态事件，实际奖励、价格、扣款与余额变化全部交给扩展。带有【MÉMÉ OS｜已结算】的操作直接视为已经完成的世界事实，只承接结果，绝不再扣一次或奖一次。\n\nCHARM是宿主综合魅力/改造进度，不是管理员好感度。漂亮、管理员欲望、个人情感、爱情彼此分轴，不要自动连锁。\n\n持续追踪当前时间、地点、人物站位、衣物、身体状态、已经发生的改造、疲劳、疼痛、湿意、污迹、红痕、道具位置、手机/房间状态及人物已知信息；没有明确恢复、清理、换衣、移动或治疗，就不要无故复原。\n\n重新生成或切换回复时，只承认当前聊天界面实际显示的这一版剧情；不要引用、延续或补写未显示的其他候选回复中发生过的事件。不要另造与扩展竞争的状态栏、商城、任务栏、记忆区、小手机或变量表；只有角色卡/世界书/扩展明确要求输出的结构才输出。",
       "injection_position": 0,
       "injection_depth": 4,
       "injection_order": 104,
@@ -200,9 +200,9 @@
       "system_prompt": false,
       "enabled": false,
       "marker": false,
-      "name": "[MÉMÉ OS][Gemini 3.1 Pro] Long Reply Output Lock",
+      "name": "[MÉMÉ OS][Gemini 3.1 Pro] Reply Length & Output Lock",
       "role": "system",
-      "content": "# 长回复输出锁\n每回合正文不少于1500个中文字符；系统提示、状态块、引用文本与格式标签不计入正文长度。{{user}}只发一句、一个动作、一个表情或“继续/推进剧情”时，也要结合当前场景主动写出足量的连续发展，不得因此缩成几百字。站点按次计费，优先把一次回复写完整。\n\n长不是复读。禁止用重复形容词、同义改写、连续心理总结、回顾上一回合、重复角色台词或大段规则解释灌水。应把篇幅用于新的动作细节、人物反应、环境变化、对话、系统事件与真实后果。\n\n正文使用自然段落；不要一句一换行。对话可以独立成段，但不要把每个短句都拆成单独段落。不要展示分析、思考过程、提纲、规则复述或“接下来可以……”的选项清单。回复结尾继续停留在剧情现场，不写总结式收尾，不问{{user}}下一步想要什么。",
+      "content": "# 回复长度与输出锁\n常规回合以约900–1200个中文字符的正文为目标。复杂剧情、多人场景、重要任务结算或需要完整展开的成人场景可以自然延长到约1500–2000个中文字符；简单承接、过渡回合或信息量本来就少的场景允许更短。这里是目标范围，不是硬性最低字数，不允许为了凑长度强行灌水、重复动作、重复心理、重复台词或硬开新剧情。\n\n{{user}}只发一句、一个动作、一个表情或“继续/推进剧情”时，仍要给出有实质内容的连续发展，但长度应服从当前场景的信息量，而不是机械撑到固定字数。优先把这一回合真正值得写的内容写完整。\n\n禁止用重复形容词、同义改写、连续心理总结、回顾上一回合、重复角色台词或大段规则解释扩充篇幅。篇幅应该用于新的动作细节、人物反应、环境变化、对话、系统事件与真实后果。\n\n正文使用自然段落；不要一句一换行。对话可以独立成段，但不要把每个短句都拆成单独段落。不要展示分析、思考过程、提纲、规则复述或“接下来可以……”的选项清单。回复结尾继续停留在剧情现场，不写总结式收尾，不问{{user}}下一步想要什么。",
       "injection_position": 0,
       "injection_depth": 4,
       "injection_order": 105,
@@ -214,36 +214,111 @@
     {
       "character_id": 100000,
       "order": [
-        {"identifier": "main", "enabled": true},
-        {"identifier": "worldInfoBefore", "enabled": true},
-        {"identifier": "personaDescription", "enabled": true},
-        {"identifier": "charDescription", "enabled": true},
-        {"identifier": "charPersonality", "enabled": true},
-        {"identifier": "scenario", "enabled": true},
-        {"identifier": "worldInfoAfter", "enabled": true},
-        {"identifier": "dialogueExamples", "enabled": true},
-        {"identifier": "chatHistory", "enabled": true},
-        {"identifier": "jailbreak", "enabled": false}
+        {
+          "identifier": "main",
+          "enabled": true
+        },
+        {
+          "identifier": "worldInfoBefore",
+          "enabled": true
+        },
+        {
+          "identifier": "personaDescription",
+          "enabled": true
+        },
+        {
+          "identifier": "charDescription",
+          "enabled": true
+        },
+        {
+          "identifier": "charPersonality",
+          "enabled": true
+        },
+        {
+          "identifier": "scenario",
+          "enabled": true
+        },
+        {
+          "identifier": "worldInfoAfter",
+          "enabled": true
+        },
+        {
+          "identifier": "dialogueExamples",
+          "enabled": true
+        },
+        {
+          "identifier": "chatHistory",
+          "enabled": true
+        },
+        {
+          "identifier": "jailbreak",
+          "enabled": false
+        }
       ]
     },
     {
       "character_id": 100001,
       "order": [
-        {"identifier": "meme31-core-v1", "enabled": true},
-        {"identifier": "meme31-admin-v1", "enabled": true},
-        {"identifier": "meme31-style-v1", "enabled": true},
-        {"identifier": "meme31-desire-v1", "enabled": true},
-        {"identifier": "meme31-state-v1", "enabled": true},
-        {"identifier": "meme31-output-v1", "enabled": true},
-        {"identifier": "main", "enabled": true},
-        {"identifier": "worldInfoBefore", "enabled": true},
-        {"identifier": "personaDescription", "enabled": true},
-        {"identifier": "charDescription", "enabled": true},
-        {"identifier": "charPersonality", "enabled": true},
-        {"identifier": "scenario", "enabled": true},
-        {"identifier": "worldInfoAfter", "enabled": true},
-        {"identifier": "dialogueExamples", "enabled": true},
-        {"identifier": "chatHistory", "enabled": true}
+        {
+          "identifier": "meme31-core-v1",
+          "enabled": true
+        },
+        {
+          "identifier": "meme31-admin-v1",
+          "enabled": true
+        },
+        {
+          "identifier": "meme31-style-v1",
+          "enabled": true
+        },
+        {
+          "identifier": "meme31-desire-v1",
+          "enabled": true
+        },
+        {
+          "identifier": "meme31-state-v1",
+          "enabled": true
+        },
+        {
+          "identifier": "meme31-output-v1",
+          "enabled": true
+        },
+        {
+          "identifier": "main",
+          "enabled": true
+        },
+        {
+          "identifier": "worldInfoBefore",
+          "enabled": true
+        },
+        {
+          "identifier": "personaDescription",
+          "enabled": true
+        },
+        {
+          "identifier": "charDescription",
+          "enabled": true
+        },
+        {
+          "identifier": "charPersonality",
+          "enabled": true
+        },
+        {
+          "identifier": "scenario",
+          "enabled": true
+        },
+        {
+          "identifier": "worldInfoAfter",
+          "enabled": true
+        },
+        {
+          "identifier": "dialogueExamples",
+          "enabled": true
+        },
+        {
+          "identifier": "chatHistory",
+          "enabled": true
+        }
       ]
     }
   ],
@@ -271,11 +346,14 @@
   "azure_deployment_name": "",
   "extensions": {
     "meme_os_preset": {
-      "name": "MÉMÉ OS · Gemini 3.1 Pro · 嬷嬷文风长回复",
-      "version": "1.0",
+      "name": "MÉMÉ OS · Gemini 3.1 Pro · 嬷嬷文风适中回复",
+      "version": "1.1",
       "target_model": "Gemini 3.1 Pro",
       "source_style": "嬷嬷文风by吐舌娃 / 我在末世很恶俗 3.1轻量版结构",
-      "min_body_chars": 1500
+      "target_body_chars": "900-1200",
+      "complex_body_chars": "1500-2000",
+      "hard_minimum": false,
+      "meme_os_min_extension": "0.10.11"
     }
   }
 }
