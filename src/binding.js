@@ -9,7 +9,9 @@ export function getBinding() {
     const character = context.characters?.[characterId];
     const binding = character?.data?.extensions?.[BINDING_KEY];
 
-    if (!binding || binding.enabled !== true) return null;
+    // Backward-compatible binding: presence of extensions.meme_os means bound
+    // unless the card explicitly disables it. Older cards omitted enabled:true.
+    if (!binding || binding.enabled === false) return null;
 
     return {
         profile: binding.profile || 'default',
