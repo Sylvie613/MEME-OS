@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.11.5';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.11.5';
-import { isBoundCharacter } from './src/binding.js?v=0.11.5';
+} from './src/state.js?v=0.11.6';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.11.6';
+import { isBoundCharacter } from './src/binding.js?v=0.11.6';
 
 /**
- * MÉMÉ OS v0.11.5
+ * MÉMÉ OS v0.11.6
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -1203,7 +1203,7 @@ async function quietSyncMemory({force=false,bootstrapOnly=false}={}){
     ? `你正在为持续角色扮演聊天建立第一次 MEMORY。请阅读当前能看到的完整聊天历史，并按“每一个 user+assistant 剧情回合对应一条短期记忆”的规则回填。
 
 只输出纯 JSON，不要代码块或解释：
-{"status":{"date":"","time":"","weather":"","location":"","people":[],"note":""},"short":[],"long":[],"permanent":[]}
+{"short":[],"long":[],"permanent":[]}
 
 严格规则：
 1. 每条 short 是一个完整剧情回合的摘要，约20-30个中文字符，最多36字。不要只挑“大事”；普通吃饭、洗澡、对话也照样按回合概括。
@@ -1223,7 +1223,7 @@ ${JSON.stringify(state.memory.long)}
 ${JSON.stringify(state.memory.permanent)}
 
 只输出纯 JSON，不要代码块或解释：
-{"status":{"date":"","time":"","weather":"","location":"","people":[],"note":""},"short":"","longSummary":"","permanentSummary":""}
+{"short":"","longSummary":"","permanentSummary":""}
 
 严格执行：
 1. needShort=${needShort}。若为 true，short 必须写且只能写1条，概括“最新一个 user+assistant 剧情回合”，约20-30个中文字符，最多36字。哪怕本回合只是普通日常也必须记。若为 false，short 留空。
@@ -1240,12 +1240,6 @@ ${JSON.stringify(state.memory.permanent)}
 
     const latest=runtimeState();
     let changed=false;
-    const statusRaw=parsed.status&&typeof parsed.status==='object'?parsed.status:{};
-    if(!statusRaw.date) statusRaw.date=storyDateLabel(latest);
-    if(!statusRaw.weather) statusRaw.weather=String(latest.storyStatus?.weather||'晴 · 闷热');
-    statusRaw.initialized=true;
-    if(applyStoryStatusEvent(latest,statusRaw)) changed=true;
-
     const memoryRaw=bootstrap
       ? {
           bootstrap:true,
@@ -2961,10 +2955,19 @@ Do not verify intentions, promises, partial attempts, vague claims, or a task th
 A completed task should disappear/cross out as soon as this reply is processed; there is no separate claim step.
 For sample, oral and drain: after their first-ever completion they become repeatable collection tasks, at most once per in-world story day. The extension automatically switches later payouts to SV-only repeat rewards. Never invent extra AP for repeated completions.
 
+VISIBLE SCENE STATUS — HARD FORMAT RULE:
+Every normal assistant story reply MUST begin with exactly one compact visible status line BEFORE any prose:
+【DAY ${String(Math.max(1,Number(state.tasks?.storyDay)||1)).padStart(3,'0')}｜<日期>｜<时间段>｜<天气>｜<地点>】
+This line belongs to the visible正文, not the MÉMÉ OS panel.
+Infer 日期 / 时间段 / 天气 / 地点 from the visible narrative continuity. Preserve the previous value when the scene has not changed. Do not invent a new time, weather or location merely to make the line look different. When the story clearly crosses into a new natural day, update the visible status line accordingly. Do not include AP, SV, CHARM or WITH/人物列表 in this line.
+
 STORY DAY:
 Current reconstructed in-world story day=${Number(state.tasks?.storyDay)||1}. The extension reconstructs chronology from the COMPLETE VISIBLE CHAT, so do not force visible DAY headings merely to feed the OS. Keep natural time progression internally consistent. If the story goes through night/sleep and then wakes into the next morning, that is a new natural day. Explicit "次日 / 第二天 / N天后 / N周后" jumps are also real day transitions. timeline.storyDay/dayAdvance may be emitted as advisory metadata, but they do not control the stored day.
 
 A natural-day transition refreshes the visible fixed DAILY / DESIRE / SPECIAL candidate pools and removes unaccepted plot-generated candidates from the previous day. Accepted non-daily long-form desire/special contracts may persist; daily contracts expire at the day boundary. Repeatable collection milestones can pay again on a later story day.
+
+SCENE STATUS STORAGE:
+MÉMÉ OS no longer displays or owns date/time/weather/location in its UI. Those facts live only in the visible status line at the top of the prose and in normal narrative continuity. Do not use hidden status fields to overwrite scene chronology.
 
 Current SHOP phase=${currentShopPhase(state).label} (${currentShopPhase(state).code}); appearance/presentation shop progress levels=${shopProgressLevels(state)}. Adult-response upgrades do not advance beauty-shelf phases.
 TWO-STAGE BODY ECONOMY — HARD RULE:
@@ -3023,8 +3026,8 @@ Do not emit a new relationship signal merely because a previous feeling continue
 
 Current CHARM=${state.host.charm}; desire allowed by appearance=${desireAllowed}; adminLove=${loveState}.
 
-Append ONE invisible HTML comment at the very end of the assistant reply when the current story creates a relevant MÉMÉ OS state update — tasks, shop, status, memory, feedback, MEN, evolution, permission, identity, or timeline. IMPORTANT: when memoryNeedsBootstrap=true, the comment is MANDATORY even if no other state changed, because the one-time history backfill itself is the required state update.
-Format exactly: <!--MEME_OS_EVENT {"dailyTaskOffers":[],"taskOffers":[],"tasks":[],"storyRewards":[],"shop":[],"lifestyleShop":[],"status":{},"memory":{"bootstrap":false,"short":"","longSummary":"","permanentSummary":""},"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{},"timeline":{"storyDay":null,"dayAdvance":false}} -->
+Append ONE invisible HTML comment at the very end of the assistant reply when the current story creates a relevant MÉMÉ OS state update — tasks, shop, memory, feedback, MEN, evolution, permission, identity, or timeline. IMPORTANT: when memoryNeedsBootstrap=true, the comment is MANDATORY even if no other state changed, because the one-time history backfill itself is the required state update.
+Format exactly: <!--MEME_OS_EVENT {"dailyTaskOffers":[],"taskOffers":[],"tasks":[],"storyRewards":[],"shop":[],"lifestyleShop":[],"memory":{"bootstrap":false,"short":"","longSummary":"","permanentSummary":""},"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{},"timeline":{"storyDay":null,"dayAdvance":false}} -->
 After memory has already been bootstrapped, do not emit the comment when nothing relevant changed.
 timeline: storyDay is the absolute in-world day represented by the visible narrative, not a turn counter. If the reply crosses into a later natural day, timeline is mandatory even if there are no other state changes. dayAdvance=true only when storyDay is greater than the current OS story day.
 dailyTaskOffers: deprecated compatibility field; normally leave [] for new daily/story tasks because visible [TASK｜任务名｜任务要求] is the canonical source.
@@ -3783,13 +3786,18 @@ function moduleCard(key,title,sub){
   `;
 }
 
+function formatCharm(value){
+  const n=Math.round((Number(value)||0)*10)/10;
+  return Number.isInteger(n)?String(n):n.toFixed(1);
+}
+
 function statsMarkup(compact = false) {
   const state=runtimeState();
   return `
     <div class="meme-stat-grid ${compact ? 'meme-stat-grid--compact' : ''}">
       <article><small>AP</small><strong>${String(state.resources.ap).padStart(3,'0')}</strong><em>改造点</em></article>
       <article><small>SV</small><strong>${String(state.resources.sv).padStart(3,'0')}</strong><em>精液值</em></article>
-      <article><small>CHARM</small><strong>${String(state.host.charm).padStart(2,'0')}</strong><em>综合魅力</em></article>
+      <article><small>CHARM</small><strong>${formatCharm(state.host.charm)}</strong><em>综合魅力</em></article>
     </div>
   `;
 }
@@ -3877,8 +3885,6 @@ function homeMarkup() {
       <article><small>CURRENT TASK</small><b>${activeCount ? `已挂上 ${activeCount} 项` : '一项都没接'}</b><em>${activeCount ? '做完再回来邀功' : '去 TASK，别装忙'}</em></article>
       <article><small>NEXT UNLOCK</small><b>${nextUnlock}</b><em>我说开才开</em></article>
     </section>
-
-    ${storyStatusMarkup(state)}
 
     <section class="meme-whisper-card">
       <span>♛</span>
@@ -4567,7 +4573,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
-        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.11.5</small>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.11.6</small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
