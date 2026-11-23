@@ -178,7 +178,8 @@
           "long_chars_approx": 200,
           "long_to_permanent_count": 10,
           "permanent_chars_approx": 300
-        }
+        },
+        "enabled": true
       }
     },
     "character_book": {
