@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.11.7",
+  "version": "0.11.8",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS 0.11.7: scene date/time/weather/location fully retired from OS state updates and shown only in the visible prose header; CHARM display rounded cleanly; prior task/timeline/shop fixes retained.",
-  "js": "index-v0.11.7.js",
-  "css": "style.css?v=0.11.7",
+  "description": "MÉMÉ OS 0.11.8: visible scene header now uses a precise story clock (M月D日 + 24h HH:MM), anchored to the previous visible header for continuous time progression; CHARM formatting and prior task/shop fixes retained.",
+  "js": "index-v0.11.8.js",
+  "css": "style.css?v=0.11.8",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
