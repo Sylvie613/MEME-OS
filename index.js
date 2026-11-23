@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.13.7';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.13.7';
-import { isBoundCharacter } from './src/binding.js?v=0.13.7';
+} from './src/state.js?v=0.13.8';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.13.8';
+import { isBoundCharacter } from './src/binding.js?v=0.13.8';
 
 /**
- * MÉMÉ OS v0.13.7
+ * MÉMÉ OS v0.13.8
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -1271,6 +1271,37 @@ const BOND_LOVE_TAGS = new Set([
   'sacrifice','personal_priority','vulnerability','future_choice','identity_choice',
 ]);
 
+const DESIRE_COMPLETION_AXES = [
+  {id:'masturbation',req:/(自慰|自己.{0,6}(?:摸|弄|刺激).{0,8}(?:阴蒂|小穴|阴道|乳头|奶头))/iu,done:/(自慰|自己.{0,6}(?:摸|弄|刺激).{0,8}(?:阴蒂|小穴|阴道|乳头|奶头))/iu},
+  {id:'handjob',req:/(手交|撸(?:动|弄|管)?|套弄.{0,8}(?:阴茎|鸡巴|肉棒|龟头))/iu,done:/(手交|撸(?:动|弄|管)?|套弄.{0,8}(?:阴茎|鸡巴|肉棒|龟头))/iu},
+  {id:'oral',req:/(口交|含住.{0,8}(?:阴茎|鸡巴|肉棒|龟头)|舔.{0,8}(?:龟头|阴茎|鸡巴|肉棒)|吞精)/iu,done:/(口交|含住.{0,8}(?:阴茎|鸡巴|肉棒|龟头)|舔.{0,8}(?:龟头|阴茎|鸡巴|肉棒)|吞精)/iu},
+  {id:'breast',req:/(乳交|乳房|乳头|奶头)/iu,done:/(乳交|乳房|乳头|奶头)/iu},
+  {id:'foot',req:/(足交|脚.{0,8}(?:夹|踩|蹭|套).{0,8}(?:阴茎|鸡巴|肉棒))/iu,done:/(足交|脚.{0,8}(?:夹|踩|蹭|套).{0,8}(?:阴茎|鸡巴|肉棒))/iu},
+  {id:'vaginal',req:/(性交|做爱|阴道|小穴|插入|抽插|内射)/iu,done:/(性交|做爱|阴道|小穴|插入|抽插|内射)/iu},
+  {id:'anal',req:/(后庭|肛交|肛门|屁眼)/iu,done:/(后庭|肛交|肛门|屁眼)/iu},
+  {id:'ejaculation',req:/(射精|精液|内射|颜射|吞精|采精|SV\s*(?:采集|收集|获取))/iu,done:/(射精|精液|内射|颜射|吞精|采精|SV\s*(?:采集|收集|获取))/iu},
+  {id:'orgasm',req:/(高潮|潮吹)/iu,done:/(高潮|潮吹)/iu}
+];
+
+function taskCompletionEvidenceValid(task,evidence,sceneText=''){
+  const claim=String(evidence||'').replace(/\s+/g,' ').trim();
+  const scene=String(sceneText||'').replace(/\s+/g,' ').trim();
+  if(claim.length<8) return {ok:false,reason:'evidence too short'};
+  if(/^(?:完成|做完|达成|成功|已完成|任务完成|done)[。.!！ ]*$/iu.test(claim)) return {ok:false,reason:'evidence is only a completion label'};
+  if(task?.category!=='desire') return {ok:true,reason:'non-desire concrete evidence'};
+
+  const combined=claim+' '+scene;
+  if(!desireSexualityGate({desc:claim,detail:scene})) return {ok:false,reason:'no explicit sexual completion evidence in visible/current scene'};
+
+  const requirement=(task?.title||'')+' '+(task?.desc||'')+' '+(task?.detail||'');
+  const requiredAxes=DESIRE_COMPLETION_AXES.filter(axis=>axis.req.test(requirement));
+  if(requiredAxes.length && !requiredAxes.some(axis=>axis.done.test(combined))) return {ok:false,reason:'completion evidence does not match required sexual act'};
+  for(const axis of requiredAxes.filter(axis=>axis.id==='ejaculation'||axis.id==='orgasm')){
+    if(!axis.done.test(combined)) return {ok:false,reason:'required measurable sexual outcome missing'};
+  }
+  return {ok:true,reason:'desire evidence grounded'};
+}
+
 function extractVisibleTaskCompletions(raw=''){
   const text=String(raw||'');
   const completions=[];
@@ -1278,7 +1309,7 @@ function extractVisibleTaskCompletions(raw=''){
   for(const match of text.matchAll(re)){
     const title=String(match[1]||'').replace(/\s+/g,' ').trim().slice(0,60);
     const marker=String(match[2]||'').trim();
-    if(title) completions.push({title,marker,index:Number(match.index)||0});
+    if(title){ const index=Number(match.index)||0; const context=text.slice(Math.max(0,index-700),Math.min(text.length,index+900)); completions.push({title,marker,index,context}); }
   }
   return completions;
 }
@@ -1341,6 +1372,11 @@ function settleVisibleTaskCompletion(state,completion,messageId){
   const id=String(task.id||'').trim();
   if(!id) return false;
 
+  const active=state.tasks?.active?.[id];
+  if(!active) return false;
+  const verification=taskCompletionEvidenceValid(task,'正文明确标记「'+String(completion?.title||'')+'」'+String(completion?.marker||'完成')+'。',String(completion?.context||''));
+  if(!verification.ok) return false;
+
   const currentDay=Math.max(1,Number(state.tasks?.storyDay)||1);
   const repeatable=task.repeatable==='daily';
   const isRollingDaily=task.category==='daily';
@@ -1354,7 +1390,6 @@ function settleVisibleTaskCompletion(state,completion,messageId){
 
   const reward=taskReward(task,state);
   const wasEverCompleted=Boolean(state.tasks?.everCompleted?.[id]);
-  const active=state.tasks?.active?.[id];
   const title=active?.title || task.title || completion.title;
   const evidence=`正文明确标记「${completion.title}」${completion.marker||'完成'}。`;
 
@@ -1530,13 +1565,13 @@ function settleVisibleStoryRewardsFromMessage(state,raw,messageId){
   return settleVisibleStoryReward(state,rewards[0],messageId);
 }
 
-function settleTaskFromModel(state,rawTask,messageId){
+function settleTaskFromModel(state,rawTask,messageId,sceneText=''){
   if(!rawTask || typeof rawTask!=='object') return false;
   const id=String(rawTask.id||'').trim();
   const status=String(rawTask.status||'').toLowerCase();
   if(!id || status!=='completed') return false;
 
-  const task=findTask(id);
+  const task=findTask(id,state);
   const active=state.tasks?.active?.[id];
   if(!task || !active) return false;
 
@@ -1549,8 +1584,13 @@ function settleTaskFromModel(state,rawTask,messageId){
   if(isRollingDaily && Number(state.tasks?.dailyCompleted?.[id]?.day||0)===currentDay) return false;
   if(!dailyLike && state.tasks?.completed?.[id]) return false;
 
-  const evidence=String(rawTask.evidence||'').replace(/\s+/g,' ').trim().slice(0,180);
+  const evidence=String(rawTask.evidence||'').replace(/\s+/g,' ').trim().slice(0,240);
   if(!evidence) return false;
+  const verification=taskCompletionEvidenceValid(task,evidence,sceneText);
+  if(!verification.ok){
+    console.warn('[MÉMÉ OS] rejected task completion evidence',{id,reason:verification.reason,evidence});
+    return false;
+  }
 
   const historyId=`meme_task_verified_${messageId}_${id}`;
   if((state.history||[]).some(entry=>entry.id===historyId)) return false;
@@ -2417,8 +2457,9 @@ async function handleRuntimeEvent(messageId){
       }
 
       if(Array.isArray(event.tasks)){
+        const taskVerificationScene=recentSceneText(Array.isArray(context.chat)?context.chat:[],4);
         for(const rawTask of event.tasks.slice(0,4)){
-          if(settleTaskFromModel(state,rawTask,messageId)) changed=true;
+          if(settleTaskFromModel(state,rawTask,messageId,taskVerificationScene)) changed=true;
         }
       }
 
@@ -2945,7 +2986,7 @@ function installRuntimePrompt(){
     ...(state.tasks?.generated||[]).map(t=>({title:t.title,desc:t.desc,tier:t.tier,status:'open'})),
     ...Object.values(state.tasks?.completed||{}).filter(t=>t?.category==='desire').map(t=>({title:t.title,desc:t.desc,tier:t.tier,status:'completed'})),
   ].slice(-6);
-  const prompt=`[MÉMÉ OS runtime bridge · v0.13.7]
+  const prompt=`[MÉMÉ OS runtime bridge · v0.13.8]
 AUTHORITY / TONE:
 - Extension state is the only authority for AP, SV, CHARM, purchases, task settlement, MEN buckets, system access/evolution and unlocks. Never mentally add/subtract numbers or reuse stale balances.
 - The host persona comes from the active SillyTavern Persona + visible chat. Do not invent host identity/history beyond established system transformation facts.
@@ -4588,7 +4629,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
-        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.13.7</small>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.13.8</small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
