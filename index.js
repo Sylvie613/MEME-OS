@@ -1416,6 +1416,8 @@ function settleVisibleTaskCompletion(state,completion,messageId){
       title,
       category:task.category,
       evidence,
+      reward:{ap:reward.ap,sv:reward.sv},
+      tier:Number(task.tier)||null,
       completedAt:Date.now(),
     };
   }
@@ -1426,6 +1428,8 @@ function settleVisibleTaskCompletion(state,completion,messageId){
     category:task.category,
     actionTags:task.category==='daily' ? taskActionTags(task) : (state.tasks.everCompleted?.[id]?.actionTags||[]),
     firstCompletedAt:state.tasks.everCompleted?.[id]?.firstCompletedAt||Date.now(),
+    reward:{ap:reward.ap,sv:reward.sv},
+    tier:Number(task.tier)||null,
   };
 
   if(task.dynamicDailyTask){
@@ -1658,6 +1662,8 @@ function settleTaskFromModel(state,rawTask,messageId,sceneText=''){
     title:`${wasEverCompleted && repeatable?'又给你结了一次':'这次算你做完'}：${title}`,
     summary:`我验过了。「${title}」算完成；${rewardText}。你干了什么我记着：${evidence}`,
     text:`TASK VERIFIED AND SETTLED: ${id}`,
+    reward:{ap:reward.ap,sv:reward.sv},
+    tier:Number(task.tier)||null,
     committedAt:Date.now(),
   });
   if(state.history.length>240) state.history=state.history.slice(-240);
@@ -3657,6 +3663,16 @@ function findTask(id,state=runtimeState()){
   for(const [category,tasks] of Object.entries(TASK_DATA)){
     const task=tasks.find(x=>x.id===id);
     if(task) return {...task,category};
+  }
+  const active=state.tasks?.active?.[id];
+  if(active){
+    return {
+      ...active,
+      type:active.category==='desire'?'DESIRE':'TASK',
+      category:active.category||'daily',
+      dynamicTask:Boolean(active.dynamicTask || active.category==='desire'),
+      dynamicDailyTask:Boolean(active.dynamicDailyTask),
+    };
   }
   return null;
 }
