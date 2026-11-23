@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.11.9';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.11.9';
-import { isBoundCharacter } from './src/binding.js?v=0.11.9';
+} from './src/state.js?v=0.12.0';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.12.0';
+import { isBoundCharacter } from './src/binding.js?v=0.12.0';
 
 /**
- * MÉMÉ OS v0.11.9
+ * MÉMÉ OS v0.12.0
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -25,11 +25,21 @@ let memoryQuietLastAttemptTurn=-999;
 
 const TASK_DATA = {
   daily: [
-    { id:'clean', type:'DAILY', title:'先把自己收拾干净', desc:'完成洗头、洗澡、换洗衣物与基础口腔清洁。系统拒绝给“脏乱”找借口。', reward:'AP +120', state:'可接取', detail:'完成后由剧情状态确认。完成当轮显示划线，下一轮从任务板移除，不会重复开放。' },
-    { id:'mirror', type:'DAILY', title:'镜前扫描', desc:'在镜子前完整观察当前外貌三分钟，不遮脸、不跳过身体状态。', reward:'AP +70', state:'可接取', detail:'用于建立宿主对当前状态的客观认知。' },
-    { id:'walk', type:'DAILY', title:'动起来', desc:'连续完成一次不少于二十分钟的步行或低强度活动。', reward:'AP +150', state:'可接取', detail:'系统只判定“完成 / 未完成”，不计算现实热量。' },
-    { id:'posture', type:'DAILY', title:'别塌着', desc:'在一段完整场景中保持肩颈舒展、坐姿或站姿不持续蜷缩。', reward:'AP +100', state:'可接取', detail:'用于解锁后续姿态类改造。' },
-    { id:'outfit', type:'DAILY', title:'像样地出门', desc:'搭配一套干净、合身、没有明显邋遢感的外出服。', reward:'AP +110', state:'可接取', detail:'不要求昂贵，只要求“看起来像认真收拾过”。' },
+    { id:'clean', type:'DAILY', title:'先把自己收拾干净', desc:'完成洗头、洗澡、换洗衣物与基础口腔清洁。系统拒绝给“脏乱”找借口。', reward:'AP +120', state:'可接取', detail:'DAY 001 的开场日常；以后隔几天也可能重新回池。' },
+    { id:'mirror', type:'DAILY', title:'镜前扫描', desc:'在镜子前完整观察当前外貌三分钟，不遮脸、不跳过身体状态。', reward:'AP +70', state:'可接取', detail:'看看现在到底变成什么样，别只挑顺眼角度。' },
+    { id:'walk', type:'DAILY', title:'动起来', desc:'完成一次不少于二十分钟的步行或低强度活动。', reward:'AP +150', state:'可接取', detail:'只判定完成与否，不计算现实热量。' },
+    { id:'posture', type:'DAILY', title:'别塌着', desc:'在一段完整场景中保持肩颈舒展、坐姿或站姿不持续蜷缩。', reward:'AP +100', state:'可接取', detail:'姿态不修，漂亮零件堆上去也白搭。' },
+    { id:'outfit', type:'DAILY', title:'像样地出门', desc:'搭配一套干净、合身、没有明显邋遢感的外出服。', reward:'AP +110', state:'可接取', detail:'不用贵，至少得像认真选过。' },
+    { id:'bedreset', type:'DAILY', title:'床别再像事故现场', desc:'把床铺、散落衣物、纸巾和床边杂物彻底收拾一遍。', reward:'AP +90', state:'可接取', detail:'睡觉的地方先别像刚打完仗。' },
+    { id:'deskreset', type:'DAILY', title:'把桌面救回来', desc:'清掉桌面垃圾和无关杂物，把常用东西归位。', reward:'AP +80', state:'可接取', detail:'至少腾出一块能正常用的桌面。' },
+    { id:'skincare', type:'DAILY', title:'脸先别摆烂', desc:'完成一次基础洁面与护肤，不拿“懒得动”当理由。', reward:'AP +85', state:'可接取', detail:'基础护理，不要求昂贵产品。' },
+    { id:'stretch', type:'DAILY', title:'把自己展开', desc:'完成一轮肩颈、腰背和腿部的轻度拉伸或舒展。', reward:'AP +95', state:'可接取', detail:'别整天缩成一团。' },
+    { id:'photo', type:'DAILY', title:'留一张证据', desc:'拍一张不刻意藏角度的全身或半身记录照，留作改造对比。', reward:'AP +75', state:'可接取', detail:'只做剧情记录，不要求公开。' },
+    { id:'wardrobe', type:'DAILY', title:'衣柜别装死', desc:'整理一小块衣柜或衣物区，把乱塞的衣服叠好、挂好或分类。', reward:'AP +90', state:'可接取', detail:'不用一次收完整个衣柜，做完一块就算。' },
+    { id:'laundry', type:'DAILY', title:'把脏衣服清掉', desc:'处理一批脏衣物：洗、晾、烘或把该洗的完整分类送进洗衣流程。', reward:'AP +100', state:'可接取', detail:'别让脏衣服继续堆着发酵。' },
+    { id:'bagreset', type:'DAILY', title:'包里别养垃圾', desc:'把日常用包里的票据、包装、废纸和无用杂物清掉并重新归位。', reward:'AP +70', state:'可接取', detail:'包不是移动垃圾桶。' },
+    { id:'shoes', type:'DAILY', title:'鞋也算你的一部分', desc:'清理今天最常穿的一双鞋，至少处理明显灰尘、污渍或乱放状态。', reward:'AP +80', state:'可接取', detail:'别上面收拾得像样，脚下还一塌糊涂。' },
+    { id:'scent', type:'DAILY', title:'闻起来像个人', desc:'完成一次基础身体与衣物气味管理：洗净、换洗、止汗或适量留香任选其一。', reward:'AP +85', state:'可接取', detail:'不是拿香水盖脏味，先把源头处理掉。' },
   ],
   desire: [
     { id:'spark', type:'DESIRE', title:'先让男人看着你硬起来', desc:'让一名成年男人因为你出现明确、可识别的性唤起。礼貌夸奖、暧昧客套、说你好看都不算；至少得让他真的起色心，明显想摸、想操、想把你弄上床。', reward:'AP +250 · SV +10', state:'CHARM 8 解锁', locked:true, detail:'一次性里程碑。可以不真正上床，但必须有明确成人性欲与身体/行为证据。' },
@@ -60,23 +70,52 @@ function deterministicTaskRotation(list,category,state=runtimeState(),count=3){
     .map(entry=>entry.task);
 }
 
+function deterministicDailyRotationForDay(list,day,count=3){
+  const items=Array.isArray(list)?list:[];
+  if(!items.length) return [];
+  const targetDay=Math.max(1,Number(day)||1);
+  const history=[];
+
+  for(let d=1;d<=targetDay;d++){
+    const previousTwo=history.slice(-2).flat();
+    const forbidden=new Set(previousTwo.map(task=>task.id));
+    let eligible=items.filter(task=>!forbidden.has(task.id));
+
+    // With the expanded pool this normally never triggers, but keep a safe
+    // fallback that relaxes from two-day avoidance to one-day avoidance.
+    if(eligible.length<count){
+      const yesterday=new Set((history.at(-1)||[]).map(task=>task.id));
+      eligible=items.filter(task=>!yesterday.has(task.id));
+    }
+    if(eligible.length<count) eligible=[...items];
+
+    const ranked=[...eligible].sort((a,b)=>{
+      const sa=hashId(`daily-v2|${d}|${a.id}`);
+      const sb=hashId(`daily-v2|${d}|${b.id}`);
+      return sa-sb || String(a.id).localeCompare(String(b.id));
+    });
+
+    let chosen=ranked.slice(0,count);
+
+    // DAY 001 always contains the onboarding cleanup task.
+    if(d===1){
+      const onboarding=items.find(task=>task.id==='clean');
+      if(onboarding && !chosen.some(task=>task.id==='clean')){
+        chosen=[onboarding,...chosen.filter(task=>task.id!=='clean')].slice(0,count);
+      }
+    }
+    history.push(chosen);
+  }
+
+  return history[targetDay-1]||[];
+}
+
 function currentStaticTaskPool(category,state=runtimeState()){
   const list=TASK_DATA[category]||[];
 
   if(category==='daily'){
     const day=Math.max(1,Number(state.tasks?.storyDay)||1);
-    const onboarding=list.find(task=>task.id==='clean')||null;
-    const onboardingDone=Boolean(state.tasks?.everCompleted?.clean)
-      || Number(state.tasks?.dailyCompleted?.clean?.day||0)===day;
-
-    // DAY 001 onboarding is not part of the random rotation.
-    // The opening scene explicitly publishes this task, so OS must show it
-    // until the host completes it. The other slots may still rotate normally.
-    if(day===1 && onboarding && !onboardingDone){
-      const rest=list.filter(task=>task.id!=='clean');
-      return [onboarding,...deterministicTaskRotation(rest,category,state,2)];
-    }
-    return deterministicTaskRotation(list,category,state,3);
+    return deterministicDailyRotationForDay(list,day,3);
   }
 
   if(category==='desire') return deterministicTaskRotation(list,category,state,3);
@@ -305,6 +344,16 @@ const RUDE_TASK_DESCS = {
   walk:'坐着不会自动变好看。起来动二十分钟，别把“改造”理解成躺着等我给。',
   posture:'肩膀打开，背挺起来。你再缩成那样，买再多东西也只是把好东西堆在烂姿态上。',
   outfit:'不用贵，先穿干净、合身、像认真挑过的衣服。别再把随便套上身当风格。',
+  bedreset:'床铺、纸巾、衣服、乱七八糟的东西都给我收了。别每天睡在事故现场里。',
+  deskreset:'桌面清出一块能正常用的地方。垃圾扔掉，常用的东西归位。',
+  skincare:'洗脸，做基础护理。不是让你买贵东西，是别连最简单的都懒得做。',
+  stretch:'肩颈、腰背、腿都舒展开一点。你再一直缩着，我看着都烦。',
+  photo:'留一张不藏角度的记录照。以后变了才知道到底变了多少。',
+  wardrobe:'挑一小块衣柜整理，叠好、挂好、分好。别每次找衣服都像翻垃圾场。',
+  laundry:'处理一批脏衣服。洗、晾、烘，至少让它们进入正常流程，别继续堆。',
+  bagreset:'把包里废纸、包装和没用的东西清掉。包不是你随身携带的垃圾桶。',
+  shoes:'把最常穿的那双鞋清理一下。别上半身收拾了，脚底下还一副逃难样。',
+  scent:'先处理干净，再谈香。洗净、换洗、止汗或适量留香，别拿香水盖脏味。',
   spark:'先让个成年男人因为你硬起来。不是夸你好看，不是嘴上说骚话，是他真的被你弄出性反应，想摸、想操、想把你按到床上。',
   sample:'我要的是第一次能结算的精液。别拿几句骚话和摸两下回来邀功，射出来、收得到，才算数。',
   oral:'这张嘴平时除了顶嘴没别的本事。去做一次真正的口交，等对方射出来再回来交差。',
@@ -438,6 +487,15 @@ const DAILY_ACTION_PATTERNS = {
   outfit:/(穿搭|搭配.{0,8}(?:衣服|外出服)|合身.{0,8}(?:衣服|衣物)|像样.{0,8}出门)/i,
   mirror:/(镜子|镜前|照镜|观察.{0,8}外貌)/i,
   movement:/(步行|散步|运动|走路|活动.{0,8}(?:分钟|小时)|动起来)/i,
+  desk_cleanup:/(桌面|书桌|电脑桌|收拾.{0,8}(?:桌|桌面)|整理.{0,8}(?:桌|桌面))/i,
+  skincare:/(洁面|洗脸|护肤|面霜|乳液|基础护理)/i,
+  stretch:/(拉伸|伸展|舒展|活动.{0,8}(?:肩颈|腰背|腿))/i,
+  photo_record:/(记录照|全身照|半身照|自拍|拍.{0,4}(?:照片|照))/i,
+  wardrobe:/(衣柜|衣物区|叠.{0,4}衣|挂.{0,4}衣|整理.{0,8}衣服)/i,
+  laundry:/(洗衣|脏衣|洗衣机|晾衣|烘衣|衣物分类)/i,
+  bag_reset:/(包里|背包|手提包|整理.{0,8}包|清.{0,8}包)/i,
+  shoes:/(擦鞋|清理.{0,6}鞋|鞋面|鞋子.{0,8}(?:灰|污渍|清理))/i,
+  scent:/(止汗|体香|香水|留香|气味管理|衣物气味|身体气味)/i,
 };
 
 const STATIC_DAILY_ACTIONS = {
@@ -446,6 +504,16 @@ const STATIC_DAILY_ACTIONS = {
   walk:['movement'],
   posture:['posture'],
   outfit:['outfit'],
+  bedreset:['bed_cleanup'],
+  deskreset:['desk_cleanup'],
+  skincare:['skincare'],
+  stretch:['stretch'],
+  photo:['photo_record'],
+  wardrobe:['wardrobe'],
+  laundry:['laundry'],
+  bagreset:['bag_reset'],
+  shoes:['shoes'],
+  scent:['scent'],
 };
 
 function extractDailyActionTags(text=''){
@@ -890,7 +958,7 @@ function applyMemoryEvent(state,raw,visibleTurns=0){
 }
 
 function applyStoryStatusEvent(){
-  // Retired in v0.11.9. Scene date/time/weather/location live in visible prose only.
+  // Retired in v0.12.0. Scene date/time/weather/location live in visible prose only.
   return false;
 }
 
@@ -3110,6 +3178,16 @@ const RUDE_TASK_NAMES = {
   walk:'动一动，别继续长在椅子上',
   posture:'别缩成一团',
   outfit:'穿得别像刚从垃圾袋里爬出来',
+  bedreset:'床先别像案发现场',
+  deskreset:'把你那堆破烂桌面清出来',
+  skincare:'脸先别继续摆烂',
+  stretch:'把自己从一团肉里展开',
+  photo:'拍张照，别只会自欺欺人',
+  wardrobe:'衣柜也给我收拾了',
+  laundry:'脏衣服别继续发酵',
+  bagreset:'包里那堆垃圾倒了',
+  shoes:'鞋脏成那样你也穿得出去？',
+  scent:'先别让自己闻着像事故现场',
   spark:'先让个男人看着你硬起来',
   sample:'第一次精液，别空手回来',
   oral:'这张嘴总得有点别的用处',
@@ -4100,7 +4178,7 @@ function taskMarkup() {
     <section class="meme-task-list" data-task-list>${renderTaskList('daily')}</section>
     <section class="meme-page-card meme-task-rules">
       <div class="meme-card-title"><small>MY RULES</small><h3>听清楚再接</h3></div>
-      ${labelValue('日常','按剧情自然日刷新候选池；当天完成的任务退出，第二天会根据新状态重新洗牌。')}
+      ${labelValue('日常','每天固定轮换 3 个基础日常；前两天出现过的任务优先禁止连续回池。当天完成后退出，剧情临时 TASK 另算，不占这 3 个位置。')}
       ${labelValue('欲望','基础里程碑只是模板；每天会结合当前男人、地点、CHARM 与剧情刷新候选，已接取的长期任务不会被强行抹掉。')}
       ${labelValue('不同任务',`${distinctEroticTaskCount(state)} 个已完成`,'重复做同一任务不重复计数')}
       ${labelValue('特殊','候选会随自然日轮换；真正的剧情放水任务不会高频出现。')}
@@ -4574,7 +4652,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
-        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.11.9</small>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.12.0</small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
