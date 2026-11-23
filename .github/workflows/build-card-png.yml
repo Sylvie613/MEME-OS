@@ -1,5 +1,5 @@
 name: Validate and build MÉMÉ OS
-# canonical: v0.4.1-alpha / extension 0.13.8 / hardened task verification
+# canonical: v0.4.1-alpha / extension 0.13.9 / hardened task verification
 
 on:
   workflow_dispatch:
@@ -14,6 +14,7 @@ on:
       - "cards/meme_os_card_v0.4.1-alpha.json"
       - "presets/**"
       - "scripts/build_card_png.py"
+      - "scripts/validate_task_lifecycle.py"
       - ".github/workflows/build-card-png.yml"
   push:
     branches: [main]
@@ -26,6 +27,7 @@ on:
       - "cards/meme_os_card_v0.4.1-alpha.json"
       - "presets/**"
       - "scripts/build_card_png.py"
+      - "scripts/validate_task_lifecycle.py"
       - ".github/workflows/build-card-png.yml"
 
 permissions:
@@ -49,6 +51,9 @@ jobs:
           python3 -m json.tool manifest.json >/dev/null
           python3 -m json.tool cards/meme_os_card_v0.4.1-alpha.json >/dev/null
           python3 -m json.tool presets/MEME-OS_Gemini3.1Pro_Momo_LongReply_v1.json >/dev/null
+
+      - name: Validate critical task lifecycle
+        run: python3 scripts/validate_task_lifecycle.py
 
       - name: Validate architecture invariants
         run: |
