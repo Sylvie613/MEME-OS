@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.37';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.37';
-import { isBoundCharacter } from './src/binding.js?v=0.10.37';
+} from './src/state.js?v=0.10.38';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.38';
+import { isBoundCharacter } from './src/binding.js?v=0.10.38';
 
 /**
- * MÉMÉ OS v0.10.37
+ * MÉMÉ OS v0.10.38
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -950,6 +950,61 @@ function advanceStoryDateLabel(label,days=1){
   return `${date.getUTCMonth()+1}月${date.getUTCDate()}日`;
 }
 
+function extractVisibleStoryDay(raw=''){
+  const text=String(raw||'').slice(0,6000);
+  const matches=[...text.matchAll(/[【\[]\s*DAY\s*0*(\d{1,3})\s*[】\]]/gi)];
+  if(!matches.length) return null;
+  const days=matches
+    .map(match=>Math.max(1,Number(match[1])||0))
+    .filter(Boolean);
+  return days.length?Math.max(...days):null;
+}
+
+function syncStoryDayTo(state,targetDay,{source='runtime',explicitDate=false}={}){
+  const target=Math.max(1,Number(targetDay)||1);
+  state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],dismissed:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
+  const current=Math.max(1,Number(state.tasks.storyDay)||1);
+  if(target<=current) return false;
+
+  const previousDate=storyDateLabel(state);
+  const delta=target-current;
+  state.tasks.storyDay=target;
+  state.storyStatus=state.storyStatus||{initialized:false,date:'',time:'',weather:'晴 · 闷热',location:'',people:[],note:'盛夏',updatedTurn:0};
+  if(!explicitDate){
+    state.storyStatus.date=advanceStoryDateLabel(previousDate,delta);
+    state.storyStatus.initialized=true;
+    state.storyStatus.updatedTurn=Math.max(0,Number(state.shop?.plotTurn)||0);
+  }
+
+  // A story-day change is a hard boundary for rolling daily content.
+  for(const [taskId] of Object.entries(state.tasks.active||{})){
+    const task=findTask(taskId,state);
+    if(task?.category==='daily' || task?.repeatable==='daily') delete state.tasks.active[taskId];
+  }
+  state.tasks.generatedDaily=[];
+  state.tasks.generated=(state.tasks.generated||[]).filter(task=>Boolean(state.tasks.active?.[task.id]));
+  state.tasks.lastGeneratedDesireDay=0;
+  state.tasks.lastGeneratedDailyTurn=0;
+  state.tasks.plotTaskIssuedDay=target;
+  state.tasks.plotTaskIssuedCount=0;
+  state.tasks.lastPlotTaskTurn=-999;
+
+  state.history=Array.isArray(state.history)?state.history:[];
+  const historyId=`meme_story_day_${target}_${source}`;
+  if(!state.history.some(entry=>entry.id===historyId)){
+    state.history.push({
+      id:historyId,
+      type:'story_day',
+      recordType:'system',
+      title:`DAY ${String(target).padStart(3,'0')} · 换批活给你`,
+      summary:'剧情日已同步；日常候选与未接取的剧情任务按新一天重新洗牌。',
+      text:`STORY DAY SYNCED TO ${target} FROM ${source.toUpperCase()}`,
+      committedAt:Date.now(),
+    });
+  }
+  return true;
+}
+
 async function quietSyncMemory({force=false,bootstrapOnly=false}={}){
   if(memoryQuietSyncInFlight || !isBoundCharacter() || !hasActiveChat()) return false;
   const context=globalThis.SillyTavern?.getContext?.()||{};
@@ -1858,6 +1913,17 @@ async function reconcileRecentVisibleTaskOffers(){
   if(purgeKnownLegacyWrongGeneratedTasks(state)) changed=true;
 
   const start=Math.max(0,chat.length-16);
+  let latestVisibleDay=Math.max(1,Number(state.tasks?.storyDay)||1);
+  for(let i=start;i<chat.length;i++){
+    const message=chat[i];
+    if(!message || message.is_user) continue;
+    const visibleDay=extractVisibleStoryDay(String(message.mes||''));
+    if(visibleDay && visibleDay>latestVisibleDay) latestVisibleDay=visibleDay;
+  }
+  if(latestVisibleDay>Math.max(1,Number(state.tasks?.storyDay)||1)){
+    if(syncStoryDayTo(state,latestVisibleDay,{source:'reconcile'})) changed=true;
+  }
+
   for(let i=start;i<chat.length;i++){
     const message=chat[i];
     if(!message || message.is_user) continue;
@@ -2007,6 +2073,13 @@ async function handleRuntimeEvent(messageId){
   });
 
   const raw=String(message.mes||'');
+  const visibleStoryDay=extractVisibleStoryDay(raw);
+  // The visible [DAY NNN] marker is authoritative for story chronology.
+  // This repairs missed hidden events and keeps TASK rotation aligned with the prose.
+  if(visibleStoryDay && visibleStoryDay>Math.max(1,Number(state.tasks?.storyDay)||1)){
+    syncStoryDayTo(state,visibleStoryDay,{source:'visible'});
+  }
+
   const canonicalCards=extractCanonicalTaskMarkers(raw);
   const candidateCanonicalTask=canonicalCards.length ? taskFromCanonicalMarker(canonicalCards[canonicalCards.length-1],state) : null;
   const plotFreq=plotTaskFrequency(state);
@@ -2144,39 +2217,12 @@ async function handleRuntimeEvent(messageId){
       if(applyMemoryEvent(state,event.memory,visibleChatTurns)) changed=true;
 
       if(event.timeline?.dayAdvance===true){
-        state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],dismissed:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
-        state.tasks.storyDay=Math.max(1,(Number(state.tasks.storyDay)||1)+1);
-        state.storyStatus=state.storyStatus||{initialized:false,date:'',time:'',weather:'晴 · 闷热',location:'',people:[],note:'盛夏',updatedTurn:0};
-        if(!event.status?.date){
-          state.storyStatus.date=advanceStoryDateLabel(storyDateLabel(state),1);
-          state.storyStatus.initialized=true;
-          state.storyStatus.updatedTurn=Math.max(0,Number(state.shop?.plotTurn)||0);
-        }
-
-        // Daily contracts expire at a natural-day boundary. Accepted non-daily
-        // desire/special contracts may persist, but every unaccepted candidate pool refreshes.
-        for(const [taskId] of Object.entries(state.tasks.active||{})){
-          const task=findTask(taskId,state);
-          if(task?.category==='daily' || task?.repeatable==='daily') delete state.tasks.active[taskId];
-        }
-        state.tasks.generatedDaily=[];
-        state.tasks.generated=(state.tasks.generated||[]).filter(task=>Boolean(state.tasks.active?.[task.id]));
-        state.tasks.lastGeneratedDesireDay=0;
-        state.tasks.lastGeneratedDailyTurn=0;
-        state.tasks.plotTaskIssuedDay=state.tasks.storyDay;
-        state.tasks.plotTaskIssuedCount=0;
-        state.tasks.lastPlotTaskTurn=-999;
-
-        changed=true;
-        state.history.push({
-          id:`meme_story_day_${state.tasks.storyDay}_${Date.now()}`,
-          type:'story_day',
-          recordType:'system',
-          title:`DAY ${String(state.tasks.storyDay).padStart(3,'0')} · 换批活给你`,
-          summary:'天换了，我把日常、特殊和欲望候选重新洗了一遍。昨天没接的退场，已经接下的长期活我没动。',
-          text:'STORY DAY ADVANCED — TASK POOLS REFRESHED',
-          committedAt:Date.now(),
-        });
+        const currentDay=Math.max(1,Number(state.tasks?.storyDay)||1);
+        // If the visible reply already declared [DAY NNN], do not increment again.
+        const targetDay=visibleStoryDay && visibleStoryDay>=currentDay
+          ? visibleStoryDay
+          : currentDay+1;
+        if(syncStoryDayTo(state,targetDay,{source:'timeline',explicitDate:Boolean(event.status?.date)})) changed=true;
       }
 
       if(event.evolution?.targetLevel){
