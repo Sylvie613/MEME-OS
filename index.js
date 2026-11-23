@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.11.4';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.11.4';
-import { isBoundCharacter } from './src/binding.js?v=0.11.4';
+} from './src/state.js?v=0.11.5';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.11.5';
+import { isBoundCharacter } from './src/binding.js?v=0.11.5';
 
 /**
- * MÉMÉ OS v0.11.4
+ * MÉMÉ OS v0.11.5
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -3196,9 +3196,11 @@ const SHOP_MAX_LEVEL = {
 
 const SHOP_PHASES = [
   {id:'rescue', minLevels:0, label:'抢救货架', code:'RESCUE', level:1},
-  {id:'refine', minLevels:8, label:'精修货架', code:'REFINE', level:2},
-  {id:'beauty', minLevels:20, label:'美女货架', code:'BEAUTY', level:3},
-  {id:'advanced', minLevels:35, label:'高阶货架', code:'ADVANCED', level:4},
+  // Level II should feel like continuing a chosen route, not clearing the whole starter shop.
+  {id:'refine', minLevels:2, label:'精修货架', code:'REFINE', level:2},
+  // Level III/IV remain progressively stricter so late-game transformation still has pacing.
+  {id:'beauty', minLevels:8, label:'美女货架', code:'BEAUTY', level:3},
+  {id:'advanced', minLevels:18, label:'高阶货架', code:'ADVANCED', level:4},
 ];
 
 const SHOP_PRICE_MULTIPLIERS = [1,1.45,2.05,2.8];
@@ -3487,7 +3489,7 @@ function shopRequirement(item,state=runtimeState()){
   if(view.soldOut) return {ok:false,reason:'已经改到当前上限'};
   if(item.currency==='LOCK') return {ok:false,reason:item.req||'SYSTEM LOCK'};
   if(!view.phaseUnlocked){
-    return {ok:false,reason:`${view.phase.label} · 外观/感官改造累计 ${view.phase.minLevels} 级`};
+    return {ok:false,reason:`${view.phase.label} · 总改造累计 ${view.phase.minLevels} 级`};
   }
   const min=Number(item.req?.match(/CHARM (\d+)/)?.[1]||0);
   if(view.nextLevel===1 && min && charm<min) return {ok:false,reason:`CHARM ${min}`};
@@ -4565,7 +4567,7 @@ function panelMarkup() {
         <span>PRIVATE CONTRACT</span>
         <b>♥</b>
         <span>NO ESCAPE</span>
-        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.11.4</small>
+        <small style="opacity:.48;font-size:9px;letter-spacing:.08em">v0.11.5</small>
         <span class="meme-footer-spark">✦</span>
       </footer>
     </section>
