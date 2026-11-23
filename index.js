@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.18';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.18';
-import { isBoundCharacter } from './src/binding.js?v=0.10.18';
+} from './src/state.js?v=0.10.19';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.19';
+import { isBoundCharacter } from './src/binding.js?v=0.10.19';
 
 /**
- * MÉMÉ OS v0.10.18
+ * MÉMÉ OS v0.10.19
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -58,7 +58,23 @@ function deterministicTaskRotation(list,category,state=runtimeState(),count=3){
 
 function currentStaticTaskPool(category,state=runtimeState()){
   const list=TASK_DATA[category]||[];
-  if(category==='daily') return deterministicTaskRotation(list,category,state,3);
+
+  if(category==='daily'){
+    const day=Math.max(1,Number(state.tasks?.storyDay)||1);
+    const onboarding=list.find(task=>task.id==='clean')||null;
+    const onboardingDone=Boolean(state.tasks?.everCompleted?.clean)
+      || Number(state.tasks?.dailyCompleted?.clean?.day||0)===day;
+
+    // DAY 001 onboarding is not part of the random rotation.
+    // The opening scene explicitly publishes this task, so OS must show it
+    // until the host completes it. The other slots may still rotate normally.
+    if(day===1 && onboarding && !onboardingDone){
+      const rest=list.filter(task=>task.id!=='clean');
+      return [onboarding,...deterministicTaskRotation(rest,category,state,2)];
+    }
+    return deterministicTaskRotation(list,category,state,3);
+  }
+
   if(category==='desire') return deterministicTaskRotation(list,category,state,3);
   if(category==='special') return deterministicTaskRotation(list,category,state,2);
   return [...list];
@@ -2022,6 +2038,7 @@ Completed action semantics already satisfied by the host: ${JSON.stringify([...c
 A new task MUST add a genuinely unfinished action. Never issue a task whose entire requirement is already satisfied in the current scene or by a completed task. In particular, if the host has just showered and the scene explicitly shows wet freshly washed hair, do not assign "wash hair" again; "dry the wet hair" is a different unfinished action and may be valid. Do not split one already-completed bundle into fake new tasks merely to create more rewards.
 A completed daily/story task may remain visibly crossed out only for the completion turn; after that it leaves the board. On a NEW natural story day, the visible DAILY candidate pool is reshuffled from the system templates plus the new day's plot state. A template may validly return on a later day if the action is relevant again; it is not permanently banned merely because it was completed yesterday.
 Today's fixed DAILY candidates: ${JSON.stringify(currentStaticTaskPool('daily',state).map(t=>({id:t.id,title:t.title,desc:t.desc})))}.
+DAY 001 onboarding invariant: if task clean ("先把自己收拾干净") has not been completed yet, it MUST remain visible in MÉMÉ OS because the opening scene explicitly assigned it. It is not eligible to be rotated out before completion.
 Current generated daily/story tasks: ${JSON.stringify((state.tasks?.generatedDaily||[]).map(t=>({id:t.id,title:t.title,desc:t.desc,difficulty:t.difficulty,source:t.source,createdDay:t.createdDay})))}.
 Host-dismissed generated tasks for the current story day: ${JSON.stringify((state.tasks?.dismissed||[]).filter(t=>Number(t.storyDay||0)===Number(state.tasks?.storyDay||1)).map(t=>({title:t.title,actionTags:t.actionTags})))}. Do not reissue the same dismissed task or an equivalent same-action rewrite during this story day.
 
