@@ -6,8 +6,8 @@ import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-JSON_PATH = ROOT / "cards" / "meme_os_card_v0.4.0-alpha.json"
-PNG_PATH = ROOT / "cards" / "meme_os_card_v0.4.0-alpha.png"
+JSON_PATH = ROOT / "cards" / "meme_os_card_v0.4.1-alpha.json"
+PNG_PATH = ROOT / "cards" / "meme_os_card_v0.4.1-alpha.png"
 
 PNG_SIG = b"\x89PNG\r\n\x1a\n"
 DROP_TEXT_KEYS = {
