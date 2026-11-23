@@ -7,9 +7,9 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.13.0';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.13.0';
-import { isBoundCharacter } from './src/binding.js?v=0.13.0';
+} from './src/state.js?v=0.13.1';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.13.1';
+import { isBoundCharacter } from './src/binding.js?v=0.13.1';
 
 /**
  * MÉMÉ OS v0.13.0
@@ -894,7 +894,7 @@ function applyMemoryEvent(state,raw,visibleTurns=0){
   const turn=Math.max(0,Number(state.shop?.plotTurn)||0);
 
   if(raw.bootstrap===true && !state.memory.initialized){
-    state.memory.short=uniqueMemoryList(raw.short,15,36);
+    state.memory.short=uniqueMemoryList(raw.short,15,28);
     state.memory.long=uniqueMemoryList(raw.long,10,240);
     const permanentRaw=Array.isArray(raw.permanent)
       ? raw.permanent
@@ -918,8 +918,8 @@ function applyMemoryEvent(state,raw,visibleTurns=0){
   // Exactly one SHORT may be recorded per plot turn.
   if(turn>Number(state.memory.lastUpdatedTurn||0)){
     const candidate=Array.isArray(raw.short)
-      ? cleanMemoryText(raw.short[0],36)
-      : cleanMemoryText(raw.short,36);
+      ? cleanMemoryText(raw.short[0],28)
+      : cleanMemoryText(raw.short,28);
     if(candidate){
       state.memory.short=[...state.memory.short,candidate].slice(-15);
       state.memory.lastUpdatedTurn=turn;
@@ -959,10 +959,37 @@ function extractJsonObject(raw){
   const text=String(raw||'').trim()
     .replace(/^\`\`\`(?:json)?\s*/i,'')
     .replace(/\s*\`\`\`$/,'');
-  const start=text.indexOf('{');
-  const end=text.lastIndexOf('}');
-  if(start<0 || end<=start) return null;
-  try{return JSON.parse(text.slice(start,end+1));}catch{return null;}
+
+  // Quiet generation can still inherit other active prompts. Parse the first
+  // complete valid JSON object instead of assuming the last "}" belongs to it.
+  for(let start=0;start<text.length;start++){
+    if(text[start]!=='{') continue;
+    let depth=0;
+    let inString=false;
+    let escaped=false;
+    for(let i=start;i<text.length;i++){
+      const ch=text[i];
+      if(inString){
+        if(escaped) escaped=false;
+        else if(ch==='\\') escaped=true;
+        else if(ch==='"') inString=false;
+        continue;
+      }
+      if(ch==='"'){
+        inString=true;
+        continue;
+      }
+      if(ch==='{') depth++;
+      else if(ch==='}'){
+        depth--;
+        if(depth===0){
+          const candidate=text.slice(start,i+1);
+          try{return JSON.parse(candidate);}catch{break;}
+        }
+      }
+    }
+  }
+  return null;
 }
 
 function extractVisibleStoryDay(raw=''){
@@ -1190,6 +1217,21 @@ async function quietSyncMemory({force=false,bootstrapOnly=false}={}){
   memoryQuietLastAttemptTurn=turn;
 
   const chatCount=Array.isArray(context.chat)?context.chat.length:0;
+  const chat=Array.isArray(context.chat)?context.chat:[];
+  let latestAssistantIndex=-1;
+  for(let i=chat.length-1;i>=0;i--){
+    if(chat[i] && !chat[i].is_user){ latestAssistantIndex=i; break; }
+  }
+  let latestUserIndex=-1;
+  for(let i=latestAssistantIndex-1;i>=0;i--){
+    if(chat[i]?.is_user){ latestUserIndex=i; break; }
+  }
+  const latestRound=latestAssistantIndex>=0
+    ? {
+        user: latestUserIndex>=0 ? visibleStoryText(chat[latestUserIndex]?.mes||'') : '',
+        assistant: visibleStoryText(chat[latestAssistantIndex]?.mes||''),
+      }
+    : {user:'',assistant:''};
   const prompt=bootstrap
     ? `你正在为持续角色扮演聊天建立第一次 MEMORY。请阅读当前能看到的完整聊天历史，并按“每一个 user+assistant 剧情回合对应一条短期记忆”的规则回填。
 
@@ -1197,10 +1239,10 @@ async function quietSyncMemory({force=false,bootstrapOnly=false}={}){
 {"short":[],"long":[],"permanent":[]}
 
 严格规则：
-1. 每条 short 是一个完整剧情回合的摘要，约20-30个中文字符，最多36字。不要只挑“大事”；普通吃饭、洗澡、对话也照样按回合概括。
+1. 每条 short 是一个完整剧情回合的摘要，约18-24个中文字符，最多28字。不要只挑“大事”；普通吃饭、洗澡、对话也照样按回合概括。
 2. 从最早到最新按回合整理。每满15个完整回合，把那15条内容压成1条约180-220字的 long，不再把那15条保留在 short。
 3. 最后不足15个回合的尾段，逐回合放进 short，最多14条。
-4. 每满10条 long，再把那10条压成1条约220-320字的 permanent，并从 long 中移除。permanent 永久保留。
+4. 每满10条 long，再把那10条压成1条约260-320字的 permanent，并从 long 中移除。permanent 永久保留。
 5. 不记录AP/SV/CHARM余额；系统结构化数值由扩展自己保存。
 6. 不凭空编造人物、事件或关系。`
     : `你正在给 MÉMÉ OS 做本回合 MEMORY 同步。
@@ -1212,13 +1254,17 @@ ${JSON.stringify(state.memory.long)}
 永久记忆：
 ${JSON.stringify(state.memory.permanent)}
 
+最新完整剧情回合（只概括这一回合作为本轮 SHORT）：
+USER：${latestRound.user}
+ASSISTANT：${latestRound.assistant}
+
 只输出纯 JSON，不要代码块或解释：
 {"short":"","longSummary":"","permanentSummary":""}
 
 严格执行：
-1. needShort=${needShort}。若为 true，short 必须写且只能写1条，概括“最新一个 user+assistant 剧情回合”，约20-30个中文字符，最多36字。哪怕本回合只是普通日常也必须记。若为 false，short 留空。
+1. needShort=${needShort}。若为 true，short 必须写且只能写1条，概括“最新一个 user+assistant 剧情回合”，约18-24个中文字符，最多28字。哪怕本回合只是普通日常也必须记。若为 false，short 留空。
 2. needShortCompression=${needShortCompression}。若为 true，longSummary 必须把构成本批次的15条 SHORT 压成约180-220字的一条长期记忆。若本次同时需要新short，必须把刚生成的这条也算进15条里。若为 false，longSummary 留空。
-3. needLongCompression=${needLongCompression}。若为 true，permanentSummary 必须把构成本批次的10条 LONG 压成约220-320字永久记忆；如果本次刚生成第10条 longSummary，也必须把它算进去。若为 false，permanentSummary 留空。
+3. needLongCompression=${needLongCompression}。若为 true，permanentSummary 必须把构成本批次的10条 LONG 压成约260-320字永久记忆；如果本次刚生成第10条 longSummary，也必须把它算进去。若为 false，permanentSummary 留空。
 4. LONG/永久总结要保留人物关系、重要变化、持续后果和关键剧情，不要写成空泛感想。
 5. 不写AP/SV/CHARM余额，不猜不存在的事实。`;
 
@@ -3016,7 +3062,7 @@ function installRuntimePrompt(){
   const previousSceneStatus=latestVisibleSceneStatus(context?.chat);
   const previousSceneStatusText=previousSceneStatus?.raw || 'NONE — establish a precise scene clock in this reply';
   const npcWheel=npcEncounterWheel(context,state);
-  const prompt=`[MÉMÉ OS runtime bridge · v0.13]
+  const prompt=`[MÉMÉ OS runtime bridge · v0.13.1]
 AUTHORITY / TONE:
 - Extension state is the only authority for AP, SV, CHARM, purchases, task settlement, MEN buckets, system access/evolution and unlocks. Never mentally add/subtract numbers or reuse stale balances.
 - The host persona comes from the active SillyTavern Persona + visible chat. Do not invent host identity/history beyond established system transformation facts.
@@ -3030,6 +3076,12 @@ LIVE STATE:
 DAY=${Number(state.tasks?.storyDay)||1}; AP=${Number(state.resources?.ap)||0}; SV=${Number(state.resources?.sv)||0}; CHARM=${Number(state.host?.charm)||0}.
 Spendable after pending: AP=${getSpendableResources(state).ap}; SV=${getSpendableResources(state).sv}.
 Body/upgrades=${JSON.stringify(state.host?.body||{})}.
+
+MEMORY / NARRATIVE CONTINUITY:
+PERMANENT=${JSON.stringify(state.memory?.permanent||[])}.
+LONG=${JSON.stringify(state.memory?.long||[])}.
+SHORT=${JSON.stringify(state.memory?.short||[])}.
+Rules: these are established past-story facts distilled by the extension. Use them silently to preserve continuity, identities, relationships, promises, consequences and prior events; do not quote or recap the memory lists unless the host asks. Newer visible chat overrides an older compressed wording when they conflict. Extension structured state still overrides memory for AP/SV/CHARM/DAY/tasks/shop/MEN/system permissions and other runtime facts. Never invent facts to fill a memory gap.
 
 TASK BOARD:
 Base DAILY today=${JSON.stringify(currentStaticTaskPool('daily',state).map(t=>({id:t.id,title:t.title,desc:t.desc,reward:t.reward})))}.
@@ -3092,7 +3144,7 @@ permission.love=true only for a genuinely established love change involving mean
 permission.systemAccess may request peek|open|private only when the corresponding readiness above is satisfied and the administrator actually chooses to grant it.
 identity is only for real administrator identity/name state changes supported by the story.
 
-MEMORY is NOT part of the main reply event. The extension's quiet memory sync owns bootstrap + one SHORT per plot round + 15 SHORT -> 1 LONG + 10 LONG -> 1 PERMANENT.
+MEMORY is NOT part of the main reply event. The extension's quiet memory sync owns bootstrap + one SHORT (~20 Chinese characters) per plot round + 15 SHORT -> 1 LONG (~200 Chinese characters) + 10 LONG -> 1 PERMANENT (~300 Chinese characters). Stored SHORT/LONG/PERMANENT are injected back into the next story prompt as narrative continuity.
 `;
 
   const sceneClockPrompt=`[MÉMÉ OS — SCENE CLOCK — ABSOLUTE OUTPUT FORMAT]
@@ -3893,7 +3945,7 @@ function memoryMarkup(){
     <section class="meme-memory-stack">
       ${memoryLayerMarkup('近期','SHORT',memory.short,'下一回合会记下第一条短期记忆。',true)}
       ${memoryLayerMarkup('长期','LONG',memory.long,'每满15条短期记忆，会压成约200字长期记忆。')}
-      ${memoryLayerMarkup('永久','PERMANENT',memory.permanent,'每满10条长期记忆，会压成一条永久记忆；这里不会因滚动压缩而消失。')}
+      ${memoryLayerMarkup('永久','PERMANENT',memory.permanent,'每满10条长期记忆，会压成约300字永久记忆；这里不会因滚动压缩而消失。')}
     </section>
   `;
 }
