@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.10.23",
+  "version": "0.10.24",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS: fixed administrator home-comment fallback, stronger early erotic atmosphere, low-engagement foul-mouthed administrator, rotating tasks, adaptive economy, correction controls and swipe-safe state.",
-  "js": "index.js?v=0.10.23",
-  "css": "style.css?v=0.10.23",
+  "description": "MÉMÉ OS: compact collapsible adult-protocol preview on home, fixed administrator comment fallback, stronger early erotic tone, low-engagement foul-mouthed administrator, rotating tasks, adaptive economy and correction controls.",
+  "js": "index.js?v=0.10.24",
+  "css": "style.css?v=0.10.24",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
