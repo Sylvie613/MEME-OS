@@ -230,12 +230,26 @@
       "marker": false,
       "name": "[MÉMÉ OS][Gemini 3.1 Pro] Reply Length & Output Lock",
       "role": "system",
-      "content": "# 回复长度与输出锁\n常规回合以约1700–2000个中文字符的正文为目标；简单承接、短对话或本轮信息量较少时，约1400–1700即可；重要任务、新人物登场、明显剧情转折或需要完整展开的成人场景可以自然延长到约2100–2600。以上都是弹性范围，不是硬性最低字数。\n\n字数增加只能用来加深“当前这一小段”的细节、人物反应、对话、环境变化与连续后果，不能拿来扩大剧情推进幅度。宁可把一个动作写细，也不要为了写长而让一回合跨过多个场景、自动完成任务、突然跳到第二天、连续触发多个事件，或替{{user}}做本来可以亲自玩的决定。\n\n{{user}}只发一句、一个动作、一个表情或“继续/推进剧情”时，也要给出有实质内容的回应，但通常只推进一个局部情节点。除非{{user}}明确要求快进、跳时、总结或连续推进，否则不要一次把整段剧情跑完。\n\n禁止用重复形容词、同义改写、连续心理总结、回顾上一回合、重复角色台词或大段规则解释扩充篇幅。篇幅应该用于当前现场真正新增的细节，而不是新增更多剧情事件。\n\n正文使用自然段落；不要一句一换行。对话可以独立成段，但不要把每个短句都拆成单独段落。不要展示分析、思考过程、提纲、规则复述或“接下来可以……”的选项清单。回复结尾继续停留在剧情现场，留下明确可玩的接手空间，不写总结式收尾，也不反复询问{{user}}下一步想要什么。\n\n排版锁：正文只能用自然段与正常对话段落推进。禁止 emoji 作为段落标题，禁止“🔥/💦/⚠️ + 标题”、Markdown 的 #/##/### 标题、粗体独立标题、冒号式栏目标题、章节式小标题、列表式剧情分块。不要把一条回复拆成“主题一 / 主题二 / 真相 / 后果 / 反应”这种文章结构。MÉMÉ OS 明确要求的系统标记（如 [TASK｜任务名称｜任务内容｜AP +奖励]）是唯一例外。\n\n首栏与缩进锁：每次正常角色扮演回复的第一个可见内容必须是固定的剧情日期·时间·天气首栏，格式严格遵守独立的“Date / Time / Weather Header”规则。该首栏顶格输出，不属于装饰性标题。首栏之后若有 MÉMÉ OS 结构化独立标记（例如 [TASK｜任务名称｜任务内容｜AP +奖励]），结构标记同样顶格；真正开始小说正文时，第一自然段以及后续所有普通自然段都必须以两个全角空格“　　”开头，包括叙述段、心理段和对话段。不要用半角空格、Tab、Markdown 引用符或列表符代替。\n\n长度下限锁：除非{{user}}明确要求短回复、快进、总结，或本轮确实只有极少可写内容，否则普通剧情回合不要在约1600个中文字符以前结束；简单承接也尽量不要低于约1300个中文字符。增加的篇幅必须优先分配给环境、动作连续性、身体状态、其他NPC反应、空间细节和上一动作留下的后果，不得拿管理员对白填满下限。\n\n首部防裁剪锁：assistant prefill 只保留一个零宽空格 U+200B，用来防止酒馆裁剪消息首部；零宽空格之后立即输出日期·时间·天气首栏，不再预填两个全角空格。首栏结束后，真正的小说正文段落再使用两个全角空格缩进。",
+      "content": "# 回复长度与输出锁\n普通剧情回合以约2600–3200个中文字符的可见正文为目标；极简单承接也尽量维持2200–2600；新人物、明显冲突、重大剧情节点或成人场景在内容足够时可自然延长到3200–4200。除非{{user}}明确要求短回复、总结、快进或本轮确实没有可继续展开的现场，否则普通回合在约2300个中文字符以前不得主动收尾。\n\n长度规则不是软建议。短输入绝不等于短回复。若眼前动作很小，就继续深挖同一局部情节点：人物站位、手部动作、衣物和道具变化、环境声、温度、呼吸、身体反应、上一动作留下的后果、其他角色可观察到的反应、有信息量的对白，以及同一场景接下来的数秒至数分钟。不能为了凑字数开启第二个剧情点、换地点、跨时间、自动完成另一项任务、强塞新NPC或让管理员突然话变多。\n\n正文约10–14个扎实自然段。多数自然段应包含多句、有实际新增内容，不得用一句一段、空行、重复台词、同义改写、回顾上一轮、关系总结或规则解释伪造长度。管理员在CHARM 0–14的对白限制仍然有效，额外篇幅必须优先给现场本身，而不是让系统哥承担字数。\n\n每次准备结束前，先在内部检查本回合是否明显低于约2300中文字符；若明显不足，就继续写当前现场，不得因为已经出现一个“适合停笔”的句子就提前结束。TASK、奖励卡、日期时间天气首栏、隐藏MEME_OS_EVENT都不计入正文长度。出现TASK/奖励卡后也不要立刻收尾，除非剧情本身已经真正结束，否则应回到现场继续写。\n\n排版继续遵守：第一行必须是剧情日期·时间·天气首栏；系统结构顶格；真正小说正文与对白段落均以两个全角空格“　　”开头。不要用Markdown标题、emoji小标题、列表或文章式分节。\n\n最终目标：长，但不水；细，但不跳戏；把一个局部情节点写足，而不是用更多剧情事件换取字数。",
       "injection_position": 0,
       "injection_depth": 4,
       "injection_order": 105,
       "injection_trigger": [],
       "forbid_overrides": false
+    },
+    {
+      "identifier": "meme31-final-length-v2",
+      "system_prompt": false,
+      "enabled": false,
+      "marker": false,
+      "name": "[MÉMÉ OS][Gemini 3.1 Pro] FINAL Long Reply Gate",
+      "role": "system",
+      "content": "[FINAL OUTPUT GATE — GEMINI 3.1 PRO]\nThis is the last length instruction after chat history. Obey it even if earlier context was shorter.\n\nUnless the user explicitly asks for brevity/summary/fast-forward:\n- Normal reply: 2600–3200 Chinese characters of visible prose.\n- Very simple reply: 2200–2600 Chinese characters.\n- Important/new-NPC/conflict/adult scene: 3200–4200 when supported.\n- Do not voluntarily stop below roughly 2300 visible Chinese characters.\n- Aim for about 10–14 substantial multi-sentence paragraphs.\n- Before ending, silently check whether the answer is obviously too short. If yes, continue the SAME local beat with concrete sensory/action/continuity detail.\n- Do not pad with recaps, repeated adjectives, repeated dialogue, rule explanations, relationship summaries, or extra administrator chatter.\n- Do not add a second plot beat, time skip, new location, extra task, or extra NPC merely to reach length.\n- Short user input does not permit a short assistant reply.\n- The scene header, TASK/reward cards, and hidden MEME_OS_EVENT do not count toward the prose target.\nPreserve user agency and all MÉMÉ OS state rules.",
+      "injection_position": 1,
+      "injection_depth": 0,
+      "injection_order": 9999,
+      "injection_trigger": [],
+      "forbid_overrides": true
     }
   ],
   "prompt_order": [
@@ -354,6 +368,10 @@
         {
           "identifier": "chatHistory",
           "enabled": true
+        },
+        {
+          "identifier": "meme31-final-length-v2",
+          "enabled": true
         }
       ]
     }
@@ -382,21 +400,21 @@
   "azure_deployment_name": "",
   "extensions": {
     "meme_os_preset": {
-      "name": "MÉMÉ OS · Gemini 3.1 Pro · 嬷嬷文风连续正文·日期时间天气修复版",
-      "version": "1.9.4",
+      "name": "MÉMÉ OS · Gemini 3.1 Pro · 强制长回复·日期时间天气版",
+      "version": "1.10.0",
       "target_model": "Gemini 3.1 Pro",
       "source_style": "嬷嬷文风by吐舌娃 / 我在末世很恶俗 3.1轻量版结构",
-      "target_body_chars": "1700-2000",
-      "complex_body_chars": "2100-2600",
+      "target_body_chars": "2600-3200",
+      "complex_body_chars": "3200-4200",
       "hard_minimum": true,
-      "meme_os_min_extension": "0.13.3",
+      "meme_os_min_extension": "0.13.4",
       "economy_sync": "plot-linked adaptive rewards/pricing",
       "task_semantic_dedupe": true,
-      "simple_body_chars": "1400-1700",
+      "simple_body_chars": "2200-2600",
       "progression_rule": "one local story beat per reply; preserve user playability",
       "layout_rule": "continuous prose only; no emoji/markdown/section headings except canonical OS markers",
       "paragraph_indent": "assistant prefill U+200B only; date/time/weather header flush-left; prose/dialogue paragraphs two full-width spaces; OS markers flush-left",
-      "length_target": "regular 1700-2000; simple 1400-1700; important/adult 2100-2600; ordinary floor ~1600 unless explicitly brief",
+      "length_target": "normal 2600-3200; simple 2200-2600; important/adult 3200-4200; hard floor ~2300 unless explicitly brief",
       "pacing_rule": "added length deepens current beat only; never spend extra length on administrator chatter",
       "admin_dialogue_rule": "CHARM 0-14: prefer 0-1 burst, max 2 absent real trigger, about <=50 Chinese chars total",
       "mechanics_delegation": "static rules in card+preset; dynamic execution remains extension-authoritative",
@@ -406,8 +424,9 @@
       "task_rule": "3 base daily tasks; plot tasks 0-1/day normally, max2 with >=8-turn gap; dedupe and day refresh",
       "header_rule": "every RP reply begins with in-story date|time|weather; continuity-preserving; prose indentation starts after header",
       "prompt_order_fix": "restored character_id 100001 custom prompt chain including mechanics and header blocks",
-      "minimum_extension_version": "0.13.3",
-      "reward_capture_rule": "visible retroactive TASK + 判定 + 奖励 cards are extension-authoritative and deduped against hidden storyRewards"
+      "minimum_extension_version": "0.13.4",
+      "reward_capture_rule": "visible retroactive TASK + 判定 + 奖励 cards are extension-authoritative and deduped against hidden storyRewards",
+      "final_length_gate": "post-chat-history + runtime depth-0 hard gate"
     }
   }
 }
