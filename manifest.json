@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.12.4",
+  "version": "0.12.5",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS 0.12.4: deterministic per-turn adult male NPC encounter wheel based on CHARM and scene exposure; public base=max(10,CHARM)%, scene multipliers, 2-turn newcomer cooldown, and CHARM-stage reaction guidance.",
-  "js": "index-v0.12.4.js",
-  "css": "style.css?v=0.12.4",
+  "description": "MÉMÉ OS 0.12.5: NPC encounter wheel now has a scene-focus lock; existing male interaction, dates and intimate/sexual scenes pause random newcomers indefinitely until the focus scene ends or the host explicitly invites new men.",
+  "js": "index-v0.12.5.js",
+  "css": "style.css?v=0.12.5",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
