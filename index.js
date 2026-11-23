@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.42';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.42';
-import { isBoundCharacter } from './src/binding.js?v=0.10.42';
+} from './src/state.js?v=0.11.0';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.11.0';
+import { isBoundCharacter } from './src/binding.js?v=0.11.0';
 
 /**
- * MÉMÉ OS v0.10.42
+ * MÉMÉ OS v0.11.0
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -963,58 +963,153 @@ function extractVisibleStoryDay(raw=''){
   return days.length?Math.max(...days):null;
 }
 
-function detectNaturalStoryDayBoundary(raw=''){
-  const text=String(raw||'').replace(/<!--MEME_OS_EVENT[\s\S]*?-->/g,' ').slice(0,7000);
-  const explicit=/(?:^|[。！？!?\n\s])(次日|翌日|第二天(?:一早|清晨|早上|上午)?|隔天|又过了一夜|过了一夜|一夜过去|新的一天)(?:[，,。！？!?\s]|$)/u.test(text);
-  if(explicit) return {kind:'explicit'};
-
-  const wake=/(醒来|睡醒|醒过来|睁开眼|睁眼|从睡梦中醒|被[^。！？!?\n]{0,18}(?:憋醒|吵醒|惊醒|叫醒))/u.test(text);
-  const morning=/(晨光|清晨|早晨|早上|天亮|天色已经亮|大亮|朝阳|晨曦|窗外[^。！？!?\n]{0,20}(?:亮|晨光|日光))/u.test(text);
-  const nightBefore=/(昨晚|昨天晚上|夜里|后半夜|半夜|一整夜|整夜|睡了一夜|昨夜)/u.test(text);
-
-  if(wake && morning && nightBefore) return {kind:'wake-morning'};
-  if(wake && /(晨光|清晨|早晨|天亮|大亮)/u.test(text)) return {kind:'wake-morning'};
-  return null;
-}
-
-function naturalDayBoundaryKey(raw=''){
-  const text=String(raw||'')
+function visibleStoryText(raw=''){
+  return String(raw||'')
     .replace(/<!--MEME_OS_EVENT[\s\S]*?-->/g,' ')
     .replace(/\s+/g,' ')
-    .trim()
-    .slice(0,1800);
-  return `nb_${hashId(text).toString(36)}`;
+    .trim();
 }
 
-function naturalDayBoundarySeen(state,key){
-  return Array.isArray(state.tasks?.naturalDayBoundaryKeys)
-    && state.tasks.naturalDayBoundaryKeys.includes(key);
+function parseSmallChineseNumber(token=''){
+  const raw=String(token||'').trim();
+  if(/^\d{1,2}$/.test(raw)) return Math.max(0,Number(raw)||0);
+  const map={一:1,二:2,两:2,三:3,四:4,五:5,六:6,七:7,八:8,九:9,十:10};
+  if(Object.prototype.hasOwnProperty.call(map,raw)) return map[raw];
+  const m=raw.match(/^十([一二三四五六七八九])$/);
+  if(m) return 10+map[m[1]];
+  const n=raw.match(/^([二三四五六七八九])十([一二三四五六七八九]?)$/);
+  if(n) return map[n[1]]*10+(n[2]?map[n[2]]:0);
+  return 0;
 }
 
-function markNaturalDayBoundarySeen(state,key,turn=0){
-  state.tasks=state.tasks||{};
-  const keys=Array.isArray(state.tasks.naturalDayBoundaryKeys)?state.tasks.naturalDayBoundaryKeys:[];
-  state.tasks.naturalDayBoundaryKeys=[...keys.filter(item=>item!==key),key].slice(-32);
-  state.tasks.lastNaturalDayBoundaryTurn=Math.max(0,Number(turn)||0);
+function relativeStoryDayJump(text=''){
+  const source=String(text||'');
+  if(/(?:^|[。！？!?；;，,\n\s])(次日|翌日|第二天(?:一早|清晨|早上|上午)?|隔天|又过了一夜|过了一夜|一夜过去|新的一天)(?:[，,。！？!?；;\s]|$)/u.test(source)) return 1;
+
+  const dayJump=source.match(/(?:^|[。！？!?；;，,\n\s])([一二两三四五六七八九十\d]{1,3})\s*天(?:之)?后(?:[，,。！？!?；;\s]|$)/u);
+  if(dayJump){
+    const days=parseSmallChineseNumber(dayJump[1]);
+    if(days>0) return days;
+  }
+
+  const weekJump=source.match(/(?:^|[。！？!?；;，,\n\s])([一二两三四五六七八九十\d]{1,3})\s*(?:周|星期)(?:之)?后(?:[，,。！？!?；;\s]|$)/u);
+  if(weekJump){
+    const weeks=parseSmallChineseNumber(weekJump[1]);
+    if(weeks>0) return weeks*7;
+  }
+  return 0;
 }
 
-function syncStoryDayTo(state,targetDay,{source='runtime',explicitDate=false}={}){
+function currentNightCue(text=''){
+  return /(今晚|今夜|当天晚上|傍晚|晚上|深夜|夜深|凌晨|半夜|后半夜|准备睡|去睡|睡下|睡着|入睡|上床睡|熬到天亮)/u.test(String(text||''));
+}
+
+function morningCue(text=''){
+  return /(晨光|晨曦|清晨|早晨|早上|上午|天亮|天色(?:已经)?亮|大亮|朝阳|日光|窗外[^。！？!?]{0,24}(?:亮|晨光|日光))/u.test(String(text||''));
+}
+
+function wakeCue(text=''){
+  return /(醒来|睡醒|醒过来|睁开眼|睁眼|从睡梦中醒|被[^。！？!?]{0,24}(?:憋醒|吵醒|惊醒|叫醒|弄醒))/u.test(String(text||''));
+}
+
+function priorNightReferenceCue(text=''){
+  return /(昨晚|昨天晚上|昨夜|夜里|后半夜|一整夜|整夜|睡了一夜)/u.test(String(text||''));
+}
+
+function reconstructStoryTimeline(chat=[]){
+  const messages=Array.isArray(chat)?chat:[];
+  let day=1;
+  let dayStartIndex=0;
+  let sawCurrentNight=false;
+  let previousText='';
+  const boundaries=[];
+
+  for(let i=0;i<messages.length;i++){
+    const message=messages[i];
+    if(!message) continue;
+    const text=visibleStoryText(message.mes||'');
+    if(!text) continue;
+
+    const explicitDay=extractVisibleStoryDay(text);
+    if(explicitDay && explicitDay>day){
+      day=explicitDay;
+      dayStartIndex=i;
+      boundaries.push({index:i,day,kind:'visible-day'});
+      sawCurrentNight=currentNightCue(text);
+      previousText=text;
+      continue;
+    }
+
+    const jump=relativeStoryDayJump(text);
+    if(jump>0){
+      day+=jump;
+      dayStartIndex=i;
+      boundaries.push({index:i,day,kind:'explicit-transition',jump});
+      sawCurrentNight=currentNightCue(text);
+      previousText=text;
+      continue;
+    }
+
+    const morning=morningCue(text);
+    const wake=wakeCue(text);
+    const priorNight=priorNightReferenceCue(text);
+    const previousWake=wakeCue(previousText);
+    const previousMorning=morningCue(previousText);
+
+    const strongMorningBoundary=
+      sawCurrentNight &&
+      (
+        (morning && wake) ||
+        (morning && priorNight) ||
+        (morning && previousWake) ||
+        (wake && previousMorning && priorNight)
+      );
+
+    if(strongMorningBoundary){
+      day+=1;
+      dayStartIndex=i;
+      boundaries.push({index:i,day,kind:'night-to-morning'});
+      sawCurrentNight=false;
+    }
+
+    // Only current-night/sleep evidence arms the NEXT morning boundary.
+    // Historical wording such as "昨晚" does not arm it.
+    if(currentNightCue(text)) sawCurrentNight=true;
+    previousText=text;
+  }
+
+  return {
+    day:Math.max(1,day),
+    dayStartIndex:Math.max(0,dayStartIndex),
+    boundaries,
+    scannedMessages:messages.length,
+  };
+}
+
+function syncStoryDayTo(state,targetDay,{source='timeline-scan',explicitDate=false,allowCorrection=true}={}){
   const target=Math.max(1,Number(targetDay)||1);
   state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],dismissed:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
   const current=Math.max(1,Number(state.tasks.storyDay)||1);
-  if(target<=current) return false;
+  if(target===current) return false;
+  if(target<current && !allowCorrection) return false;
 
   const previousDate=storyDateLabel(state);
   const delta=target-current;
   state.tasks.storyDay=target;
   state.storyStatus=state.storyStatus||{initialized:false,date:'',time:'',weather:'晴 · 闷热',location:'',people:[],note:'盛夏',updatedTurn:0};
+
   if(!explicitDate){
-    state.storyStatus.date=advanceStoryDateLabel(previousDate,delta);
+    if(delta>0){
+      state.storyStatus.date=advanceStoryDateLabel(previousDate,delta);
+    }else{
+      const date=new Date(Date.UTC(2026,6,18));
+      date.setUTCDate(date.getUTCDate()+target-1);
+      state.storyStatus.date=`${date.getUTCMonth()+1}月${date.getUTCDate()}日`;
+    }
     state.storyStatus.initialized=true;
     state.storyStatus.updatedTurn=Math.max(0,Number(state.shop?.plotTurn)||0);
   }
 
-  // A story-day change is a hard boundary for rolling daily content.
   for(const [taskId] of Object.entries(state.tasks.active||{})){
     const task=findTask(taskId,state);
     if(task?.category==='daily' || task?.repeatable==='daily') delete state.tasks.active[taskId];
@@ -1026,17 +1121,19 @@ function syncStoryDayTo(state,targetDay,{source='runtime',explicitDate=false}={}
   state.tasks.plotTaskIssuedDay=target;
   state.tasks.plotTaskIssuedCount=0;
   state.tasks.lastPlotTaskTurn=-999;
+  delete state.tasks.naturalDayBoundaryKeys;
+  delete state.tasks.lastNaturalDayBoundaryTurn;
 
   state.history=Array.isArray(state.history)?state.history:[];
-  const historyId=`meme_story_day_${target}_${source}`;
+  const historyId=`meme_story_day_${target}_timeline`;
   if(!state.history.some(entry=>entry.id===historyId)){
     state.history.push({
       id:historyId,
       type:'story_day',
       recordType:'system',
-      title:`DAY ${String(target).padStart(3,'0')} · 换批活给你`,
-      summary:'剧情日已同步；日常候选与未接取的剧情任务按新一天重新洗牌。',
-      text:`STORY DAY SYNCED TO ${target} FROM ${source.toUpperCase()}`,
+      title:`DAY ${String(target).padStart(3,'0')} · 时间线已对齐`,
+      summary:`按完整可见剧情重建自然日：DAY ${String(current).padStart(3,'0')} → DAY ${String(target).padStart(3,'0')}。日常候选同步刷新。`,
+      text:`STORY DAY REBUILT: ${current} -> ${target} FROM ${String(source).toUpperCase()}`,
       committedAt:Date.now(),
     });
   }
@@ -1947,62 +2044,25 @@ async function reconcileRecentVisibleTaskOffers(){
   const state=runtimeState();
   state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
   state.tasks.generatedDaily=Array.isArray(state.tasks.generatedDaily)?state.tasks.generatedDaily:[];
+
   let changed=pruneRedundantGeneratedDaily(state);
   if(purgeKnownLegacyWrongGeneratedTasks(state)) changed=true;
 
-  const start=Math.max(0,chat.length-16);
-  let latestVisibleDay=Math.max(1,Number(state.tasks?.storyDay)||1);
-  let latestVisibleDayStart=-1;
-  for(let i=start;i<chat.length;i++){
-    const message=chat[i];
-    if(!message || message.is_user) continue;
-    const visibleDay=extractVisibleStoryDay(String(message.mes||''));
-    if(visibleDay && visibleDay>latestVisibleDay){
-      latestVisibleDay=visibleDay;
-      latestVisibleDayStart=i;
-    }else if(visibleDay && visibleDay===latestVisibleDay){
-      latestVisibleDayStart=i;
-    }
-  }
-  if(latestVisibleDay>Math.max(1,Number(state.tasks?.storyDay)||1)){
-    if(syncStoryDayTo(state,latestVisibleDay,{source:'reconcile'})) changed=true;
-  }
+  const timeline=reconstructStoryTimeline(chat);
+  if(syncStoryDayTo(state,timeline.day,{source:'full-chat-reconcile',allowCorrection:true})) changed=true;
 
-  const unseenNaturalBoundaries=[];
-  for(let i=start;i<chat.length;i++){
-    const message=chat[i];
-    if(!message || message.is_user) continue;
-    const raw=String(message.mes||'');
-    const boundary=detectNaturalStoryDayBoundary(raw);
-    if(!boundary) continue;
-    const key=naturalDayBoundaryKey(raw);
-    if(naturalDayBoundarySeen(state,key)) continue;
-    unseenNaturalBoundaries.push({i,key,boundary});
-  }
-  const latestUnseenNaturalBoundary=unseenNaturalBoundaries.at(-1)||null;
-  if(
-    latestUnseenNaturalBoundary
-    && latestVisibleDay<=Math.max(1,Number(state.tasks?.storyDay)||1)
-  ){
-    const target=Math.max(1,Number(state.tasks?.storyDay)||1)+1;
-    if(syncStoryDayTo(state,target,{source:`reconcile-${latestUnseenNaturalBoundary.boundary.kind}`})){
-      // The current OS day already represents earlier historical boundaries.
-      // When repairing one missed newest boundary, mark every older visible
-      // boundary in the scan window as accounted for so refresh cannot add days again.
-      for(const item of unseenNaturalBoundaries){
-        markNaturalDayBoundarySeen(state,item.key,Number(state.shop?.plotTurn)||0);
-      }
-      changed=true;
-      latestVisibleDay=target;
-      latestVisibleDayStart=latestUnseenNaturalBoundary.i;
-    }
-  }
+  state.tasks.timelineAudit={
+    storyDay:timeline.day,
+    dayStartIndex:timeline.dayStartIndex,
+    boundaries:timeline.boundaries.slice(-16),
+    scannedMessages:timeline.scannedMessages,
+    updatedAt:Date.now(),
+  };
 
-  // Never resurrect plot-generated DAILY cards from an older story day.
-  // If the newest day marker is visible in the recent window, only reconcile
-  // task cards from that marker onward.
-  const taskReconcileStart=latestVisibleDayStart>=0?latestVisibleDayStart:start;
-  for(let i=taskReconcileStart;i<chat.length;i++){
+  state.tasks.generatedDaily=(state.tasks.generatedDaily||[])
+    .filter(task=>Number(task.createdDay||timeline.day)===timeline.day || Boolean(state.tasks?.active?.[task.id]));
+
+  for(let i=Math.max(0,timeline.dayStartIndex);i<chat.length;i++){
     const message=chat[i];
     if(!message || message.is_user) continue;
     const raw=String(message.mes||'');
@@ -2022,24 +2082,21 @@ async function reconcileRecentVisibleTaskOffers(){
 
     for(const task of tasks){
       if((task.canonicalMarker || task.legacyMigrated) && removeFallbackTasksCompetingWithFormalCard(state,task)) changed=true;
-      const historyId=`meme_visible_task_reconcile_${i}_${task.id}`;
-      if((state.history||[]).some(entry=>entry.id===historyId)) continue;
-      if(state.tasks.everCompleted?.[task.id] || state.tasks.active?.[task.id] || state.tasks.generatedDaily.some(old=>old.id===task.id)){
-        state.history.push({
-          id:historyId,type:'visible_task_reconcile_seen',recordType:'task',
-          title:`我早记过了：${task.title}`,summary:'这张任务卡已经在 TASK 里，别重复塞第二份。',
-          text:`VISIBLE TASK ALREADY PRESENT: ${task.id}`,committedAt:Date.now(),
-        });
-        changed=true;
-        continue;
-      }
+      if(state.tasks.everCompleted?.[task.id] || state.tasks.active?.[task.id] || state.tasks.generatedDaily.some(old=>old.id===task.id)) continue;
+
       state.tasks.generatedDaily=[task,...state.tasks.generatedDaily].slice(0,8);
-      state.history.push({
-        id:historyId,type:'visible_task_reconcile',recordType:'task',
-        title:`漏的我给你补上了：${task.title}`,
-        summary:'正文里已经发过这张任务卡，TASK 当时没吃到。我现在把它补回去。',
-        text:`VISIBLE TASK RECONCILED: ${task.id}`,committedAt:Date.now(),
-      });
+      const historyId=`meme_visible_task_reconcile_${timeline.day}_${i}_${task.id}`;
+      if(!(state.history||[]).some(entry=>entry.id===historyId)){
+        state.history.push({
+          id:historyId,
+          type:'visible_task_reconcile',
+          recordType:'task',
+          title:`正文任务已同步：${task.title}`,
+          summary:`仅从 DAY ${String(timeline.day).padStart(3,'0')} 的剧情起点往后读取 [TASK]。`,
+          text:`VISIBLE TASK RECONCILED: ${task.id}`,
+          committedAt:Date.now(),
+        });
+      }
       changed=true;
     }
   }
@@ -2161,31 +2218,16 @@ async function handleRuntimeEvent(messageId){
   });
 
   const raw=String(message.mes||'');
-  const visibleStoryDay=extractVisibleStoryDay(raw);
-  // The visible [DAY NNN] marker is authoritative when present.
-  if(visibleStoryDay && visibleStoryDay>Math.max(1,Number(state.tasks?.storyDay)||1)){
-    syncStoryDayTo(state,visibleStoryDay,{source:'visible'});
-  }
 
-  // Visible prose can prove a natural-day boundary even when the model omits
-  // both a DAY heading and the hidden timeline event.
-  const naturalBoundary=detectNaturalStoryDayBoundary(raw);
-  const naturalBoundaryKey=naturalBoundary ? naturalDayBoundaryKey(raw) : null;
-  const lastNaturalTurn=Math.max(-999,Number(state.tasks?.lastNaturalDayBoundaryTurn??-999));
-  const naturalCooldownOk=naturalBoundary?.kind==='explicit'
-    || (Number(state.shop?.plotTurn||0)-lastNaturalTurn>=2);
-  if(
-    !visibleStoryDay
-    && naturalBoundary
-    && naturalBoundaryKey
-    && !naturalDayBoundarySeen(state,naturalBoundaryKey)
-    && naturalCooldownOk
-  ){
-    const nextDay=Math.max(1,Number(state.tasks?.storyDay)||1)+1;
-    if(syncStoryDayTo(state,nextDay,{source:`prose-${naturalBoundary.kind}`})){
-      markNaturalDayBoundarySeen(state,naturalBoundaryKey,Number(state.shop?.plotTurn)||0);
-    }
-  }
+  const timeline=reconstructStoryTimeline(Array.isArray(context.chat)?context.chat:[]);
+  syncStoryDayTo(state,timeline.day,{source:'full-chat-runtime',allowCorrection:true});
+  state.tasks.timelineAudit={
+    storyDay:timeline.day,
+    dayStartIndex:timeline.dayStartIndex,
+    boundaries:timeline.boundaries.slice(-16),
+    scannedMessages:timeline.scannedMessages,
+    updatedAt:Date.now(),
+  };
 
   const canonicalCards=extractCanonicalTaskMarkers(raw);
   const canonicalTasks=canonicalCards
@@ -2333,23 +2375,8 @@ async function handleRuntimeEvent(messageId){
       if(applyStoryStatusEvent(state,event.status)) changed=true;
       if(applyMemoryEvent(state,event.memory,visibleChatTurns)) changed=true;
 
-      {
-        const currentDay=Math.max(1,Number(state.tasks?.storyDay)||1);
-        const hiddenStoryDay=Math.max(0,Number(event.timeline?.storyDay)||0);
-        let targetDay=currentDay;
-        if(hiddenStoryDay>currentDay){
-          targetDay=hiddenStoryDay;
-        }else if(visibleStoryDay && visibleStoryDay>currentDay){
-          targetDay=visibleStoryDay;
-        }else if(event.timeline?.dayAdvance===true){
-          targetDay=currentDay+1;
-        }
-        if(targetDay>currentDay && syncStoryDayTo(
-          state,
-          targetDay,
-          {source:hiddenStoryDay>currentDay?'timeline-absolute':visibleStoryDay>currentDay?'visible':'timeline',explicitDate:Boolean(event.status?.date)}
-        )) changed=true;
-      }
+      // timeline.storyDay/dayAdvance is advisory metadata only.
+      // The complete visible chat timeline is the sole authority for storyDay.
 
       if(event.evolution?.targetLevel){
         const targetLevel=Math.round(Number(event.evolution.targetLevel)||0);
@@ -2716,8 +2743,9 @@ A completed task should disappear/cross out as soon as this reply is processed; 
 For sample, oral and drain: after their first-ever completion they become repeatable collection tasks, at most once per in-world story day. The extension automatically switches later payouts to SV-only repeat rewards. Never invent extra AP for repeated completions.
 
 STORY DAY:
-Current OS in-world story day=${Number(state.tasks?.storyDay)||1}. You must track the ACTUAL narrative day from the visible conversation even when the prose does NOT print "DAY 003" or any day label. The extension also independently detects strong visible day-boundary prose (for example waking into morning after the previous night), so keep the narrative chronology consistent with that visible evidence. A natural-day advance includes overnight sleep, waking the next morning, an explicit next/another day, or a date jump. Whenever the actual narrative day differs from the OS day, the hidden MÉMÉ_OS_EVENT is MANDATORY and timeline.storyDay MUST contain the absolute actual story-day number. Set timeline.dayAdvance=true when the narrative has advanced beyond the current OS day. If the narrative is still on the same day, timeline.storyDay may equal the current OS day. Never require a visible [DAY NNN] heading for synchronization and never advance merely because several turns passed.
-A natural-day advance reshuffles the visible fixed DAILY / DESIRE / SPECIAL candidate pools and removes unaccepted plot-generated candidates from the previous day. Accepted non-daily long-form desire/special contracts may persist; daily contracts expire at the day boundary. Repeatable collection milestones can pay again on a later story day.
+Current reconstructed in-world story day=${Number(state.tasks?.storyDay)||1}. The extension reconstructs chronology from the COMPLETE VISIBLE CHAT, so do not force visible DAY headings merely to feed the OS. Keep natural time progression internally consistent. If the story goes through night/sleep and then wakes into the next morning, that is a new natural day. Explicit "次日 / 第二天 / N天后 / N周后" jumps are also real day transitions. timeline.storyDay/dayAdvance may be emitted as advisory metadata, but they do not control the stored day.
+
+A natural-day transition refreshes the visible fixed DAILY / DESIRE / SPECIAL candidate pools and removes unaccepted plot-generated candidates from the previous day. Accepted non-daily long-form desire/special contracts may persist; daily contracts expire at the day boundary. Repeatable collection milestones can pay again on a later story day.
 
 Current SHOP phase=${currentShopPhase(state).label} (${currentShopPhase(state).code}); appearance/presentation shop progress levels=${shopProgressLevels(state)}. Adult-response upgrades do not advance beauty-shelf phases.
 TWO-STAGE BODY ECONOMY — HARD RULE:
