@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS 0.13.0 audit cleanup: retired duplicate scene/status paths, slimmed runtime bridge, single-owner MEMORY, safer NPC wheel focus/exit logic, canonical card build, and repository cleanup.",
-  "js": "index-v0.13.0.js",
-  "css": "style.css?v=0.13.0",
+  "description": "MÉMÉ OS 0.13.1 memory repair: stored SHORT/LONG/PERMANENT now feed back into story prompts, quiet-memory JSON parsing is resilient, and the canonical 15/10 memory ladder is aligned across extension, card and preset.",
+  "js": "index-v0.13.1.js",
+  "css": "style.css?v=0.13.1",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
