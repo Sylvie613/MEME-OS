@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.10.11",
+  "version": "0.10.12",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS: extension-authoritative resources, rolling plot-aware tasks, swipe-safe state replay, one plotTurn per user turn, synchronized story rewards, and mobile-safe launcher positioning.",
-  "js": "index.js?v=0.10.11",
-  "css": "style.css?v=0.10.11",
+  "description": "MÉMÉ OS: authoritative resources, rolling plot-aware tasks, visible-task fallback synchronization, swipe-safe state replay, one plotTurn per user turn, and mobile-safe launcher positioning.",
+  "js": "index.js?v=0.10.12",
+  "css": "style.css?v=0.10.12",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
