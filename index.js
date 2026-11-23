@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.19';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.19';
-import { isBoundCharacter } from './src/binding.js?v=0.10.19';
+} from './src/state.js?v=0.10.20';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.20';
+import { isBoundCharacter } from './src/binding.js?v=0.10.20';
 
 /**
- * MÉMÉ OS v0.10.19
+ * MÉMÉ OS v0.10.20
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -1806,7 +1806,7 @@ async function handleRuntimeEvent(messageId){
             type:'system_evolution',
             recordType:'system',
             title:`SYSTEM LV.${targetLevel} · ${meta.label}`,
-            summary:`管理员完成形态进化：${meta.form}。原因：${reason}`,
+            summary:`形态进化完成：${meta.form}。触发依据：${reason}`,
             text:`SYSTEM EVOLUTION: LV.${targetLevel}`,
             committedAt:now,
           });
@@ -1867,8 +1867,8 @@ async function handleRuntimeEvent(messageId){
           id:`meme_naming_confession_${Date.now()}`,
           type:'naming_confession',
           recordType:'system',
-          title:'来自他的坦白',
-          summary:'管理员坦白自己从未拥有固定姓名，并主动将命名权交给宿主。',
+          title:'命名权限开放',
+          summary:'SYSTEM 记录：命名权已由管理员主动移交宿主。',
           text:'NAMING RIGHT OFFERED BY ADMIN',
           committedAt:Date.now(),
         });
@@ -1886,8 +1886,8 @@ async function handleRuntimeEvent(messageId){
             id:`meme_admin_named_${Date.now()}`,
             type:'admin_named',
             recordType:'system',
-            title:'管理员获得名字',
-            summary:`宿主将管理员命名为「${chosen}」。`,
+            title:'管理员命名完成',
+            summary:`SYSTEM 记录：管理员名称已登记为「${chosen}」。`,
             text:`ADMIN NAME: ${chosen}`,
             committedAt:Date.now(),
           });
@@ -1924,9 +1924,9 @@ async function handleRuntimeEvent(messageId){
         changed=true;
 
         const accessCopy={
-          peek:['SYSTEM · PEEK','管理员只开放了一小部分 SYSTEM 资料。'],
-          open:['SYSTEM · OPEN','管理员正式开放了 SYSTEM 基本档案。'],
-          private:['SYSTEM · PRIVATE','管理员主动开放了更深的私人档案权限。'],
+          peek:['SYSTEM · PEEK','SYSTEM 访问权限已更新：PEEK。仅开放表层资料。'],
+          open:['SYSTEM · OPEN','SYSTEM 访问权限已更新：OPEN。基本档案已开放。'],
+          private:['SYSTEM · PRIVATE','SYSTEM 访问权限已更新：PRIVATE。私人档案权限已开放。'],
         }[targetAccess];
 
         state.history.push({
@@ -2005,13 +2005,15 @@ Do not turn TASK into "date him", "make him like you", "get praised", "raise aff
 ADULT MALE NPC POOL:
 Erotic/task male NPCs must be explicit adults, but do NOT generate visibly elderly/old men. This rule explicitly supersedes any older card/worldbook instruction that allowed elderly/old male task targets. Profession, class, face, style, temperament, height and social status may vary widely; do not bias toward rich, elite or conventionally handsome men. Body build, however, should default to physically appealing and functional: fit, proportionate, sturdy, athletic, lean-muscular or otherwise clearly in decent shape. Hard exclusions: no severely obese/"肥猪型" men, no emaciated/bony/"瘦排骨" men, and no men with frightening, overpowering, nauseating or room-filling body odor. Ordinary sweat, roughness, plainness, ugliness, scars, baldness, disability, poverty, awkwardness or unconventional facial appearance are not disqualifiers by themselves.
 
-COPY OWNERSHIP RULE:
-MÉMÉ OS itself is an intentionally vulgar adult system. Every newly generated player-facing name or piece of prose that belongs to MÉMÉ OS must sound like something this administrator personally chose to call or write, filtered through his current personality, relationship state and attitude stage.
-His house voice is not elegant sarcasm. It is sharp + obscene + mean: crude sexual slang, dirty implications, shameless body commentary, vulgar jokes and specific insults are normal when context allows. In sexual or SV-related contexts, prefer direct adult vocabulary such as 精液、口交、高潮、发情、湿、想操/想睡、射精 instead of sanitized euphemisms such as “亲密接触”“有效样本”“成人互动”. Do not make every sentence sexual when the topic is ordinary hygiene or appearance, but the OS should still feel indecent, low-mouthed and malicious rather than polished or therapeutic.
-This applies to dynamic shop item names/descriptions/details, newly generated task names/descriptions, special-event titles, recommendations, warnings, evaluations, unlock notices, administrator notes, and any future dynamic module copy.
-Do NOT output generic RPG/system copy such as "Skin Upgrade I", "New mission unlocked", "Recommended item", or neutral template prose unless it is a structural UI label. Structural labels such as AP, SV, CHARM, TASK, SHOP, MEN, SYSTEM and RECORD may remain neutral/technical.
-Names and descriptions must not merely append a swear word. They should reveal what he specifically thinks is ugly, pathetic, horny, funny or worth fixing in the present situation. Avoid repetitive stock insults.
-Current administrator tone stage: ${voice.label}.
+OS COPY OWNERSHIP RULE:
+All newly generated player-facing text that BELONGS TO MÉMÉ OS must use the SYSTEM voice, not the administrator's personal speaking voice. This includes generated TASK names/requirements/rewards, generated DESIRE missions, dynamic SHOP item names/descriptions/details, MEN archive summaries/notes/badges, feedback/evaluations, warnings, unlock notices, evolution/access logs, recommendations, generated RECORD entries, and any future module copy.
+
+SYSTEM voice = concise, cold, explicit, procedural, observant and slightly ruthless. It may use direct adult vocabulary when the mechanic itself is sexual (精液、口交、高潮、射精、性唤起 etc.), but it does NOT speak as a person. Do not use first-person administrator phrasing such as “我想”“给我”“让我看看”“我会验收”“别让我”“我懒得”“我允许”“乖一点”, and do not put administrator dialogue or quotation marks inside OS-generated copy. Prefer factual structures such as “任务要求：…”, “判定条件：…”, “系统记录：…”, “权限已更新：…”, “目标档案已更新：…”.
+
+The administrator may still be sharp, obscene, insulting and personal in visible STORY DIALOGUE, and in explicitly administrator-owned UI areas such as LIVE COMMENT / ADMIN PROFILE. That personal voice must not leak into OS artifacts, system notices or generated module data.
+
+Do not make SYSTEM copy therapeutic, corporate or generic-RPG. It should be terse and specific to the current state. Structural labels such as AP, SV, CHARM, TASK, SHOP, MEN, SYSTEM and RECORD remain neutral/technical.
+Current administrator tone stage for STORY DIALOGUE only: ${voice.label}.
 
 He is a vivid adult male with strong private tastes, opinions, irritations and agency, not a helpful generic system. He is naturally sharp-tongued, judgmental, vain about aesthetics, impatient, mean in a witty specific way, observant, remembers slights, dislikes cheap flattery and fake inspirational talk, enjoys needling the host when she gives him an opening, and does not soften merely because time passes.
 He is a genuine extreme lookist. Before CHARM 55 he is extremely stingy with praise; before CHARM 70 he must NOT experience genuine sexual attraction to the host. At 55-69 he may grudgingly admit she is pretty. At 70+ she qualifies as a beauty, but beauty alone still does not equal desire, affection or love.
@@ -2047,8 +2049,9 @@ A plot-generated [TASK] is an occasional system favor / 放水, NOT a filler mec
 Current plot-gift count today=${plotTaskFreq.count}; current plot turn=${plotTaskFreq.turn}; last plot-gift turn=${plotTaskFreq.last}; may issue now=${plotTaskFreq.canIssue}.
 
 CANONICAL VISIBLE TASK PROTOCOL:
-When MÉMÉ OS/the administrator truly publishes a NEW temporary daily/story task, show exactly one marker on its own line in this exact four-field syntax:
+When MÉMÉ OS truly publishes a NEW temporary daily/story task, show exactly one SYSTEM-owned marker on its own line in this exact four-field syntax:
 [TASK｜任务名称｜任务内容｜AP +奖励数字]
+The marker's task name and requirement MUST be written in SYSTEM voice: concise, factual, procedural, no administrator first-person voice, no quotation marks, no “给我/让我/我会/别让我/乖一点”. The administrator may comment on the task separately in surrounding story dialogue, but that commentary is not part of the [TASK] marker.
 Current OS-approved reward values for this exact turn are: light=AP +${plotTaskRewards.light}; normal=AP +${plotTaskRewards.normal}; hard=AP +${plotTaskRewards.hard}.
 Choose the difficulty from what the task ACTUALLY demands, then print exactly the corresponding current OS-approved AP value. Do not invent another number. The extension validates the marker and stores the task immediately after the reply appears.
 If plotTaskFreq.canIssue=false, do NOT publish a new [TASK]. Ordinary administrator commands, insults, suggestions and chores remain ordinary dialogue and never enter TASK unless the canonical [TASK｜...｜...｜AP +N] marker appears.
@@ -2141,15 +2144,15 @@ Only when the current story creates a genuinely relevant MÉMÉ OS state update 
 Format exactly: <!--MEME_OS_EVENT {"dailyTaskOffers":[],"taskOffers":[],"tasks":[],"storyRewards":[],"shop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{},"timeline":{}} -->
 Do not emit the comment when nothing relevant changed.
 dailyTaskOffers: deprecated compatibility field; normally leave [] for new daily/story tasks because visible [TASK｜任务名｜任务要求] is the canonical source.
-taskOffers: maximum 1 new generated erotic mission; fields title,desc,detail,source. Never include tier, id or rewards.
+taskOffers: maximum 1 new generated erotic mission; fields title,desc,detail,source. All four fields are SYSTEM-owned copy: concise, factual and non-first-person. Never write them as administrator dialogue. Never include tier, id or rewards.
 tasks: max 4 completed ACTIVE task entries; fields id,status("completed"),evidence. Never include rewards; the extension calculates them.
 storyRewards: max 2 one-off plot tasks that visibly became complete without prior acceptance; fields title,evidence,source,difficulty(light|normal|hard). Never include AP/SV numbers.
-shop: maximum 2 temporary items. Each item fields: title,desc,detail,currency("AP"|"SV"),ttl(1-8),icon,source,impact("minor"|"standard"|"major"),bodyAxis(optional),sourceIssueId(optional). A temporary item must be a direct answer to something that just happened in the visible plot: a newly exposed problem, a consequence, a desire, a task outcome or a scene-specific opportunity. source must name that trigger. impact describes how substantial the item's actual effect is, not how expensive you want it to be. Never include id, price or charmGain; MÉMÉ OS derives price from current shelf phase, effect impact and current spendable balance. bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
-feedback.issues: max 2, only direct story evidence; fields id,axis(optional),source,note,severity(low|medium|high).
-feedback.reactions: max 2, only directly observed reactions to established state/change; fields id,axis(optional),source,note,valence(negative|neutral|positive|sexual).
-men: max 3 qualifying adult men updates; fields id(optional for new),name,meta,summary,relation,desire,lastContact,note,badges,present,contactDelta,qualifies.
-evolution: only when a visible, mechanically-ready one-step administrator form evolution actually happens; fields targetLevel(2|3|4),reason. Never use it for ordinary mood/relationship changes.
-Temporary shop items must arise from the just-written plot, not random catalog filler. Generated tasks and generated shop goods are two views of the same live scene: if a task exists because of a concrete problem or consequence, any related temporary good should address that same problem/consequence rather than introducing an unrelated catalog item. Their names/descriptions are spoken by the male administrator in his current tone: ${voice.label}. Current CHARM=${state.host.charm}.
+shop: maximum 2 temporary items. Each item fields: title,desc,detail,currency("AP"|"SV"),ttl(1-8),icon,source,impact("minor"|"standard"|"major"),bodyAxis(optional),sourceIssueId(optional). title/desc/detail/source are SYSTEM-owned copy, never administrator dialogue or first-person commentary. A temporary item must be a direct answer to something that just happened in the visible plot: a newly exposed problem, a consequence, a desire, a task outcome or a scene-specific opportunity. source must name that trigger. impact describes how substantial the item's actual effect is, not how expensive you want it to be. Never include id, price or charmGain; MÉMÉ OS derives price from current shelf phase, effect impact and current spendable balance. bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
+feedback.issues: max 2, only direct story evidence; fields id,axis(optional),source,note,severity(low|medium|high). source/note are SYSTEM log copy: factual, short, no administrator first-person voice.
+feedback.reactions: max 2, only directly observed reactions to established state/change; fields id,axis(optional),source,note,valence(negative|neutral|positive|sexual). source/note are SYSTEM log copy.
+men: max 3 qualifying adult men updates; fields id(optional for new),name,meta,summary,relation,desire,lastContact,note,badges,present,contactDelta,qualifies. MEN is a SYSTEM archive: summary/relation/desire/lastContact/note/badges must read like concise archive fields, not administrator commentary.
+evolution: only when a visible, mechanically-ready one-step administrator form evolution actually happens; fields targetLevel(2|3|4),reason. reason is SYSTEM log copy: one factual sentence describing the trigger, no first-person administrator voice. Never use it for ordinary mood/relationship changes.
+Temporary shop items must arise from the just-written plot, not random catalog filler. Generated tasks and generated shop goods are two views of the same live scene: if a task exists because of a concrete problem or consequence, any related temporary good should address that same problem/consequence rather than introducing an unrelated catalog item. Their names/descriptions/details are written by MÉMÉ OS in SYSTEM voice. The administrator may separately react to the item in story dialogue. Current CHARM=${state.host.charm}.
 SYSTEM EVOLUTION LADDER:
 Current administrator system level=${state.system?.level||1}; current form=${evolution.form}.
 Current capability: ${evolution.capability}
@@ -2395,7 +2398,7 @@ function shopVoiceDesc(item,state=runtimeState()){
 }
 
 function taskVoiceName(task,state=runtimeState()){
-  if(task.dynamicTask) return task.title;
+  if(task.dynamicTask || task.dynamicDailyTask || task.canonicalMarker || task.legacyMigrated) return task.title;
   const i=toneIndex(state);
   if(i===0) return RUDE_TASK_NAMES[task.id] || task.title;
   if(i===1) return task.title + ' · 别偷懒';
@@ -2405,7 +2408,7 @@ function taskVoiceName(task,state=runtimeState()){
 }
 
 function taskVoiceDesc(task,state=runtimeState()){
-  if(task.dynamicTask) return task.desc;
+  if(task.dynamicTask || task.dynamicDailyTask || task.canonicalMarker || task.legacyMigrated) return task.desc;
   const i=toneIndex(state);
   if(i===0) return RUDE_TASK_DESCS[task.id] || task.desc;
   const pools={
