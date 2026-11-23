@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.13.8",
+  "version": "0.13.9",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS 0.13.8 hardens DESIRE completion verification: accepted-task-only settlement, explicit visible evidence, exact required acts/results, target-man binding, frozen reward snapshots, and swipe-safe payout rollback.",
-  "js": "index-v0.13.8.js",
-  "css": "style.css?v=0.13.8",
+  "description": "MÉMÉ OS 0.13.9 aligns prose↔OS linkage: canonical DAY header parsing, returning-MEN focus lock, and mandatory DESIRE target binding.",
+  "js": "index-v0.13.9.js",
+  "css": "style.css?v=0.13.9",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
