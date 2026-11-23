@@ -7,17 +7,20 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.31';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.31';
-import { isBoundCharacter } from './src/binding.js?v=0.10.31';
+} from './src/state.js?v=0.10.32';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.32';
+import { isBoundCharacter } from './src/binding.js?v=0.10.32';
 
 /**
- * MÉMÉ OS v0.10.31
+ * MÉMÉ OS v0.10.32
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
 const MEME_ID = 'meme-os-heart-launcher';
 const DIALOG_ID = 'meme-os-dialog';
+
+let memoryQuietSyncInFlight=false;
+let memoryQuietLastAttemptTurn=-999;
 
 const TASK_DATA = {
   daily: [
@@ -917,6 +920,129 @@ function applyStoryStatusEvent(state,raw){
   }
   if(changed) state.storyStatus.updatedTurn=Math.max(0,Number(state.shop?.plotTurn)||0);
   return changed;
+}
+
+function extractJsonObject(raw){
+  const text=String(raw||'').trim()
+    .replace(/^\`\`\`(?:json)?\s*/i,'')
+    .replace(/\s*\`\`\`$/,'');
+  const start=text.indexOf('{');
+  const end=text.lastIndexOf('}');
+  if(start<0 || end<=start) return null;
+  try{return JSON.parse(text.slice(start,end+1));}catch{return null;}
+}
+
+function storyDateLabel(state=runtimeState()){
+  const stored=String(state.storyStatus?.date||'').trim();
+  if(stored && !/^DAY\s+\d+/i.test(stored)) return stored;
+  const day=Math.max(1,Number(state.tasks?.storyDay)||1);
+  const date=new Date(Date.UTC(2026,6,18));
+  date.setUTCDate(date.getUTCDate()+day-1);
+  return `${date.getUTCMonth()+1}月${date.getUTCDate()}日`;
+}
+
+function advanceStoryDateLabel(label,days=1){
+  const match=String(label||'').match(/^(\d{1,2})月(\d{1,2})日$/);
+  if(!match) return label;
+  const date=new Date(Date.UTC(2026,Number(match[1])-1,Number(match[2])));
+  date.setUTCDate(date.getUTCDate()+Math.max(1,Number(days)||1));
+  return `${date.getUTCMonth()+1}月${date.getUTCDate()}日`;
+}
+
+async function quietSyncMemory({force=false,bootstrapOnly=false}={}){
+  if(memoryQuietSyncInFlight || !isBoundCharacter() || !hasActiveChat()) return false;
+  const context=globalThis.SillyTavern?.getContext?.()||{};
+  const generateQuietPrompt=context?.generateQuietPrompt;
+  if(typeof generateQuietPrompt!=='function'){
+    console.warn('[MÉMÉ OS] generateQuietPrompt unavailable; memory quiet sync skipped');
+    return false;
+  }
+
+  const state=runtimeState();
+  state.memory=state.memory||{initialized:false,bootstrappedAt:null,sourceTurns:0,short:[],long:[],core:[],lastUpdatedTurn:0};
+  state.storyStatus=state.storyStatus||{initialized:false,date:'',time:'',weather:'晴 · 闷热',location:'',people:[],note:'盛夏',updatedTurn:0};
+
+  const turn=Math.max(0,Number(state.shop?.plotTurn)||0);
+  const bootstrap=!state.memory.initialized;
+  if(bootstrapOnly && !bootstrap) return false;
+  if(!bootstrap && !force && Number(state.memory.lastUpdatedTurn||0)>=turn) return false;
+  if(memoryQuietLastAttemptTurn===turn && !bootstrap && !force) return false;
+
+  memoryQuietSyncInFlight=true;
+  memoryQuietLastAttemptTurn=turn;
+
+  const chatCount=Array.isArray(context.chat)?context.chat.length:0;
+  const currentDate=storyDateLabel(state);
+  const currentWeather=String(state.storyStatus.weather||'晴 · 闷热');
+  const existingMemory={
+    short:state.memory.short||[],
+    long:state.memory.long||[],
+    core:state.memory.core||[],
+  };
+
+  const prompt=bootstrap
+    ? `你正在为一个持续角色扮演聊天做一次性的后台记忆回填。请阅读你当前能看到的完整聊天历史，而不是只看最后一轮。
+只输出一个纯 JSON 对象，不要代码块、解释或额外文字：
+{"status":{"date":"","time":"","weather":"","location":"","people":[],"note":""},"short":[],"long":[],"core":[]}
+
+规则：
+1. 这是首次回填。short 最多10条，每条尽量30个中文字符以内，记录最近仍会影响后续的具体事实。
+2. long 最多5条，每条约120-240中文字符，总结已经形成的阶段性剧情、关系、任务或连续后果。
+3. core 最多5条，每条约180-320中文字符，只留真正长期重要的关系转折、永久变化、关键约定或不可丢失的设定事实。
+4. 不要记录普通走路、重复流水、文风描写、AP/SV/CHARM具体余额，也不要猜不存在的事实。
+5. status 要反映聊天结束时的最新剧情现场：time、location、people尽量从历史判断。
+6. 虚构故事允许补一个日历锚点。如果历史没有明确日期，date 固定写 "${currentDate}"；季节视为盛夏。若没有明确天气，weather 写 "${currentWeather}"。不要因为现实世界日期或天气改变剧情日期。
+7. note 可以简短写季节/时段补充，不确定就留空。`
+    : `你正在为一个持续角色扮演聊天做后台增量记忆。阅读当前可见聊天历史，重点比较最近新增剧情与下面已经保存的记忆：
+${JSON.stringify(existingMemory)}
+
+只输出一个纯 JSON 对象，不要代码块、解释或额外文字：
+{"status":{"date":"","time":"","weather":"","location":"","people":[],"note":""},"short":[],"long":[],"core":[]}
+
+规则：
+1. 只返回“尚未保存在现有记忆中、且会影响后续连续性”的新事实；不要复述已有条目。
+2. short 最多2条，每条尽量30个中文字符以内。大多数普通回合最多新增1条。
+3. long 最多1条；只有最近几轮确实形成了新的阶段性变化才写。
+4. core 最多1条；只有真正永久/重大转折才写。
+5. 不记录AP/SV/CHARM具体余额，不记录普通动作流水，不猜。
+6. status 写当前最新剧情现场。若没有明确日期继续沿用 "${currentDate}"；夏季基准天气可沿用 "${currentWeather}"，除非剧情明确改变。`;
+
+  try{
+    const raw=await generateQuietPrompt({quietPrompt:prompt});
+    const parsed=extractJsonObject(raw);
+    if(!parsed) throw new Error('quiet memory response was not valid JSON');
+
+    const latest=runtimeState();
+    let changed=false;
+    const statusRaw=parsed.status&&typeof parsed.status==='object'?parsed.status:{};
+    if(!statusRaw.date) statusRaw.date=storyDateLabel(latest);
+    if(!statusRaw.weather) statusRaw.weather=String(latest.storyStatus?.weather||'晴 · 闷热');
+    statusRaw.initialized=true;
+    if(applyStoryStatusEvent(latest,statusRaw)) changed=true;
+
+    const memoryRaw={
+      bootstrap,
+      short:Array.isArray(parsed.short)?parsed.short:[],
+      long:Array.isArray(parsed.long)?parsed.long:[],
+      core:Array.isArray(parsed.core)?parsed.core:[],
+      compactShort:false,
+      compactLong:false,
+    };
+    if(applyMemoryEvent(latest,memoryRaw,chatCount)) changed=true;
+
+    if(changed){
+      await saveState(latest);
+      renderView(currentView(),false);
+      installRuntimePrompt();
+      console.info(`[MÉMÉ OS] memory ${bootstrap?'bootstrap':'incremental sync'} completed`);
+    }
+    return changed;
+  }catch(error){
+    console.warn('[MÉMÉ OS] quiet memory sync failed',error);
+    return false;
+  }finally{
+    memoryQuietSyncInFlight=false;
+  }
 }
 
 function lifestyleShelfDisposition(state=runtimeState()){
@@ -1986,9 +2112,9 @@ async function handleRuntimeEvent(messageId){
       if(event.timeline?.dayAdvance===true){
         state.tasks=state.tasks||{storyDay:1,active:{},generated:[],generatedDaily:[],dismissed:[],lastGeneratedDesireDay:0,lastGeneratedDailyTurn:0,completed:{},dailyCompleted:{},everCompleted:{}};
         state.tasks.storyDay=Math.max(1,(Number(state.tasks.storyDay)||1)+1);
-        state.storyStatus=state.storyStatus||{initialized:false,date:'',time:'',weather:'',location:'',people:[],note:'',updatedTurn:0};
-        if(!event.status?.date || /^DAY\s+\d+/i.test(String(state.storyStatus.date||''))){
-          state.storyStatus.date=`DAY ${String(state.tasks.storyDay).padStart(3,'0')}`;
+        state.storyStatus=state.storyStatus||{initialized:false,date:'',time:'',weather:'晴 · 闷热',location:'',people:[],note:'盛夏',updatedTurn:0};
+        if(!event.status?.date){
+          state.storyStatus.date=advanceStoryDateLabel(storyDateLabel(state),1);
           state.storyStatus.initialized=true;
           state.storyStatus.updatedTurn=Math.max(0,Number(state.shop?.plotTurn)||0);
         }
@@ -4076,6 +4202,15 @@ function bindSillyTavernEvents(){
     if(!Number.isInteger(messageId)) return;
     await handleRuntimeEvent(messageId);
     installRuntimePrompt();
+
+    const state=runtimeState();
+    const turn=Math.max(0,Number(state.shop?.plotTurn)||0);
+    if(!state.memory?.initialized){
+      await quietSyncMemory({force:true});
+    }else if(Number(state.memory?.lastUpdatedTurn||0)<turn){
+      // Main reply did not provide a memory delta. Quiet sync is fallback only.
+      await quietSyncMemory({force:true});
+    }
   };
   if(events.MESSAGE_RECEIVED) source.on(events.MESSAGE_RECEIVED,handleAssistantVariant);
   if(events.MESSAGE_SWIPED) source.on(events.MESSAGE_SWIPED,handleAssistantVariant);
@@ -4087,6 +4222,7 @@ function bindSillyTavernEvents(){
     await reconcileRecentVisibleTaskOffers();
     renderView('home',false);
     installRuntimePrompt();
+    await quietSyncMemory({bootstrapOnly:true});
   });
   globalThis.__meme_os_events_bound__=true;
 }
@@ -4233,6 +4369,7 @@ function start() {
   reconcileRecentVisibleTaskOffers().catch(error=>console.warn('[MÉMÉ OS] visible task sync failed',error));
   bindSillyTavernEvents();
   installRuntimePrompt();
+  setTimeout(()=>quietSyncMemory({bootstrapOnly:true}),900);
   globalThis.__meme_os_probe_timer__ = setInterval(mount, 1000);
   window.addEventListener('resize', mount, { passive:true });
   window.addEventListener('orientationchange', () => setTimeout(mount,150), { passive:true });
