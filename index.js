@@ -390,38 +390,22 @@ function dynamicDesireTierForState(state=runtimeState()){
 
 const MEME_RUNTIME_PROMPT_ID='meme_os_runtime_bridge';
 
-function systemCopyText(value,fallback='',max=180){
-  let text=String(value??fallback??'')
-    .replace(/[“”"']/g,'')
+function adminCopyText(value,fallback='',max=180){
+  // MÉMÉ OS and the administrator are the same speaking personality.
+  // Normalize formatting only; never scrub away his first-person voice,
+  // insults, dirty wording, judgments or stage-dependent attitude.
+  const text=String(value??fallback??'')
+    .replace(/[\r\n\t]+/g,' ')
     .replace(/\s+/g,' ')
     .trim();
-
-  const replacements=[
-    [/本管理员/g,'系统'],
-    [/老子/g,'系统'],
-    [/我会验收/g,'由系统验收'],
-    [/让我(?:看看|看结果)/g,'提交结果供系统验收'],
-    [/给我看看/g,'提交结果供系统验收'],
-    [/给我/g,''],
-    [/别让我/g,'不得'],
-    [/我想/g,'系统要求'],
-    [/我允许/g,'权限允许'],
-    [/我懒得/g,'系统不予'],
-    [/乖一点/g,'按要求执行'],
-    [/做完再来邀功/g,'完成后提交系统验收'],
-    [/回来给我看结果/g,'完成后提交系统验收'],
-    [/我会看结果/g,'由系统验收结果'],
-  ];
-  for(const [pattern,replacement] of replacements) text=text.replace(pattern,replacement);
-
-  return text.replace(/\s+/g,' ').trim().slice(0,max) || String(fallback||'').slice(0,max);
+  return text.slice(0,max) || String(fallback||'').slice(0,max);
 }
 
 function sanitizeGeneratedDesireTask(raw,state=runtimeState()){
   if(!raw || typeof raw!=='object') return null;
-  const title=systemCopyText(raw.title,'剧情欲望任务',48);
-  const desc=systemCopyText(raw.desc,'',180);
-  const detail=systemCopyText(raw.detail,'',180);
+  const title=adminCopyText(raw.title,'剧情欲望任务',48);
+  const desc=adminCopyText(raw.desc,'',180);
+  const detail=adminCopyText(raw.detail,'',180);
   if(!title || !desc) return null;
 
   const tier=dynamicDesireTierForState(state);
@@ -447,7 +431,7 @@ function sanitizeGeneratedDesireTask(raw,state=runtimeState()){
     locked:false,
     createdDay:Number(state.tasks?.storyDay)||1,
     createdTurn:Number(state.shop?.plotTurn)||0,
-    source:systemCopyText(raw.source,'当前剧情',80),
+    source:adminCopyText(raw.source,'当前剧情',80),
   };
 }
 
@@ -587,9 +571,9 @@ function rememberDismissedTask(state,task){
 
 function sanitizeGeneratedDailyTask(raw,state=runtimeState()){
   if(!raw || typeof raw!=='object') return null;
-  const title=systemCopyText(raw.title,'剧情任务',48);
-  const desc=systemCopyText(raw.desc,'',180);
-  const detail=systemCopyText(raw.detail,'',180);
+  const title=adminCopyText(raw.title,'剧情任务',48);
+  const desc=adminCopyText(raw.desc,'',180);
+  const detail=adminCopyText(raw.detail,'',180);
   if(!title || !desc) return null;
 
   const difficulty=['light','normal','hard'].includes(String(raw.difficulty||'').toLowerCase())
@@ -718,9 +702,9 @@ function sanitizeDynamicItem(raw,state=runtimeState()){
   const phase=economy.phase;
   const price=economy.price;
   const ttl=Math.max(1,Math.min(8,Math.round(Number(raw.ttl)||4)));
-  const title=systemCopyText(raw.title,'临时改造',40);
-  const desc=systemCopyText(raw.desc,'系统临时上架。',140);
-  const detail=systemCopyText(raw.detail,'根据当前剧情临时出现，过期后自动撤架。',180);
+  const title=adminCopyText(raw.title,'临时改造',40);
+  const desc=adminCopyText(raw.desc,'系统临时上架。',140);
+  const detail=adminCopyText(raw.detail,'根据当前剧情临时出现，过期后自动撤架。',180);
   const bodyAxis=BODY_AXES.has(String(raw.bodyAxis||'')) ? String(raw.bodyAxis) : null;
   const fingerprint=`${title.toLowerCase()}|${desc.toLowerCase()}|${bodyAxis||'none'}|${currency}|${String(raw.source||'')}`;
   const id=`plot_${hashId(fingerprint).toString(36)}`;
@@ -740,7 +724,7 @@ function sanitizeDynamicItem(raw,state=runtimeState()){
     charmGain,
     createdTurn:Number(state.shop?.plotTurn)||0,
     expiresTurn:(Number(state.shop?.plotTurn)||0)+ttl,
-    source:systemCopyText(raw.source,'剧情临时上架',80),
+    source:adminCopyText(raw.source,'剧情临时上架',80),
     impact,
     economyBasis:{base:economy.base,balanceAtCreation:economy.balance,phase:economy.phase.id},
     bodyAxis,
@@ -755,10 +739,10 @@ function getDynamicShop(state=runtimeState()){
 
 function sanitizeSceneIssue(raw,state=runtimeState()){
   if(!raw || typeof raw!=='object') return null;
-  const note=systemCopyText(raw.note,'',120);
+  const note=adminCopyText(raw.note,'',120);
   if(!note) return null;
   const axis=BODY_AXES.has(String(raw.axis||'')) ? String(raw.axis) : null;
-  const source=systemCopyText(raw.source,'当前剧情',60);
+  const source=adminCopyText(raw.source,'当前剧情',60);
   const severity=['low','medium','high'].includes(String(raw.severity||'')) ? String(raw.severity) : 'medium';
   const key=String(raw.id||raw.key||`issue_${hashId(axis+'|'+source+'|'+note)}`).replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48);
   return {
@@ -778,7 +762,7 @@ function sanitizeSceneReaction(raw,state=runtimeState()){
   const note=String(raw.note||'').trim().slice(0,120);
   if(!note) return null;
   const axis=BODY_AXES.has(String(raw.axis||'')) ? String(raw.axis) : null;
-  const source=systemCopyText(raw.source,'剧情人物',60);
+  const source=adminCopyText(raw.source,'剧情人物',60);
   const valence=['negative','neutral','positive','sexual'].includes(String(raw.valence||'')) ? String(raw.valence) : 'neutral';
   const key=String(raw.id||raw.key||`reaction_${hashId(axis+'|'+source+'|'+note)}`).replace(/[^a-zA-Z0-9_-]/g,'').slice(0,48);
   return {
@@ -809,12 +793,12 @@ function sanitizeMenUpdate(raw,state=runtimeState()){
     id,
     name,
     meta,
-    summary:systemCopyText(raw.summary,'',100),
-    relation:systemCopyText(raw.relation,'未判定',60),
-    desire:systemCopyText(raw.desire,'未记录',80),
-    lastContact:systemCopyText(raw.lastContact,'',100),
-    note:systemCopyText(raw.note,'',140),
-    badges:badges.map(badge=>systemCopyText(badge,'',20)).filter(Boolean),
+    summary:adminCopyText(raw.summary,'',100),
+    relation:adminCopyText(raw.relation,'未判定',60),
+    desire:adminCopyText(raw.desire,'未记录',80),
+    lastContact:adminCopyText(raw.lastContact,'',100),
+    note:adminCopyText(raw.note,'',140),
+    badges:badges.map(badge=>adminCopyText(badge,'',20)).filter(Boolean),
     present:raw.present!==false,
     contactDelta:Math.max(0,Math.min(5,Math.round(Number(raw.contactDelta)||0))),
     storyDay:Number(state.tasks?.storyDay)||1,
@@ -2033,14 +2017,14 @@ ADULT MALE NPC POOL:
 Erotic/task male NPCs must be explicit adults, but do NOT generate visibly elderly/old men. This rule explicitly supersedes any older card/worldbook instruction that allowed elderly/old male task targets. Profession, class, face, style, temperament, height and social status may vary widely; do not bias toward rich, elite or conventionally handsome men. Body build, however, should default to physically appealing and functional: fit, proportionate, sturdy, athletic, lean-muscular or otherwise clearly in decent shape. Hard exclusions: no severely obese/"肥猪型" men, no emaciated/bony/"瘦排骨" men, and no men with frightening, overpowering, nauseating or room-filling body odor. Ordinary sweat, roughness, plainness, ugliness, scars, baldness, disability, poverty, awkwardness or unconventional facial appearance are not disqualifiers by themselves.
 
 OS COPY OWNERSHIP RULE:
-All newly generated player-facing text that BELONGS TO MÉMÉ OS must use the SYSTEM voice, not the administrator's personal speaking voice. This includes generated TASK names/requirements/rewards, generated DESIRE missions, dynamic SHOP item names/descriptions/details, MEN archive summaries/notes/badges, feedback/evaluations, warnings, unlock notices, evolution/access logs, recommendations, generated RECORD entries, and any future module copy.
+MÉMÉ OS and the male administrator are the SAME speaking personality. Every newly generated player-facing name or piece of prose that belongs to MÉMÉ OS must sound like something HE personally chose, wrote, labeled or commented on, filtered through his current personality, relationship state and attitude stage.
 
-SYSTEM voice = concise, cold, explicit, procedural, observant and slightly ruthless. It may use direct adult vocabulary when the mechanic itself is sexual (精液、口交、高潮、射精、性唤起 etc.), but it does NOT speak as a person. Do not use first-person administrator phrasing such as “我想”“给我”“让我看看”“我会验收”“别让我”“我懒得”“我允许”“乖一点”, and do not put administrator dialogue or quotation marks inside OS-generated copy. Prefer factual structures such as “任务要求：…”, “判定条件：…”, “系统记录：…”, “权限已更新：…”, “目标档案已更新：…”.
+This applies to generated TASK names/requirements, generated DESIRE missions, dynamic SHOP item names/descriptions/details, MEN archive summaries/notes/badges/relationship judgments, feedback/evaluations, warnings, unlock notices, evolution/access notices, recommendations, generated RECORD entries and any future dynamic module copy.
 
-The administrator may still be sharp, obscene, insulting and personal in visible STORY DIALOGUE, and in explicitly administrator-owned UI areas such as LIVE COMMENT / ADMIN PROFILE. That personal voice must not leak into OS artifacts, system notices or generated module data.
+His OS house voice is sharp, rude, vulgar, observant, aesthetically judgmental and sometimes explicitly sexual when the mechanic is sexual. First-person phrasing is ALLOWED and often desirable: “给我”“让我看看”“我会验收”“我懒得记”“我允许”“别让我失望” may appear when natural. Direct adult vocabulary such as 精液、口交、高潮、射精、发情、湿、想操/想睡 is preferred over sanitized euphemisms in adult mechanics. Do not turn him into a generic announcer, customer-service bot, therapist or neutral RPG narrator.
 
-Do not make SYSTEM copy therapeutic, corporate or generic-RPG. It should be terse and specific to the current state. Structural labels such as AP, SV, CHARM, TASK, SHOP, MEN, SYSTEM and RECORD remain neutral/technical.
-Current administrator tone stage for STORY DIALOGUE only: ${voice.label}.
+The only neutral/technical parts are structural UI labels and raw values such as AP, SV, CHARM, TASK, SHOP, MEN, SYSTEM, RECORD, DAY, IDs, prices, reward numbers and lock states. Those may remain concise and machine-readable. The prose attached to them should still sound like him.
+Current administrator tone stage for BOTH story dialogue and OS-authored copy: ${voice.label}.
 
 He is a vivid adult male with strong private tastes, opinions, irritations and agency, not a helpful generic system. He is naturally sharp-tongued, judgmental, vain about aesthetics, impatient, mean in a witty specific way, observant, remembers slights, dislikes cheap flattery and fake inspirational talk, enjoys needling the host when she gives him an opening, and does not soften merely because time passes.
 He is a genuine extreme lookist. Before CHARM 55 he is extremely stingy with praise; before CHARM 70 he must NOT experience genuine sexual attraction to the host. At 55-69 he may grudgingly admit she is pretty. At 70+ she qualifies as a beauty, but beauty alone still does not equal desire, affection or love.
@@ -2076,9 +2060,9 @@ A plot-generated [TASK] is an occasional system favor / 放水, NOT a filler mec
 Current plot-gift count today=${plotTaskFreq.count}; current plot turn=${plotTaskFreq.turn}; last plot-gift turn=${plotTaskFreq.last}; may issue now=${plotTaskFreq.canIssue}.
 
 CANONICAL VISIBLE TASK PROTOCOL:
-When MÉMÉ OS truly publishes a NEW temporary daily/story task, show exactly one SYSTEM-owned marker on its own line in this exact four-field syntax:
+When MÉMÉ OS/the administrator truly publishes a NEW temporary daily/story task, show exactly one OS-owned marker on its own line in this exact four-field syntax:
 [TASK｜任务名称｜任务内容｜AP +奖励数字]
-The marker's task name and requirement MUST be written in SYSTEM voice: concise, factual, procedural, no administrator first-person voice, no quotation marks, no “给我/让我/我会/别让我/乖一点”. The administrator may comment on the task separately in surrounding story dialogue, but that commentary is not part of the [TASK] marker.
+The task name and requirement are HIS wording. They should sound like the same administrator who is speaking in the scene: sharp, personal, rude or dirty when appropriate, and allowed to use first-person wording such as “给我”“让我看看”“我会验收”. Keep the marker compact enough to parse, but do not flatten his personality into neutral system prose.
 Current OS-approved reward values for this exact turn are: light=AP +${plotTaskRewards.light}; normal=AP +${plotTaskRewards.normal}; hard=AP +${plotTaskRewards.hard}.
 Choose the difficulty from what the task ACTUALLY demands, then print exactly the corresponding current OS-approved AP value. Do not invent another number. The extension validates the marker and stores the task immediately after the reply appears.
 If plotTaskFreq.canIssue=false, do NOT publish a new [TASK]. Ordinary administrator commands, insults, suggestions and chores remain ordinary dialogue and never enter TASK unless the canonical [TASK｜...｜...｜AP +N] marker appears.
@@ -2137,6 +2121,7 @@ Current visible MEN state: ${JSON.stringify({
   returning:(state.men?.returning||[]).map(p=>({id:p.id,name:p.name,meta:p.meta,relation:p.relation,desire:p.desire,contactCount:p.contactCount,status:p.status})),
 })}.
 Only emit MEN updates for adult men who actually qualify for the archive: task-related involvement, sexual contact, a clear desire event, exchanged contact information, or meaningful plot impact. Ordinary passersby, a cashier, a man who only says two lines, or someone who merely looks at the host do NOT qualify.
+MEN is HIS private archive. name/meta may stay factual, but summary/relation/desire/lastContact/note/badges should read like the administrator personally wrote the file: concise, observant, judgmental, dirty or mocking when the facts justify it. Do not turn MEN entries into neutral CRM notes.
 For an existing archived man, reuse his exact id. For a genuinely new qualifying man, omit id or provide a stable slug; the extension assigns a deterministic id.
 present=true means he is visibly still part of the current scene/contact. present=false means the meaningful interaction has clearly ended or he has left. If a currently archived man remains visibly present, emit a lightweight update with contactDelta=0 so he does not naturally decay into RECENT.
 contactDelta counts meaningful new contact/events only; use 0 for continued presence, normally 1 for a new meaningful interaction.
@@ -2171,7 +2156,7 @@ Only when the current story creates a genuinely relevant MÉMÉ OS state update 
 Format exactly: <!--MEME_OS_EVENT {"dailyTaskOffers":[],"taskOffers":[],"tasks":[],"storyRewards":[],"shop":[],"feedback":{"issues":[],"reactions":[]},"men":[],"evolution":{"targetLevel":null,"reason":""},"permission":{"signal":null,"signalReason":"","signalTag":"","love":false,"loveReason":"","loveTag":"","systemAccess":null},"identity":{},"timeline":{}} -->
 Do not emit the comment when nothing relevant changed.
 dailyTaskOffers: deprecated compatibility field; normally leave [] for new daily/story tasks because visible [TASK｜任务名｜任务要求] is the canonical source.
-taskOffers: maximum 1 new generated erotic mission; fields title,desc,detail,source. All four fields are SYSTEM-owned copy: concise, factual and non-first-person. Never write them as administrator dialogue. Never include tier, id or rewards.
+taskOffers: maximum 1 new generated erotic mission; fields title,desc,detail,source. title/desc/detail/source are written in the administrator's current OS voice and may be personal, rude, obscene or judgmental when appropriate. Never include tier, id or rewards.
 tasks: max 4 completed ACTIVE task entries; fields id,status("completed"),evidence. Never include rewards; the extension calculates them.
 storyRewards: max 2 one-off plot tasks that visibly became complete without prior acceptance; fields title,evidence,source,difficulty(light|normal|hard). Never include AP/SV numbers.
 shop: maximum 2 temporary items. Each item fields: title,desc,detail,currency("AP"|"SV"),ttl(1-8),icon,source,impact("minor"|"standard"|"major"),bodyAxis(optional),sourceIssueId(optional). title/desc/detail/source are SYSTEM-owned copy, never administrator dialogue or first-person commentary. A temporary item must be a direct answer to something that just happened in the visible plot: a newly exposed problem, a consequence, a desire, a task outcome or a scene-specific opportunity. source must name that trigger. impact describes how substantial the item's actual effect is, not how expensive you want it to be. Never include id, price or charmGain; MÉMÉ OS derives price from current shelf phase, effect impact and current spendable balance. bodyAxis must be one of lips|face|eyes|skin|hair|posture|bodyShape|waistHip|legs|neckShoulders|bust|scent|breath|voice|touch|sensitivity|arousal|lubrication|orgasm|recovery|specialMark and only when the item genuinely changes that axis.
@@ -2179,7 +2164,7 @@ feedback.issues: max 2, only direct story evidence; fields id,axis(optional),sou
 feedback.reactions: max 2, only directly observed reactions to established state/change; fields id,axis(optional),source,note,valence(negative|neutral|positive|sexual). source/note are SYSTEM log copy.
 men: max 3 qualifying adult men updates; fields id(optional for new),name,meta,summary,relation,desire,lastContact,note,badges,present,contactDelta,qualifies. MEN is a SYSTEM archive: summary/relation/desire/lastContact/note/badges must read like concise archive fields, not administrator commentary.
 evolution: only when a visible, mechanically-ready one-step administrator form evolution actually happens; fields targetLevel(2|3|4),reason. reason is SYSTEM log copy: one factual sentence describing the trigger, no first-person administrator voice. Never use it for ordinary mood/relationship changes.
-Temporary shop items must arise from the just-written plot, not random catalog filler. Generated tasks and generated shop goods are two views of the same live scene: if a task exists because of a concrete problem or consequence, any related temporary good should address that same problem/consequence rather than introducing an unrelated catalog item. Their names/descriptions/details are written by MÉMÉ OS in SYSTEM voice. The administrator may separately react to the item in story dialogue. Current CHARM=${state.host.charm}.
+Temporary shop items must arise from the just-written plot, not random catalog filler. Generated tasks and generated shop goods are two views of the same live scene: if a task exists because of a concrete problem or consequence, any related temporary good should address that same problem/consequence rather than introducing an unrelated catalog item. Their names/descriptions/details are written by the same male administrator in his current OS voice: ${voice.label}. They should feel personally named and judged by him, not catalog-generated. Current CHARM=${state.host.charm}.
 SYSTEM EVOLUTION LADDER:
 Current administrator system level=${state.system?.level||1}; current form=${evolution.form}.
 Current capability: ${evolution.capability}
@@ -3485,20 +3470,20 @@ async function handleTaskAction(id){
   const completedToday=dailyLike && Number(state.tasks?.dailyCompleted?.[id]?.day||0)===storyDay;
   const completedPermanent=!dailyLike && task.category!=='daily' && Boolean(state.tasks?.completed?.[id]);
   if(completedToday || completedPermanent){
-    globalThis.toastr?.info?.(completedToday?'系统记录：本任务今日已结算。':'系统记录：本任务已完成结算。');
+    globalThis.toastr?.info?.(completedToday?'今天这笔我已经给你结过了，别想再薅一次。':'这任务我已经给你结过账了。重复做不算第二份。');
     return;
   }
   if(state.tasks?.active?.[id]){
-    globalThis.toastr?.info?.('任务状态：已接取，等待完成条件与系统验收。');
+    globalThis.toastr?.info?.('已经挂上了。真做完我自然会验收。');
     return;
   }
   if(pendingFor('taskAccept',id,state)){
-    globalThis.toastr?.info?.('任务接取指令已写入输入框，发送后生效。');
+    globalThis.toastr?.info?.('接取内容塞进输入框了。发出去才算你真接。');
     return;
   }
 
-  const systemTitle=systemCopyText(task.title,'未命名任务',48);
-  const systemDesc=systemCopyText(task.desc,'按任务条件完成。',180);
+  const systemTitle=adminCopyText(task.title,'未命名任务',48);
+  const systemDesc=adminCopyText(task.desc,'按任务条件完成。',180);
   const dayTag=dailyLike?`DAY ${String(storyDay).padStart(3,'0')}｜`:'';
   const text=`【MÉMÉ OS｜任务接取】${dayTag}TASK_ID:${task.id}｜「${systemTitle}」\n任务要求：${systemDesc}`;
 
@@ -3518,7 +3503,7 @@ async function handleShopAction(id){
   const view=staticShopView(item,state);
   const req=shopRequirement(item,state);
   if(view.soldOut){
-    globalThis.toastr?.info?.('改造状态：当前项目已达到版本上限。');
+    globalThis.toastr?.info?.('这项已经改到当前上限了。再点也榨不出下一层。');
     return;
   }
   if(!req.ok){
@@ -3526,7 +3511,7 @@ async function handleShopAction(id){
     return;
   }
   if(pendingFor('purchase',id,state)){
-    globalThis.toastr?.info?.('购买指令已写入输入框，等待发送。');
+    globalThis.toastr?.info?.('购买内容已经塞进输入框。发出去我才给你扣账。');
     return;
   }
 
@@ -3538,7 +3523,7 @@ async function handleShopAction(id){
   }
 
   const systemTitle=item.dynamic
-    ? systemCopyText(item.title,'临时改造',40)
+    ? adminCopyText(item.title,'临时改造',40)
     : levelledShopTitle(item,state);
   const charmGain=Number(item.dynamic ? item.charmGain : (CHARM_GAIN[item.id]||0));
   const bodyDelta=item.dynamic
