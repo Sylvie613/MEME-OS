@@ -3500,7 +3500,6 @@ function moduleIcon(type) {
     men: '♂',
     system: '♛',
     record: '≋',
-    memory: '✧',
     home: '⌂',
   };
   return icons[type] || '•';
