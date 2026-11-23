@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.11.4",
+  "version": "0.11.5",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS 0.11.4: visible TASK completion markers settle rewards, persist daily completion, retire completed tasks, and backfill existing replies without hidden-event dependence.",
-  "js": "index-v0.11.4.js",
-  "css": "style.css?v=0.11.4",
+  "description": "MÉMÉ OS 0.11.5: freer shop progression — Level II unlocks at 2 total upgrade levels, Level III at 8, Level IV at 18; visible TASK settlement and unified story timeline retained.",
+  "js": "index-v0.11.5.js",
+  "css": "style.css?v=0.11.5",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
