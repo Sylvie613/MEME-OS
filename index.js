@@ -806,17 +806,34 @@ function uniqueMemoryList(values,maxItems,maxChars){
   return out;
 }
 
+function memoryNeedsCompression(state=runtimeState()){
+  const memory=state.memory||{};
+  return (Array.isArray(memory.short) && memory.short.length>=15)
+    || (Array.isArray(memory.long) && memory.long.length>=10);
+}
+
 function applyMemoryEvent(state,raw,visibleTurns=0){
   if(!raw || typeof raw!=='object') return false;
   state.memory=state.memory||{
-    initialized:false,bootstrappedAt:null,sourceTurns:0,short:[],long:[],core:[],lastUpdatedTurn:0,
+    initialized:false,bootstrappedAt:null,sourceTurns:0,
+    short:[],long:[],permanent:[],lastUpdatedTurn:0,
   };
+  state.memory.short=Array.isArray(state.memory.short)?state.memory.short:[];
+  state.memory.long=Array.isArray(state.memory.long)?state.memory.long:[];
+  state.memory.permanent=Array.isArray(state.memory.permanent)?state.memory.permanent:[];
   const turn=Math.max(0,Number(state.shop?.plotTurn)||0);
 
   if(raw.bootstrap===true && !state.memory.initialized){
-    state.memory.short=uniqueMemoryList(raw.short,10,36);
-    state.memory.long=uniqueMemoryList(raw.long,5,240);
-    state.memory.core=uniqueMemoryList(raw.core,5,320);
+    state.memory.short=uniqueMemoryList(raw.short,15,36);
+    state.memory.long=uniqueMemoryList(raw.long,10,240);
+    const permanentRaw=Array.isArray(raw.permanent)
+      ? raw.permanent
+      : (Array.isArray(raw.core)?raw.core:[]);
+    state.memory.permanent=uniqueMemoryList(
+      [...state.memory.permanent,...permanentRaw],
+      9999,
+      340
+    );
     state.memory.initialized=true;
     state.memory.bootstrappedAt=Date.now();
     state.memory.sourceTurns=Math.max(0,Number(visibleTurns)||0);
@@ -826,39 +843,45 @@ function applyMemoryEvent(state,raw,visibleTurns=0){
 
   if(!state.memory.initialized) return false;
 
-  const shortAdd=uniqueMemoryList(raw.short,2,36);
-  const longAdd=uniqueMemoryList(raw.long,2,240);
-  const coreAdd=uniqueMemoryList(raw.core,1,320);
   let changed=false;
 
-  for(const item of shortAdd){
-    if(!state.memory.short.includes(item)){
-      state.memory.short=[...state.memory.short,item].slice(-10);
-      changed=true;
-    }
-  }
-  for(const item of longAdd){
-    if(!state.memory.long.includes(item)){
-      state.memory.long=[...state.memory.long,item].slice(-5);
-      changed=true;
-    }
-  }
-  for(const item of coreAdd){
-    if(!state.memory.core.includes(item)){
-      state.memory.core=[...state.memory.core,item].slice(-5);
+  // Exactly one SHORT may be recorded per plot turn.
+  if(turn>Number(state.memory.lastUpdatedTurn||0)){
+    const candidate=Array.isArray(raw.short)
+      ? cleanMemoryText(raw.short[0],36)
+      : cleanMemoryText(raw.short,36);
+    if(candidate){
+      state.memory.short=[...state.memory.short,candidate].slice(-15);
+      state.memory.lastUpdatedTurn=turn;
       changed=true;
     }
   }
 
-  if(raw.compactShort===true && longAdd.length){
+  // The extension, not the model, owns the thresholds and clearing.
+  const longSummary=cleanMemoryText(
+    raw.longSummary || (Array.isArray(raw.long)?raw.long[0]:''),
+    260
+  );
+  if(state.memory.short.length>=15 && longSummary){
+    state.memory.long=[...state.memory.long,longSummary].slice(-10);
     state.memory.short=[];
     changed=true;
   }
-  if(raw.compactLong===true && coreAdd.length){
+
+  const permanentSummary=cleanMemoryText(
+    raw.permanentSummary
+      || (Array.isArray(raw.permanent)?raw.permanent[0]:'')
+      || (Array.isArray(raw.core)?raw.core[0]:''),
+    340
+  );
+  if(state.memory.long.length>=10 && permanentSummary){
+    if(!state.memory.permanent.includes(permanentSummary)){
+      state.memory.permanent.push(permanentSummary);
+    }
     state.memory.long=[];
     changed=true;
   }
-  if(changed) state.memory.lastUpdatedTurn=turn;
+
   return changed;
 }
 
@@ -937,14 +960,30 @@ async function quietSyncMemory({force=false,bootstrapOnly=false}={}){
   }
 
   const state=runtimeState();
-  state.memory=state.memory||{initialized:false,bootstrappedAt:null,sourceTurns:0,short:[],long:[],core:[],lastUpdatedTurn:0};
-  state.storyStatus=state.storyStatus||{initialized:false,date:'',time:'',weather:'晴 · 闷热',location:'',people:[],note:'盛夏',updatedTurn:0};
+  state.memory=state.memory||{
+    initialized:false,bootstrappedAt:null,sourceTurns:0,
+    short:[],long:[],permanent:[],lastUpdatedTurn:0,
+  };
+  state.memory.short=Array.isArray(state.memory.short)?state.memory.short:[];
+  state.memory.long=Array.isArray(state.memory.long)?state.memory.long:[];
+  state.memory.permanent=Array.isArray(state.memory.permanent)?state.memory.permanent:[];
+  state.storyStatus=state.storyStatus||{
+    initialized:false,date:'',time:'',weather:'晴 · 闷热',location:'',people:[],note:'盛夏',updatedTurn:0,
+  };
 
   const turn=Math.max(0,Number(state.shop?.plotTurn)||0);
   const bootstrap=!state.memory.initialized;
   if(bootstrapOnly && !bootstrap) return false;
-  if(!bootstrap && !force && Number(state.memory.lastUpdatedTurn||0)>=turn) return false;
-  if(memoryQuietLastAttemptTurn===turn && !bootstrap && !force) return false;
+
+  const needShort=!bootstrap && Number(state.memory.lastUpdatedTurn||0)<turn;
+  const shortCount=state.memory.short.length;
+  const longCount=state.memory.long.length;
+  const needShortCompression=!bootstrap && (shortCount>=15 || (needShort && shortCount===14));
+  const prospectiveLongCount=longCount+(needShortCompression?1:0);
+  const needLongCompression=!bootstrap && (longCount>=10 || prospectiveLongCount>=10);
+
+  if(!bootstrap && !force && !needShort && !needShortCompression && !needLongCompression) return false;
+  if(memoryQuietLastAttemptTurn===turn && !bootstrap && !force && !memoryNeedsCompression(state)) return false;
 
   memoryQuietSyncInFlight=true;
   memoryQuietLastAttemptTurn=turn;
@@ -952,38 +991,40 @@ async function quietSyncMemory({force=false,bootstrapOnly=false}={}){
   const chatCount=Array.isArray(context.chat)?context.chat.length:0;
   const currentDate=storyDateLabel(state);
   const currentWeather=String(state.storyStatus.weather||'晴 · 闷热');
-  const existingMemory={
-    short:state.memory.short||[],
-    long:state.memory.long||[],
-    core:state.memory.core||[],
-  };
 
   const prompt=bootstrap
-    ? `你正在为一个持续角色扮演聊天做一次性的后台记忆回填。请阅读你当前能看到的完整聊天历史，而不是只看最后一轮。
-只输出一个纯 JSON 对象，不要代码块、解释或额外文字：
-{"status":{"date":"","time":"","weather":"","location":"","people":[],"note":""},"short":[],"long":[],"core":[]}
+    ? `你正在为持续角色扮演聊天建立第一次 MEMORY。请阅读当前能看到的完整聊天历史，并按“每一个 user+assistant 剧情回合对应一条短期记忆”的规则回填。
 
-规则：
-1. 这是首次回填。short 最多10条，每条尽量30个中文字符以内，记录最近仍会影响后续的具体事实。
-2. long 最多5条，每条约120-240中文字符，总结已经形成的阶段性剧情、关系、任务或连续后果。
-3. core 最多5条，每条约180-320中文字符，只留真正长期重要的关系转折、永久变化、关键约定或不可丢失的设定事实。
-4. 不要记录普通走路、重复流水、文风描写、AP/SV/CHARM具体余额，也不要猜不存在的事实。
-5. status 要反映聊天结束时的最新剧情现场：time、location、people尽量从历史判断。
-6. 虚构故事允许补一个日历锚点。如果历史没有明确日期，date 固定写 "${currentDate}"；季节视为盛夏。若没有明确天气，weather 写 "${currentWeather}"。不要因为现实世界日期或天气改变剧情日期。
-7. note 可以简短写季节/时段补充，不确定就留空。`
-    : `你正在为一个持续角色扮演聊天做后台增量记忆。阅读当前可见聊天历史，重点比较最近新增剧情与下面已经保存的记忆：
-${JSON.stringify(existingMemory)}
+只输出纯 JSON，不要代码块或解释：
+{"status":{"date":"","time":"","weather":"","location":"","people":[],"note":""},"short":[],"long":[],"permanent":[]}
 
-只输出一个纯 JSON 对象，不要代码块、解释或额外文字：
-{"status":{"date":"","time":"","weather":"","location":"","people":[],"note":""},"short":[],"long":[],"core":[]}
+严格规则：
+1. 每条 short 是一个完整剧情回合的摘要，约20-30个中文字符，最多36字。不要只挑“大事”；普通吃饭、洗澡、对话也照样按回合概括。
+2. 从最早到最新按回合整理。每满15个完整回合，把那15条内容压成1条约180-220字的 long，不再把那15条保留在 short。
+3. 最后不足15个回合的尾段，逐回合放进 short，最多14条。
+4. 每满10条 long，再把那10条压成1条约220-320字的 permanent，并从 long 中移除。permanent 永久保留。
+5. 不记录AP/SV/CHARM余额；系统结构化数值由扩展自己保存。
+6. status 反映当前最新剧情现场。若历史没有明确日期，date 写 "${currentDate}"；默认盛夏。没有明确天气时 weather 写 "${currentWeather}"。
+7. 不凭空编造人物、事件或关系。`
+    : `你正在给 MÉMÉ OS 做本回合 MEMORY 同步。
 
-规则：
-1. 只返回“尚未保存在现有记忆中、且会影响后续连续性”的新事实；不要复述已有条目。
-2. short 最多2条，每条尽量30个中文字符以内。大多数普通回合最多新增1条。
-3. long 最多1条；只有最近几轮确实形成了新的阶段性变化才写。
-4. core 最多1条；只有真正永久/重大转折才写。
-5. 不记录AP/SV/CHARM具体余额，不记录普通动作流水，不猜。
-6. status 写当前最新剧情现场。若没有明确日期继续沿用 "${currentDate}"；夏季基准天气可沿用 "${currentWeather}"，除非剧情明确改变。`;
+当前 SHORT（${shortCount}/15）：
+${JSON.stringify(state.memory.short)}
+当前 LONG（${longCount}/10）：
+${JSON.stringify(state.memory.long)}
+永久记忆：
+${JSON.stringify(state.memory.permanent)}
+
+只输出纯 JSON，不要代码块或解释：
+{"status":{"date":"","time":"","weather":"","location":"","people":[],"note":""},"short":"","longSummary":"","permanentSummary":""}
+
+严格执行：
+1. needShort=${needShort}。若为 true，short 必须写且只能写1条，概括“最新一个 user+assistant 剧情回合”，约20-30个中文字符，最多36字。哪怕本回合只是普通日常也必须记。若为 false，short 留空。
+2. needShortCompression=${needShortCompression}。若为 true，longSummary 必须把构成本批次的15条 SHORT 压成约180-220字的一条长期记忆。若本次同时需要新short，必须把刚生成的这条也算进15条里。若为 false，longSummary 留空。
+3. needLongCompression=${needLongCompression}。若为 true，permanentSummary 必须把构成本批次的10条 LONG 压成约220-320字永久记忆；如果本次刚生成第10条 longSummary，也必须把它算进去。若为 false，permanentSummary 留空。
+4. LONG/永久总结要保留人物关系、重要变化、持续后果和关键剧情，不要写成空泛感想。
+5. status 更新到最新剧情现场。日期没有变化就沿用 "${currentDate}"；天气没有剧情变化就沿用 "${currentWeather}"。
+6. 不写AP/SV/CHARM余额，不猜不存在的事实。`;
 
   try{
     const raw=await generateQuietPrompt({quietPrompt:prompt});
@@ -998,21 +1039,29 @@ ${JSON.stringify(existingMemory)}
     statusRaw.initialized=true;
     if(applyStoryStatusEvent(latest,statusRaw)) changed=true;
 
-    const memoryRaw={
-      bootstrap,
-      short:Array.isArray(parsed.short)?parsed.short:[],
-      long:Array.isArray(parsed.long)?parsed.long:[],
-      core:Array.isArray(parsed.core)?parsed.core:[],
-      compactShort:false,
-      compactLong:false,
-    };
+    const memoryRaw=bootstrap
+      ? {
+          bootstrap:true,
+          short:Array.isArray(parsed.short)?parsed.short:[],
+          long:Array.isArray(parsed.long)?parsed.long:[],
+          permanent:Array.isArray(parsed.permanent)?parsed.permanent:[],
+        }
+      : {
+          bootstrap:false,
+          short:parsed.short||'',
+          longSummary:parsed.longSummary||'',
+          permanentSummary:parsed.permanentSummary||'',
+        };
+
     if(applyMemoryEvent(latest,memoryRaw,chatCount)) changed=true;
 
+    // If a summary was malformed/missing, leave the full bucket intact and try
+    // again on the next assistant event rather than deleting memories.
     if(changed){
       await saveState(latest);
       renderView(currentView(),false);
       installRuntimePrompt();
-      console.info(`[MÉMÉ OS] memory ${bootstrap?'bootstrap':'incremental sync'} completed`);
+      console.info(`[MÉMÉ OS] memory ${bootstrap?'bootstrap':'rolling sync'} completed`);
     }
     return changed;
   }catch(error){
@@ -1022,6 +1071,7 @@ ${JSON.stringify(existingMemory)}
     memoryQuietSyncInFlight=false;
   }
 }
+
 
 function lifestyleShelfDisposition(state=runtimeState()){
   const day=Math.max(1,Number(state.tasks?.storyDay)||1);
@@ -4257,8 +4307,8 @@ function bindSillyTavernEvents(){
     const turn=Math.max(0,Number(state.shop?.plotTurn)||0);
     if(!state.memory?.initialized){
       await quietSyncMemory({force:true});
-    }else if(Number(state.memory?.lastUpdatedTurn||0)<turn){
-      // Main reply did not provide a memory delta. Quiet sync is fallback only.
+    }else if(Number(state.memory?.lastUpdatedTurn||0)<turn || memoryNeedsCompression(state)){
+      // Every round needs exactly one SHORT. Compression is also extension-owned.
       await quietSyncMemory({force:true});
     }
   };
