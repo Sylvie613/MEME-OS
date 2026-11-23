@@ -1,11 +1,11 @@
 {
   "display_name": "MÉMÉ OS",
-  "version": "0.10.32",
+  "version": "0.10.33",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS: automatic background MEMORY bootstrap and fallback sync via SillyTavern quiet generation, summer story calendar, persistent STATUS, five-slot malicious daily-goods shelf, AP/SV economy and low-engagement administrator.",
-  "js": "index.js?v=0.10.32",
-  "css": "style.css?v=0.10.32",
+  "description": "MÉMÉ OS: tiered CHARM gains that grow with upgrade level, shared daily plot-favor AP budget, automatic background MEMORY sync, summer STATUS calendar, five-slot malicious daily-goods shelf, AP/SV economy and low-engagement administrator.",
+  "js": "index.js?v=0.10.33",
+  "css": "style.css?v=0.10.33",
   "auto_update": true,
   "minimum_client_version": "1.13.0"
 }
