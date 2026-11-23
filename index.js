@@ -7,12 +7,12 @@ import {
   hasActiveChat,
   removePendingAction,
   saveState,
-} from './src/state.js?v=0.10.9';
-import { appendToInput, removeFromInput } from './src/input.js?v=0.10.9';
-import { isBoundCharacter } from './src/binding.js?v=0.10.9';
+} from './src/state.js?v=0.10.10';
+import { appendToInput, removeFromInput } from './src/input.js?v=0.10.10';
+import { isBoundCharacter } from './src/binding.js?v=0.10.10';
 
 /**
- * MÉMÉ OS v0.10.9
+ * MÉMÉ OS v0.10.10
  * Navigable content shell. Visual style + native <dialog> retained.
  * Persistent state, tone engine, pending actions and transaction commits are live in this build.\n * Rolling task board + authoritative resource sync. CI validation target.
  */
@@ -1271,11 +1271,15 @@ async function handleRuntimeEvent(messageId){
     state.history=state.history.slice(-240);
   }
 
-  // The whole assistant message is one idempotent runtime event.
-  // Once marked, refresh/reload/repeated event dispatches and swipes on the same
-  // message slot cannot settle it a second time.
-  markRuntimeMessageProcessed(state,messageKey);
-  changed=true;
+  // Only lock a turn after a valid MÉMÉ OS event block was actually present.
+  // A truncated reply that ends before the hidden event must remain retryable:
+  // regenerating/swiping the same user turn can then still settle correctly.
+  // Once a valid event-bearing reply has been processed, the turn key prevents
+  // duplicate AP/SV/task settlement across refreshes or regenerated swipes.
+  if(matches.length){
+    markRuntimeMessageProcessed(state,messageKey);
+    changed=true;
+  }
 
   // Hidden eligibility is recalculated here too, without auto-unlocking.
   const milestones=state.permission?.milestones||{};
