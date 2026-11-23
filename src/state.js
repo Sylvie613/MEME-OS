@@ -1,5 +1,5 @@
 const META_KEY = 'meme_os';
-const SCHEMA_VERSION = 34;
+const SCHEMA_VERSION = 35;
 
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: SCHEMA_VERSION,
@@ -222,23 +222,24 @@ function mergeState(raw) {
         memory: {
             ...base.memory,
             ...(raw.memory ?? {}),
-            // Schema <33 used a different 10/5/CORE memory policy. Force one
-            // clean bootstrap from visible chat so legacy buckets do not pollute
-            // the new one-round / 15 / 10 ladder.
-            initialized: Number(raw.schemaVersion || 0) >= 33 ? Boolean(raw.memory?.initialized) : false,
-            bootstrappedAt: Number(raw.schemaVersion || 0) >= 33 ? (raw.memory?.bootstrappedAt || null) : null,
-            sourceTurns: Number(raw.schemaVersion || 0) >= 33 ? Math.max(0, Number(raw.memory?.sourceTurns) || 0) : 0,
-            short: Number(raw.schemaVersion || 0) >= 33 && Array.isArray(raw.memory?.short)
+            // Schema <35 predates the 0.13.1 memory repair. Force one clean bootstrap
+            // from visible chat because older buckets could be incomplete: they were
+            // displayed but not fed back into story prompts, and quiet JSON parsing
+            // could fail when another active prompt appended extra structured text.
+            initialized: Number(raw.schemaVersion || 0) >= 35 ? Boolean(raw.memory?.initialized) : false,
+            bootstrappedAt: Number(raw.schemaVersion || 0) >= 35 ? (raw.memory?.bootstrappedAt || null) : null,
+            sourceTurns: Number(raw.schemaVersion || 0) >= 35 ? Math.max(0, Number(raw.memory?.sourceTurns) || 0) : 0,
+            short: Number(raw.schemaVersion || 0) >= 35 && Array.isArray(raw.memory?.short)
                 ? raw.memory.short.map(v => String(v).replace(/\s+/g,' ').trim().slice(0,28)).filter(Boolean).slice(-15)
                 : [],
-            long: Number(raw.schemaVersion || 0) >= 33 && Array.isArray(raw.memory?.long)
+            long: Number(raw.schemaVersion || 0) >= 35 && Array.isArray(raw.memory?.long)
                 ? raw.memory.long.map(v => String(v).replace(/\s+/g,' ').trim().slice(0,240)).filter(Boolean).slice(-10)
                 : [],
             permanent: [
                 ...(Array.isArray(raw.memory?.permanent) ? raw.memory.permanent : []),
                 ...(Array.isArray(raw.memory?.core) ? raw.memory.core : []),
             ].map(v => String(v).replace(/\s+/g,' ').trim().slice(0,340)).filter((v,i,a)=>v && a.indexOf(v)===i),
-            lastUpdatedTurn: Number(raw.schemaVersion || 0) >= 33 ? Math.max(0, Number(raw.memory?.lastUpdatedTurn) || 0) : 0,
+            lastUpdatedTurn: Number(raw.schemaVersion || 0) >= 35 ? Math.max(0, Number(raw.memory?.lastUpdatedTurn) || 0) : 0,
         },
         reactivity: {
             ...base.reactivity,
