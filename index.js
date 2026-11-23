@@ -356,6 +356,7 @@ function inferVisibleDailyTaskOffer(raw,state=runtimeState()){
   if(!quotes.length) return null;
 
   const commandWords=/(把|去|先|给我|别|换|扔|洗|吹|擦|收拾|整理|清理|起来|站|走|动|看|做完|完成)/g;
+  const commandCheck=/(把|去|先|给我|别|换|扔|洗|吹|擦|收拾|整理|清理|起来|站|走|动|看|做完|完成)/;
   let best='';
   let bestScore=-1;
   for(const quote of quotes){
@@ -378,10 +379,9 @@ function inferVisibleDailyTaskOffer(raw,state=runtimeState()){
   if(!desc) desc=best.slice(0,180);
 
   const imperative=desc.match(/(?:^|[。！？])\s*((?:先|把|去|给我|别|换|扔|洗|吹|擦|收拾|整理|清理|起来|站|走|动|看)[^。！？]{2,42})/);
-  let title=String(imperative?.[1]||desc.split(/[。！？]/).find(part=>commandWords.test(part))||'剧情临时任务')
+  let title=String(imperative?.[1]||desc.split(/[。！？]/).find(part=>commandCheck.test(part))||'剧情临时任务')
     .replace(/\s+/g,' ')
     .trim();
-  commandWords.lastIndex=0;
   title=title.replace(/[，,；;：:].*$/,'').slice(0,28) || '剧情临时任务';
 
   return sanitizeGeneratedDailyTask({
