@@ -3,7 +3,7 @@
   "version": "0.13.8",
   "author": "Sylvie & River",
   "homePage": "https://github.com/Sylvie613/MEME-OS",
-  "description": "MÉMÉ OS 0.13.8 hardens task verification: accepted-task criteria are frozen, DESIRE completion must be grounded in visible story evidence, payout is auditable, and verified AP/SV issuance is explicitly confirmed.",
+  "description": "MÉMÉ OS 0.13.8 hardens DESIRE verification and payout: active-only settlement, frozen acceptance criteria/reward, current-scene evidence validation, atomic completion conditions, duplicate protection, and swipe-safe rollback.",
   "js": "index-v0.13.8.js",
   "css": "style.css?v=0.13.8",
   "auto_update": true,
