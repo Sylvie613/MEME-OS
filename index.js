@@ -1275,10 +1275,10 @@ const DESIRE_COMPLETION_AXES = [
   {id:'masturbation',req:/(自慰|自己.{0,6}(?:摸|弄|刺激).{0,8}(?:阴蒂|小穴|阴道|乳头|奶头))/iu,done:/(自慰|自己.{0,6}(?:摸|弄|刺激).{0,8}(?:阴蒂|小穴|阴道|乳头|奶头))/iu},
   {id:'handjob',req:/(手交|撸(?:动|弄|管)?|套弄.{0,8}(?:阴茎|鸡巴|肉棒|龟头))/iu,done:/(手交|撸(?:动|弄|管)?|套弄.{0,8}(?:阴茎|鸡巴|肉棒|龟头))/iu},
   {id:'oral',req:/(口交|含住.{0,8}(?:阴茎|鸡巴|肉棒|龟头)|舔.{0,8}(?:龟头|阴茎|鸡巴|肉棒)|吞精)/iu,done:/(口交|含住.{0,8}(?:阴茎|鸡巴|肉棒|龟头)|舔.{0,8}(?:龟头|阴茎|鸡巴|肉棒)|吞精)/iu},
-  {id:'breast',req:/(乳交|乳房|乳头|奶头)/iu,done:/(乳交|乳房|乳头|奶头)/iu},
+  {id:'breast',req:/(乳交|(?:摸|揉|捏|舔|含|吸|咬|摩擦|夹|刺激|暴露|露出|掀开|扒开|展示).{0,10}(?:乳房|乳头|奶头)|(?:乳房|乳头|奶头).{0,10}(?:被|让|给|遭).{0,5}(?:摸|揉|捏|舔|含|吸|咬|摩擦|夹|刺激|暴露|露出|展示))/iu,done:/(乳交|(?:摸|揉|捏|舔|含|吸|咬|摩擦|夹|刺激|暴露|露出|掀开|扒开|展示).{0,10}(?:乳房|乳头|奶头)|(?:乳房|乳头|奶头).{0,10}(?:被|让|给|遭).{0,5}(?:摸|揉|捏|舔|含|吸|咬|摩擦|夹|刺激|暴露|露出|展示))/iu},
   {id:'foot',req:/(足交|脚.{0,8}(?:夹|踩|蹭|套).{0,8}(?:阴茎|鸡巴|肉棒))/iu,done:/(足交|脚.{0,8}(?:夹|踩|蹭|套).{0,8}(?:阴茎|鸡巴|肉棒))/iu},
-  {id:'vaginal',req:/(性交|做爱|阴道|小穴|插入|抽插|内射)/iu,done:/(性交|做爱|阴道|小穴|插入|抽插|内射)/iu},
-  {id:'anal',req:/(后庭|肛交|肛门|屁眼)/iu,done:/(后庭|肛交|肛门|屁眼)/iu},
+  {id:'vaginal',req:/(性交|做爱|内射|(?:插入|抽插).{0,8}(?:阴道|小穴)|(?:摸|揉|舔|指|摩擦|蹭|刺激|暴露|露出|扒开|张开).{0,10}(?:阴道|小穴|阴蒂|阴唇)|(?:阴道|小穴|阴蒂|阴唇).{0,10}(?:被|让|给|遭).{0,5}(?:摸|揉|舔|指|摩擦|蹭|刺激|暴露|露出|扒开|张开))/iu,done:/(性交|做爱|内射|(?:插入|抽插).{0,8}(?:阴道|小穴)|(?:摸|揉|舔|指|摩擦|蹭|刺激|暴露|露出|扒开|张开).{0,10}(?:阴道|小穴|阴蒂|阴唇)|(?:阴道|小穴|阴蒂|阴唇).{0,10}(?:被|让|给|遭).{0,5}(?:摸|揉|舔|指|摩擦|蹭|刺激|暴露|露出|扒开|张开))/iu},
+  {id:'anal',req:/(后庭|肛交|(?:插入|抽插|摸|揉|舔|摩擦|刺激|暴露|露出|扒开|张开).{0,10}(?:肛门|屁眼)|(?:肛门|屁眼).{0,10}(?:被|让|给|遭).{0,5}(?:插|抽插|摸|揉|舔|摩擦|刺激|暴露|露出|扒开|张开))/iu,done:/(后庭|肛交|(?:插入|抽插|摸|揉|舔|摩擦|刺激|暴露|露出|扒开|张开).{0,10}(?:肛门|屁眼)|(?:肛门|屁眼).{0,10}(?:被|让|给|遭).{0,5}(?:插|抽插|摸|揉|舔|摩擦|刺激|暴露|露出|扒开|张开))/iu},
   {id:'ejaculation',req:/(射精|精液|内射|颜射|吞精|采精|SV\s*(?:采集|收集|获取))/iu,done:/(射精|精液|内射|颜射|吞精|采精|SV\s*(?:采集|收集|获取))/iu},
   {id:'orgasm',req:/(高潮|潮吹)/iu,done:/(高潮|潮吹)/iu}
 ];
@@ -1305,6 +1305,24 @@ function completionVerificationScene(context,messageId,currentRaw=''){
   }
   const currentVisible=cleanCompletionSceneText(currentRaw);
   return [previousUser,currentVisible].filter(Boolean).join(' ').slice(-5000);
+}
+
+function desireTargetMatches(task,state,sceneText=''){
+  const targetId=String(task?.targetManId||'').trim();
+  if(!targetId) return {ok:true,reason:'no fixed target'};
+  const archive=state.men?.archive||{};
+  const person=archive[targetId]
+    || [...(state.men?.current||[]),...(state.men?.returning||[]),...(state.men?.recent||[])].find(item=>item?.id===targetId)
+    || null;
+  if(!person) return {ok:true,reason:'target id has no resolved MEN record'};
+  const currentIds=new Set([
+    ...(state.men?.current||[]).map(item=>item?.id),
+    ...(state.men?.returning||[]).map(item=>item?.id),
+  ].filter(Boolean));
+  if(currentIds.has(targetId)) return {ok:true,reason:'target is current'};
+  const name=String(task?.targetName||person?.name||'').trim();
+  if(name && cleanCompletionSceneText(sceneText).includes(name)) return {ok:true,reason:'target named in completion scene'};
+  return {ok:false,reason:'DESIRE was completed with the wrong or absent target man'};
 }
 
 function taskCompletionEvidenceValid(task,evidence,sceneText=''){
@@ -1407,6 +1425,8 @@ function settleVisibleTaskCompletion(state,completion,messageId){
     tier:Number.isFinite(Number(active.tier))?Number(active.tier):task.tier,
     targetManId:active.targetManId||task.targetManId||null,
   };
+  const targetCheck=desireTargetMatches(settledTask,state,String(completion?.context||''));
+  if(!targetCheck.ok) return false;
   const verification=taskCompletionEvidenceValid(settledTask,String(completion?.context||''),String(completion?.context||''));
   if(!verification.ok) return false;
 
@@ -1489,6 +1509,8 @@ function settleVisibleTaskCompletion(state,completion,messageId){
     title:`正文验收完成：${title}`,
     summary:`正文已经把这项任务划掉；扩展同步结算 ${rewardText}，并从 DAY ${String(currentDay).padStart(3,'0')} 任务板退场。`,
     text:`VISIBLE TASK COMPLETED: ${id}`,
+    reward:{ap:reward.ap,sv:reward.sv},
+    tier:Number(settledTask.tier)||null,
     committedAt:Date.now(),
   });
   if(state.history.length>240) state.history=state.history.slice(-240);
@@ -1631,6 +1653,11 @@ function settleTaskFromModel(state,rawTask,messageId,sceneText=''){
 
   const evidence=String(rawTask.evidence||'').replace(/\s+/g,' ').trim().slice(0,240);
   if(!evidence) return false;
+  const targetCheck=desireTargetMatches(settledTask,state,sceneText);
+  if(!targetCheck.ok){
+    console.warn('[MÉMÉ OS] rejected DESIRE target mismatch',{id,reason:targetCheck.reason,targetManId:settledTask.targetManId});
+    return false;
+  }
   const verification=taskCompletionEvidenceValid(settledTask,evidence,sceneText);
   if(!verification.ok){
     console.warn('[MÉMÉ OS] rejected task completion evidence',{id,reason:verification.reason,evidence});
@@ -4754,6 +4781,7 @@ async function handleTaskAction(id){
       reward:String(task.reward||''),
       tier:Number(task.tier)||null,
       targetManId:task.targetManId||null,
+      targetName:task.targetManId ? String(state.men?.archive?.[task.targetManId]?.name||'') : '',
       dynamicTask:Boolean(task.dynamicTask),
       dynamicDailyTask:Boolean(task.dynamicDailyTask),
     }},
